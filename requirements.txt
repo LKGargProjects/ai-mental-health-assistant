@@ -1,0 +1,7 @@
+flask
+google-generativeai
+openai
+requests
+flask-limiter
+flask-jwt-extended
+gunicorn
