@@ -1,0 +1,29 @@
+import requests
+import os
+
+class HuggingFaceProvider:
+    def __init__(self, api_key=None, model="HuggingFaceH4/zephyr-7b-beta"):
+        # You can set your API key in .env as HUGGINGFACE_API_KEY
+        self.api_key = api_key or os.getenv("HUGGINGFACE_API_KEY")
+        self.model = model
+        self.base_url = f"https://api-inference.huggingface.co/models/{self.model}"
+
+    def chat(self, prompt, history=None):
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        # Hugging Face Inference API expects a "inputs" field
+        data = {
+            "inputs": prompt
+        }
+        response = requests.post(self.base_url, headers=headers, json=data, timeout=60)
+        response.raise_for_status()
+        result = response.json()
+        # The output format may vary by model; here's a common case:
+        if isinstance(result, list) and "generated_text" in result[0]:
+            return result[0]["generated_text"]
+        elif isinstance(result, dict) and "generated_text" in result:
+            return result["generated_text"]
+        else:
+            return str(result)

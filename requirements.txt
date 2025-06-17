@@ -1,7 +1,9 @@
 flask
+python-dotenv
 google-generativeai
 openai
 requests
 flask-limiter
 flask-jwt-extended
 gunicorn
+Flask-HTTPAuth

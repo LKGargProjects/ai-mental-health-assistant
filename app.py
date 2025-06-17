@@ -5,17 +5,28 @@ import os
 # Load environment variables
 load_dotenv()
 
-# Import only GeminiProvider for now
 from providers.gemini import GeminiProvider
 from providers.perplexity import PerplexityProvider
 
+# --- Add these imports for rate limiting ---
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')  # 'dev' is a fallback for local/dev only
+
+# --- Rate Limiting Setup ---
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["100 per day", "20 per hour"],  # Adjust as needed
+    storage_uri="memory://"
+)
 
 # Get API keys from environment
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 PPLX_API_KEY = os.getenv("PPLX_API_KEY")
 
-# Only GeminiProvider is active for now
 def get_provider(provider_name):
     if provider_name == "gemini":
         return GeminiProvider(GEMINI_API_KEY)
@@ -24,8 +35,9 @@ def get_provider(provider_name):
     else:
         raise ValueError(f"Provider '{provider_name}' is not active.")
 
-
+# --- Apply rate limiting to the /chat endpoint ---
 @app.route("/chat", methods=["POST"])
+@limiter.limit("10 per minute")  # Custom limit for /chat endpoint
 def chat():
     data = request.get_json()
     prompt = data.get("prompt", "")

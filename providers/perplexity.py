@@ -8,7 +8,7 @@ class PerplexityProvider:
         self.model = model
         self.base_url = "https://api.perplexity.ai/chat/completions"
         # Debug print: Check the actual API key being used (remove/comment after debugging)
-        print("DEBUG: Using Perplexity API Key:", repr(self.api_key))
+        #print("DEBUG: Using Perplexity API Key:", repr(self.api_key))
 
     def chat(self, prompt, history=None):
         headers = {
@@ -23,8 +23,8 @@ class PerplexityProvider:
             "messages": messages
         }
         # Debug prints: Show headers and payload being sent (remove/comment after debugging)
-        print("DEBUG: Headers:", headers)
-        print("DEBUG: Payload:", payload)
+        #print("DEBUG: Headers:", headers)
+        #print("DEBUG: Payload:", payload)
 
         response = requests.post(self.base_url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
