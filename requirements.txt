@@ -7,3 +7,8 @@ flask-limiter
 flask-jwt-extended
 gunicorn
 Flask-HTTPAuth
+Flask==3.0.2
+python-dotenv==1.1.0
+Flask-Limiter==3.5.0
+gunicorn==21.2.0
+requests==2.31.0

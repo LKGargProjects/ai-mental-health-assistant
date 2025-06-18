@@ -13,7 +13,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')  # 'dev' is a fallback for local/dev only
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod') # 'dev-key-change-in-prod' is a fallback for local/dev only
+#app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')  # 'dev' is a fallback for local/dev only
 
 # --- Rate Limiting Setup ---
 limiter = Limiter(
@@ -54,3 +55,9 @@ def chat():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+# ... all your Flask code above ...
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
