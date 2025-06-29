@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Ignore Python cache and environments
 __pycache__/
 *.pyc
@@ -13,8 +12,6 @@ archive/
 ############
 #Below all as per standard templete on github - https://github.com/github/gitignore/blob/main/Python.gitignore
 
-=======
->>>>>>> 297c0dcc28451810b7ec710b48b48122c4bfd9d3
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
