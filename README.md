@@ -120,3 +120,47 @@ curl -X POST http://127.0.0.1:5000/chat \
 None
 
 ---
+
+---
+
+## **Root Cause**
+Somewhere in your code, a bytes object is being stored in the session (most likely `session['session_id']`). Flask/werkzeug expects cookie values to be strings, not bytes.
+
+---
+
+## **How to Fix**
+
+### 1. **Force Session Values to be Strings**
+In your `get_or_create_session()` function in `app.py`, make sure you always store a string, not bytes:
+
+**Find this code:**
+```python
+if 'session_id' not in session:
+    session['session_id'] = str(uuid.uuid4())
+    # ... rest of code ...
+```
+**If you ever decode or encode session values, make sure you use `.decode()` or `.encode()` appropriately.**
+
+### 2. **Patch: Always Store as String**
+To be extra safe, you can update the assignment to:
+```python
+session['session_id'] = str(session['session_id']) if isinstance(session.get('session_id'), bytes) else session.get('session_id', str(uuid.uuid4()))
+```
+But the original code should already store a string, so check if anywhere else you are putting a bytes value in the session.
+
+---
+
+## **Quick Diagnostic**
+- Add a debug print right after setting the session:
+  ```python
+  print("session_id type:", type(session['session_id']))
+  ```
+- Restart your app and try the `/chat` endpoint again. If you see `<class 'bytes'>`, something is storing bytes instead of a string.
+
+---
+
+## **Summary**
+- The error is caused by storing a bytes object in the session.
+- Make sure all session values (especially `session['session_id']`) are always strings.
+
+Would you like me to provide a code patch for your `app.py` to ensure this?

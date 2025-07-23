@@ -12,3 +12,12 @@ python-dotenv==1.1.0
 Flask-Limiter==3.5.0
 gunicorn==21.2.0
 requests==2.31.0
+# NEW DEPENDENCIES FOR PHASE 1:
+flask-sqlalchemy==3.1.1
+flask-migrate==4.0.5
+redis==5.0.1
+psycopg2-binary==2.9.9
+cryptography==41.0.7
+flask-session==0.5.0
+textblob==0.17.1
+nltk==3.8.1
