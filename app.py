@@ -72,6 +72,17 @@ def get_provider(provider_name):
 def get_or_create_session():
     """Get or create anonymous user session"""
     session_id = str(uuid.uuid4())
+    
+    # Create new user session in database
+    try:
+        user_session = UserSession(id=session_id)
+        db.session.add(user_session)
+        db.session.commit()
+    except Exception as e:
+        # If session already exists, just return the ID
+        db.session.rollback()
+        app.logger.warning(f"Session {session_id} might already exist: {e}")
+    
     return session_id
 
 @app.route("/chat", methods=["POST"])
