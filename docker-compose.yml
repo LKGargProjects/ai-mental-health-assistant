@@ -4,6 +4,7 @@ services:
     ports:
       - "5001:5000"
     environment:
+      - ENVIRONMENT=docker
       - DATABASE_URL=postgresql://postgres:password@db:5432/myapp
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=your-secret-key

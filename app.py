@@ -24,12 +24,33 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///mental_health.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Redis configuration for sessions (Comment this if you want to use Redis in Docker)
-#app.config['SESSION_TYPE'] = 'filesystem'
-# Redis configuration for sessions (Uncomment this if you want to use Redis in Docker)
-app.config['SESSION_TYPE'] = 'redis'
-app.config['SESSION_REDIS'] = redis.from_url(os.environ.get('REDIS_URL', 'redis://redis:6379/0'))
-# session is not permanent, so it will be deleted when the browser is closed
+# Environment-based session configuration
+ENVIRONMENT = os.environ.get('ENVIRONMENT', 'local')
+
+if ENVIRONMENT == 'docker':
+    # Docker environment - use Redis
+    app.config['SESSION_TYPE'] = 'redis'
+    app.config['SESSION_REDIS'] = redis.from_url(os.environ.get('REDIS_URL', 'redis://redis:6379/0'))
+elif ENVIRONMENT == 'render':
+    # Render environment - use Redis if available, otherwise filesystem
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url and redis_url != 'port':
+        app.config['SESSION_TYPE'] = 'redis'
+        app.config['SESSION_REDIS'] = redis.from_url(redis_url)
+    else:
+        app.config['SESSION_TYPE'] = 'filesystem'
+elif ENVIRONMENT == 'azure':
+    # Azure environment - use Azure Redis Cache and PostgreSQL
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url:
+        app.config['SESSION_TYPE'] = 'redis'
+        app.config['SESSION_REDIS'] = redis.from_url(redis_url)
+    else:
+        app.config['SESSION_TYPE'] = 'filesystem'
+else:
+    # Local environment - use filesystem for simplicity
+    app.config['SESSION_TYPE'] = 'filesystem'
+
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 
@@ -163,5 +184,5 @@ with app.app_context():
     db.create_all()
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5050))
     app.run(host="0.0.0.0", port=port, debug=False)
