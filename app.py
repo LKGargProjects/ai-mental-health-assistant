@@ -37,10 +37,27 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Environment-based session configuration
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'local')
 
-# Temporarily use filesystem sessions for stability
-app.config['SESSION_TYPE'] = 'filesystem'
+# Try Redis first, fallback to filesystem
+redis_url = os.environ.get('REDIS_URL')
+if redis_url and redis_url != 'port':
+    try:
+        # Test Redis connection
+        redis_client = redis.from_url(redis_url)
+        redis_client.ping()  # Test connection
+        app.config['SESSION_TYPE'] = 'redis'
+        app.config['SESSION_REDIS'] = redis_client
+        app.logger.info("✅ Redis sessions enabled")
+    except Exception as e:
+        app.logger.warning(f"⚠️ Redis connection failed: {e}, using filesystem sessions")
+        app.config['SESSION_TYPE'] = 'filesystem'
+        app.config['SESSION_REDIS'] = None
+else:
+    app.logger.info("ℹ️ No REDIS_URL found, using filesystem sessions")
+    app.config['SESSION_TYPE'] = 'filesystem'
+    app.config['SESSION_REDIS'] = None
+
 app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_USE_SIGNER'] = False
+app.config['SESSION_USE_SIGNER'] = False  # Disable signing for now
 
 # Initialize extensions
 db.init_app(app)
@@ -71,19 +88,35 @@ def get_provider(provider_name):
 
 def get_or_create_session():
     """Get or create anonymous user session"""
-    session_id = str(uuid.uuid4())
+    # Try to get existing session from Flask session
+    session_id = session.get('session_id')
     
-    # Create new user session in database
-    try:
-        user_session = UserSession(id=session_id)
-        db.session.add(user_session)
-        db.session.commit()
-    except Exception as e:
-        # If session already exists, just return the ID
-        db.session.rollback()
-        app.logger.warning(f"Session {session_id} might already exist: {e}")
+    if not session_id:
+        # Create new session
+        session_id = str(uuid.uuid4())
+        session['session_id'] = session_id
+        
+        # Create new user session in database
+        try:
+            user_session = UserSession(id=session_id)
+            db.session.add(user_session)
+            db.session.commit()
+            app.logger.info(f"✅ Created new session: {session_id}")
+        except Exception as e:
+            db.session.rollback()
+            app.logger.warning(f"⚠️ Session {session_id} might already exist: {e}")
+    else:
+        app.logger.info(f"ℹ️ Using existing session: {session_id}")
     
     return session_id
+
+@app.before_request
+def ensure_session_id_is_str():
+    """Ensure session_id is always a string"""
+    session_id = session.get('session_id')
+    if isinstance(session_id, bytes):
+        session['session_id'] = session_id.decode('utf-8')
+        app.logger.info("🔄 Converted bytes session_id to string")
 
 @app.route("/chat", methods=["POST"])
 @limiter.limit("10 per minute")
