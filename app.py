@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_session import Session
 from dotenv import load_dotenv
@@ -16,6 +16,7 @@ from models import db, UserSession, ConversationLog, CrisisEvent
 from crisis_detection import CrisisDetector
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_cors import CORS
 
 app = Flask(__name__)
 
@@ -131,6 +132,10 @@ def chat():
         app.logger.info(f"GEMINI_API_KEY exists: {bool(GEMINI_API_KEY)}")
         app.logger.info(f"PPLX_API_KEY exists: {bool(PPLX_API_KEY)}")
         
+        # Validate prompt length
+        if len(prompt) > 1000:
+            return jsonify({"error": "Message too long"}), 400
+
         # Get or create anonymous session
         session_id = get_or_create_session()
         
@@ -194,9 +199,25 @@ def chat():
         app.logger.error(f"Error in /chat: {e}", exc_info=True)
         return jsonify({"error": f"Error: {str(e)}"}), 500
 
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html")
+
 @app.route("/ping", methods=["GET"])
 def ping():
     return "pong", 200
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "healthy", "timestamp": datetime.utcnow()})
+
+@app.route("/stats", methods=["GET"])
+def stats():
+    return jsonify({
+        "total_sessions": UserSession.query.count(),
+        "total_conversations": ConversationLog.query.count(),
+        "crisis_events": CrisisEvent.query.count()
+    })
 
 with app.app_context():
     db.create_all()
