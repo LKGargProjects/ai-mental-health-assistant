@@ -21,7 +21,14 @@ app = Flask(__name__)
 
 # Enhanced configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///mental_health.db')
+
+# Database configuration with fallback
+database_url = os.environ.get('DATABASE_URL')
+if database_url and database_url != 'port':
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Environment-based session configuration
