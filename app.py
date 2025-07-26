@@ -83,6 +83,10 @@ def chat():
         history = data.get("history", [])
         provider_name = data.get("provider", "gemini")
         
+        # Debug: Check API keys
+        app.logger.info(f"GEMINI_API_KEY exists: {bool(GEMINI_API_KEY)}")
+        app.logger.info(f"PPLX_API_KEY exists: {bool(PPLX_API_KEY)}")
+        
         # Get or create anonymous session
         session_id = get_or_create_session()
         
@@ -144,7 +148,7 @@ def chat():
         
     except Exception as e:
         app.logger.error(f"Error in /chat: {e}", exc_info=True)
-        return jsonify({"error": "I'm having trouble responding right now. Please try again."}), 500
+        return jsonify({"error": f"Error: {str(e)}"}), 500
 
 @app.route("/ping", methods=["GET"])
 def ping():
