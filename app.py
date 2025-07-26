@@ -37,32 +37,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Environment-based session configuration
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'local')
 
-if ENVIRONMENT == 'docker':
-    # Docker environment - use Redis
-    app.config['SESSION_TYPE'] = 'redis'
-    app.config['SESSION_REDIS'] = redis.from_url(os.environ.get('REDIS_URL', 'redis://redis:6379/0'))
-elif ENVIRONMENT == 'render':
-    # Render environment - use Redis if available, otherwise filesystem
-    redis_url = os.environ.get('REDIS_URL')
-    if redis_url and redis_url != 'port':
-        app.config['SESSION_TYPE'] = 'redis'
-        app.config['SESSION_REDIS'] = redis.from_url(redis_url)
-    else:
-        app.config['SESSION_TYPE'] = 'filesystem'
-elif ENVIRONMENT == 'azure':
-    # Azure environment - use Azure Redis Cache and PostgreSQL
-    redis_url = os.environ.get('REDIS_URL')
-    if redis_url:
-        app.config['SESSION_TYPE'] = 'redis'
-        app.config['SESSION_REDIS'] = redis.from_url(redis_url)
-    else:
-        app.config['SESSION_TYPE'] = 'filesystem'
-else:
-    # Local environment - use filesystem for simplicity
-    app.config['SESSION_TYPE'] = 'filesystem'
-
+# Temporarily use filesystem sessions for stability
+app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_USE_SIGNER'] = False
 
 # Initialize extensions
 db.init_app(app)
@@ -93,34 +71,19 @@ def get_provider(provider_name):
 
 def get_or_create_session():
     """Get or create anonymous user session"""
-    session_id = session.get('session_id')
+    session_id = str(uuid.uuid4())
     
-    # Ensure session_id is always a string
-    if isinstance(session_id, bytes):
-        session_id = session_id.decode('utf-8')
+    # Create new user session in database
+    try:
+        user_session = UserSession(id=session_id)
+        db.session.add(user_session)
+        db.session.commit()
+    except Exception as e:
+        # If session already exists, just return the ID
+        db.session.rollback()
+        app.logger.warning(f"Session {session_id} might already exist: {e}")
     
-    if not session_id:
-        session_id = str(uuid.uuid4())
-        session['session_id'] = session_id
-        # Create new user session in database
-        try:
-            user_session = UserSession(id=session_id)
-            db.session.add(user_session)
-            db.session.commit()
-        except Exception as e:
-            # If session already exists, just return the ID
-            db.session.rollback()
-            app.logger.warning(f"Session {session_id} might already exist: {e}")
-    else:
-        session['session_id'] = str(session_id)
-    
-    return session['session_id']
-
-@app.before_request
-def ensure_session_id_is_str():
-    session_id = session.get('session_id')
-    if isinstance(session_id, bytes):
-        session['session_id'] = session_id.decode('utf-8')
+    return session_id
 
 @app.route("/chat", methods=["POST"])
 @limiter.limit("10 per minute")
