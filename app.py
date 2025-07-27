@@ -11,8 +11,16 @@ import uuid
 load_dotenv()
 
 from providers.gemini import get_gemini_response
-from providers.perplexity import get_perplexity_response
 from providers.openai import get_openai_response
+
+# Try to import perplexity, but don't fail if it's not available
+try:
+    from providers.perplexity import get_perplexity_response
+    PERPLEXITY_AVAILABLE = True
+except ImportError:
+    PERPLEXITY_AVAILABLE = False
+    print("⚠️ Perplexity provider not available")
+
 from models import db, UserSession, ConversationLog, CrisisEvent
 from crisis_detection import detect_crisis_level
 from flask_limiter import Limiter
@@ -134,7 +142,7 @@ def chat():
             response = get_openai_response(message, mode)
         elif PROVIDER == 'gemini' and GEMINI_API_KEY:
             response = get_gemini_response(message, mode, session_id)
-        elif PROVIDER == 'perplexity' and PPLX_API_KEY:
+        elif PROVIDER == 'perplexity' and PPLX_API_KEY and PERPLEXITY_AVAILABLE:
             response = get_perplexity_response(message, mode)
         else:
             response = "I understand you're sharing something personal. I'm here to listen and support you. Would you like to tell me more about how you're feeling?"
@@ -190,7 +198,7 @@ def index():
         "provider": PROVIDER,
         "has_gemini_key": bool(GEMINI_API_KEY),
         "has_openai_key": bool(OPENAI_API_KEY),
-        "has_perplexity_key": bool(PPLX_API_KEY)
+        "has_perplexity_key": bool(PPLX_API_KEY and PERPLEXITY_AVAILABLE)
     })
 
 @app.route("/ping", methods=["GET"])
