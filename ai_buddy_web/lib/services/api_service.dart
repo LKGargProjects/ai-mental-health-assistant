@@ -123,6 +123,108 @@ class ApiService {
     }
   }
 
+  // New methods for enhanced features
+
+  // Assessment methods
+  Future<Map<String, dynamic>> fetchAssessmentQuestions() async {
+    await _setupSession();
+    try {
+      final response = await _dio.get('/assessments/start');
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data?['error'] ?? 'Failed to fetch assessment questions');
+    }
+  }
+
+  Future<Map<String, dynamic>> submitAssessment(List<Map<String, dynamic>> responses) async {
+    await _setupSession();
+    try {
+      final response = await _dio.post('/assessments/submit', data: {
+        'responses': responses,
+      });
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data?['error'] ?? 'Failed to submit assessment');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAssessmentHistory() async {
+    await _setupSession();
+    try {
+      final response = await _dio.get('/assessments/history');
+      return (response.data['history'] as List)
+          .map((json) => Map<String, dynamic>.from(json))
+          .toList();
+    } catch (e) {
+      print('Error getting assessment history: $e');
+      return [];
+    }
+  }
+
+  // Task methods
+  Future<List<Map<String, dynamic>>> getTasks() async {
+    await _setupSession();
+    try {
+      final response = await _dio.get('/tasks');
+      return (response.data['tasks'] as List)
+          .map((json) => Map<String, dynamic>.from(json))
+          .toList();
+    } catch (e) {
+      print('Error getting tasks: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> completeTask(int taskId) async {
+    await _setupSession();
+    try {
+      final response = await _dio.post('/tasks/$taskId/complete');
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data?['error'] ?? 'Failed to complete task');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getReminders() async {
+    await _setupSession();
+    try {
+      final response = await _dio.get('/reminders');
+      return (response.data['reminders'] as List)
+          .map((json) => Map<String, dynamic>.from(json))
+          .toList();
+    } catch (e) {
+      print('Error getting reminders: $e');
+      return [];
+    }
+  }
+
+  // Progress sharing methods
+  Future<Map<String, dynamic>> shareProgress({String? sharedText, String privacySetting = 'public'}) async {
+    await _setupSession();
+    try {
+      final response = await _dio.post('/progress/share', data: {
+        'shared_text': sharedText,
+        'privacy_setting': privacySetting,
+      });
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data?['error'] ?? 'Failed to share progress');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getCommunityFeed() async {
+    await _setupSession();
+    try {
+      final response = await _dio.get('/community/feed');
+      return (response.data['feed'] as List)
+          .map((json) => Map<String, dynamic>.from(json))
+          .toList();
+    } catch (e) {
+      print('Error getting community feed: $e');
+      return [];
+    }
+  }
+
   Future<void> clearSession() async {
     await _storage.delete(key: 'session_id');
   }

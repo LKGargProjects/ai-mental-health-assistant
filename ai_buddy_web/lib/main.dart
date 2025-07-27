@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/mood_provider.dart';
+import 'providers/assessment_provider.dart';
+import 'providers/task_provider.dart';
+import 'providers/progress_provider.dart';
 import 'widgets/chat_message_widget.dart';
 import 'widgets/mood_tracker.dart';
+import 'widgets/self_assessment_screen.dart';
+import 'widgets/task_list_screen.dart';
+import 'widgets/community_feed_screen.dart';
 import 'models/message.dart';
 
 void main() {
@@ -19,6 +25,9 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => MoodProvider()),
+        ChangeNotifierProvider(create: (_) => AssessmentProvider()),
+        ChangeNotifierProvider(create: (_) => TaskProvider()),
+        ChangeNotifierProvider(create: (_) => ProgressProvider()),
       ],
       child: MaterialApp(
         title: 'AI Mental Health Buddy',
@@ -47,7 +56,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _showMoodTracker = false;
+  int _currentIndex = 0;
 
   @override
   void dispose() {
@@ -76,152 +85,262 @@ class _HomePageState extends State<HomePage> {
         title: const Text('AI Mental Health Buddy'),
         centerTitle: true,
         actions: [
+          // Assessment button
           IconButton(
-            icon: Icon(_showMoodTracker ? Icons.chat : Icons.mood),
+            icon: const Icon(Icons.psychology),
             onPressed: () {
-              setState(() {
-                _showMoodTracker = !_showMoodTracker;
-              });
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const SelfAssessmentScreen(),
+                ),
+              );
             },
-            tooltip: _showMoodTracker ? 'Show Chat' : 'Show Mood Tracker',
+            tooltip: 'Mental Health Assessment',
+          ),
+          // Tasks button
+          IconButton(
+            icon: const Icon(Icons.task_alt),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const TaskListScreen(),
+                ),
+              );
+            },
+            tooltip: 'Wellness Tasks',
+          ),
+          // Community button
+          IconButton(
+            icon: const Icon(Icons.people),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const CommunityFeedScreen(),
+                ),
+              );
+            },
+            tooltip: 'Community',
           ),
         ],
       ),
-      body: _showMoodTracker
-          ? const SingleChildScrollView(
-              padding: EdgeInsets.all(16.0),
-              child: MoodTrackerWidget(),
-            )
-          : Column(
-              children: [
-                // Welcome message
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16.0),
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primaryContainer
-                      .withOpacity(0.3),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.favorite,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Welcome to Your Safe Space',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Feel free to share your thoughts and feelings. I\'m here to listen and support you.',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ],
-                  ),
-                ),
-                // Chat messages
-                Expanded(
-                  child: Consumer<ChatProvider>(
-                    builder: (context, chatProvider, child) {
-                      if (chatProvider.isLoading && chatProvider.messages.isEmpty) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          // Chat screen
+          _buildChatScreen(),
+          // Mood tracker screen
+          _buildMoodTrackerScreen(),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat),
+            label: 'Chat',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.mood),
+            label: 'Mood',
+          ),
+        ],
+      ),
+    );
+  }
 
-                      return ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(8.0),
-                        itemCount: chatProvider.messages.length,
-                        itemBuilder: (context, index) {
-                          return ChatMessageWidget(
-                            message: chatProvider.messages[index],
-                          );
-                        },
+  Widget _buildChatScreen() {
+    return Column(
+      children: [
+        // Welcome message
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16.0),
+          color: Theme.of(context)
+              .colorScheme
+              .primaryContainer
+              .withOpacity(0.3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.favorite,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Welcome to Your Safe Space',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Feel free to share your thoughts and feelings. I\'m here to listen and support you.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  _buildQuickActionChip(
+                    'Take Assessment',
+                    Icons.psychology,
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const SelfAssessmentScreen(),
+                        ),
                       );
                     },
                   ),
-                ),
-                // Typing indicator
-                Consumer<ChatProvider>(
-                  builder: (context, chatProvider, child) {
-                    if (!chatProvider.isLoading) return const SizedBox.shrink();
-                    return Container(
-                      padding: const EdgeInsets.all(8),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .secondaryContainer,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text('AI is typing...'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                // Input area
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        offset: const Offset(0, -2),
-                        blurRadius: 4,
-                        color: Colors.black.withOpacity(0.1),
-                      ),
-                    ],
+                  _buildQuickActionChip(
+                    'View Tasks',
+                    Icons.task_alt,
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const TaskListScreen(),
+                        ),
+                      );
+                    },
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _messageController,
-                            decoration: InputDecoration(
-                              hintText: 'Share your thoughts...',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            onSubmitted: _handleSubmitted,
-                            maxLines: null,
-                            textInputAction: TextInputAction.send,
-                          ),
+                  _buildQuickActionChip(
+                    'Community',
+                    Icons.people,
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const CommunityFeedScreen(),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: () =>
-                              _handleSubmitted(_messageController.text),
-                          icon: const Icon(Icons.send),
-                          style: IconButton.styleFrom(
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primary,
-                            foregroundColor:
-                                Theme.of(context).colorScheme.onPrimary,
-                          ),
-                        ),
-                      ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Chat messages
+        Expanded(
+          child: Consumer<ChatProvider>(
+            builder: (context, chatProvider, child) {
+              if (chatProvider.isLoading && chatProvider.messages.isEmpty) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              return ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(8.0),
+                itemCount: chatProvider.messages.length,
+                itemBuilder: (context, index) {
+                  return ChatMessageWidget(
+                    message: chatProvider.messages[index],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        // Typing indicator
+        Consumer<ChatProvider>(
+          builder: (context, chatProvider, child) {
+            if (!chatProvider.isLoading) return const SizedBox.shrink();
+            return Container(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .secondaryContainer,
+                      borderRadius: BorderRadius.circular(20),
                     ),
+                    child: const Text('AI is typing...'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        // Input area
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                offset: const Offset(0, -2),
+                blurRadius: 4,
+                color: Colors.black.withOpacity(0.1),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _messageController,
+                    decoration: InputDecoration(
+                      hintText: 'Share your thoughts...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    onSubmitted: _handleSubmitted,
+                    maxLines: null,
+                    textInputAction: TextInputAction.send,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () =>
+                      _handleSubmitted(_messageController.text),
+                  icon: const Icon(Icons.send),
+                  style: IconButton.styleFrom(
+                    backgroundColor:
+                        Theme.of(context).colorScheme.primary,
+                    foregroundColor:
+                        Theme.of(context).colorScheme.onPrimary,
                   ),
                 ),
               ],
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMoodTrackerScreen() {
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(16.0),
+      child: MoodTrackerWidget(),
+    );
+  }
+
+  Widget _buildQuickActionChip(String label, IconData icon, VoidCallback onTap) {
+    return ActionChip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label),
+      onPressed: onTap,
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      labelStyle: TextStyle(
+        color: Theme.of(context).colorScheme.onPrimaryContainer,
+      ),
     );
   }
 

@@ -67,7 +67,7 @@ class ChatMessage extends StatelessWidget {
       return colorScheme.errorContainer;
     }
     if (message.isHigh) {
-      return colorScheme.surfaceVariant;
+      return colorScheme.surfaceContainerHighest;
     }
     return colorScheme.surface;
   }
