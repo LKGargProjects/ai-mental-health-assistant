@@ -1,11 +1,10 @@
 #!/bin/bash
-# Startup script for Azure App Service
+# startup.sh - Script to start the Flask application on Render
+
+echo "Starting AI Mental Health API..."
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Run database migrations (if using Flask-Migrate)
-# flask db upgrade
-
-# Start the application
-gunicorn --bind=0.0.0.0 --timeout=600 app:app 
+# Start the application with gunicorn
+exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 0 app:app 
