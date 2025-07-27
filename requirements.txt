@@ -11,3 +11,4 @@ redis==5.0.1
 psycopg[binary]==3.2.9
 requests==2.32.4
 cryptography==42.0.5
+textblob==0.17.1

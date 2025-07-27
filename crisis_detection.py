@@ -1,4 +1,3 @@
-from textblob import TextBlob
 import re
 from datetime import datetime
 
