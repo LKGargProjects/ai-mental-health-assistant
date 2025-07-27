@@ -76,7 +76,7 @@ try:
     limiter = Limiter(
         key_func=get_remote_address,
         app=app,
-        default_limits=["100 per day", "20 per hour"],
+        default_limits=["500 per day", "100 per hour"],
         storage_uri=os.environ.get('REDIS_URL', 'memory://')
     )
     app.logger.info("✅ Rate limiter initialized")
@@ -86,7 +86,7 @@ except Exception as e:
     limiter = Limiter(
         key_func=get_remote_address,
         app=app,
-        default_limits=["100 per day", "20 per hour"],
+        default_limits=["500 per day", "100 per hour"],
         storage_uri='memory://'
     )
 
@@ -129,7 +129,7 @@ def ensure_session_id_is_str():
         app.logger.info("🔄 Converted bytes session_id to string")
 
 @app.route("/chat", methods=["POST"])
-@limiter.limit("10 per minute")
+@limiter.limit("30 per minute")
 def chat():
     try:
         data = request.get_json()
