@@ -38,12 +38,9 @@ class MoodProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final entry = MoodEntry(
-        moodLevel: moodLevel,
-        note: note,
-      );
-      final savedEntry = await _apiService.addMoodEntry(entry);
-      _moodEntries = [..._moodEntries, savedEntry];
+      final entry = MoodEntry(moodLevel: moodLevel, note: note);
+      await _apiService.addMoodEntry(entry);
+      _moodEntries = [..._moodEntries, entry];
       _error = null;
     } catch (e) {
       _error = 'Failed to save mood entry';
@@ -82,4 +79,4 @@ class MoodProvider extends ChangeNotifier {
     }
     return map;
   }
-} 
+}

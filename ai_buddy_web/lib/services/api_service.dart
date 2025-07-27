@@ -10,20 +10,22 @@ class ApiService {
   final FlutterSecureStorage _storage;
 
   ApiService()
-      : _dio = Dio(BaseOptions(
+    : _dio = Dio(
+        BaseOptions(
           baseUrl: baseUrl,
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
-        )),
-        _storage = const FlutterSecureStorage();
+        ),
+      ),
+      _storage = const FlutterSecureStorage();
 
   Future<void> _setupSession() async {
     String? sessionId = await _storage.read(key: 'session_id');
     if (sessionId == null) {
       // Get new session from backend
-      final response = await _dio.get('/get_or_create_session');
+      final response = await _dio.get('/api/get_or_create_session');
       sessionId = response.data['session_id'];
       await _storage.write(key: 'session_id', value: sessionId);
     }
@@ -34,14 +36,17 @@ class ApiService {
   Future<Message> sendMessage(String content) async {
     await _setupSession();
     try {
-      final response = await _dio.post('/chat', data: {
-        'message': content,
-        'mode': 'mental_health', // Always use mental health mode for now
-      });
+      final response = await _dio.post(
+        '/api/chat',
+        data: {
+          'message': content,
+          'mode': 'mental_health', // Always use mental health mode for now
+        },
+      );
 
       if (response.data['error'] != null) {
         throw DioException(
-          requestOptions: RequestOptions(path: '/chat'),
+          requestOptions: RequestOptions(path: '/api/chat'),
           error: response.data['error'],
         );
       }
@@ -49,17 +54,20 @@ class ApiService {
       // Extract risk level and resources if present
       String riskLevel = 'none';
       List<String>? resources;
-      
+
       if (response.data['risk_level'] != null) {
         riskLevel = response.data['risk_level'].toString().toLowerCase();
       }
-      
+
       if (response.data['resources'] != null) {
         resources = List<String>.from(response.data['resources']);
       }
 
       final message = Message(
-        content: response.data['response'] ?? response.data['message'] ?? 'No response received',
+        content:
+            response.data['response'] ??
+            response.data['message'] ??
+            'No response received',
         isUser: false,
         riskLevel: RiskLevel.values.firstWhere(
           (e) => e.toString().split('.').last == riskLevel,
@@ -73,7 +81,9 @@ class ApiService {
       print('Error sending message: ${e.message}');
       print('Error response: ${e.response?.data}');
       return Message(
-        content: e.response?.data?['error'] ?? 'An error occurred while communicating with the AI. Please try again.',
+        content:
+            e.response?.data?['error'] ??
+            'An error occurred while communicating with the AI. Please try again.',
         isUser: false,
         type: MessageType.error,
       );
@@ -90,7 +100,7 @@ class ApiService {
   Future<List<MoodEntry>> getMoodHistory() async {
     await _setupSession();
     try {
-      final response = await _dio.get('/mood_history');
+      final response = await _dio.get('/api/mood_history');
       return (response.data as List)
           .map((json) => MoodEntry.fromJson(json))
           .toList();
@@ -100,20 +110,20 @@ class ApiService {
     }
   }
 
-  Future<MoodEntry> addMoodEntry(MoodEntry entry) async {
+  Future<void> addMoodEntry(MoodEntry entry) async {
     await _setupSession();
     try {
-      final response = await _dio.post('/mood_entry', data: entry.toJson());
-      return MoodEntry.fromJson(response.data);
-    } on DioException catch (e) {
-      throw Exception(e.response?.data?['error'] ?? 'Failed to save mood entry');
+      await _dio.post('/api/mood_entry', data: entry.toJson());
+    } catch (e) {
+      print('Error adding mood entry: $e');
+      throw e;
     }
   }
 
   Future<List<Message>> getChatHistory() async {
     await _setupSession();
     try {
-      final response = await _dio.get('/chat_history');
+      final response = await _dio.get('/api/chat_history');
       return (response.data as List)
           .map((json) => Message.fromJson(json))
           .toList();
@@ -126,4 +136,4 @@ class ApiService {
   Future<void> clearSession() async {
     await _storage.delete(key: 'session_id');
   }
-} 
+}

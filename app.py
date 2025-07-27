@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session, render_template
+from flask import Flask, request, jsonify, session, render_template, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_session import Session
 from dotenv import load_dotenv
@@ -19,7 +19,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='ai_buddy_web/build/web', static_url_path='')
 CORS(app, supports_credentials=True)
 
 # Enhanced configuration
@@ -128,7 +128,7 @@ def ensure_session_id_is_str():
         session['session_id'] = session_id.decode('utf-8')
         app.logger.info("🔄 Converted bytes session_id to string")
 
-@app.route("/chat", methods=["POST"])
+@app.route("/api/chat", methods=["POST"])
 @limiter.limit("30 per minute")
 def chat():
     try:
@@ -195,25 +195,18 @@ def chat():
         return jsonify(response_data)
         
     except Exception as e:
-        app.logger.error(f"Error in /chat: {e}", exc_info=True)
+        app.logger.error(f"Error in /api/chat: {e}", exc_info=True)
         return jsonify({"error": f"Error: {str(e)}"}), 500
 
 @app.route("/", methods=["GET"])
 def index():
-    return jsonify({
-        "status": "ok", 
-        "message": "AI Mental Health API is running",
-        "provider": PROVIDER,
-        "has_gemini_key": bool(GEMINI_API_KEY),
-        "has_openai_key": bool(OPENAI_API_KEY),
-        "has_perplexity_key": bool(PPLX_API_KEY)
-    })
+    return send_from_directory(app.static_folder, 'index.html')
 
-@app.route("/ping", methods=["GET"])
+@app.route("/api/ping", methods=["GET"])
 def ping():
     return "pong", 200
 
-@app.route("/health", methods=["GET"])
+@app.route("/api/health", methods=["GET"])
 def health():
     try:
         # Test basic functionality
@@ -232,7 +225,7 @@ def health():
     except Exception as e:
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
-@app.route("/deploy-test", methods=["GET"])
+@app.route("/api/deploy-test", methods=["GET"])
 def deploy_test():
     """Simple endpoint to test if deployment is working"""
     return jsonify({
@@ -241,7 +234,7 @@ def deploy_test():
         "environment": ENVIRONMENT
     })
 
-@app.route("/stats", methods=["GET"])
+@app.route("/api/stats", methods=["GET"])
 def stats():
     return jsonify({
         "total_sessions": UserSession.query.count(),
@@ -249,12 +242,12 @@ def stats():
         "crisis_events": CrisisEvent.query.count()
     })
 
-@app.route('/get_or_create_session', methods=['GET'])
+@app.route('/api/get_or_create_session', methods=['GET'])
 def get_or_create_session_endpoint():
     session_id = get_or_create_session()
     return jsonify({"session_id": session_id})
 
-@app.route('/chat_history', methods=['GET'])
+@app.route('/api/chat_history', methods=['GET'])
 def get_chat_history():
     session_id = session.get('session_id')
     if not session_id:
@@ -268,12 +261,12 @@ def get_chat_history():
         'timestamp': conv.timestamp.isoformat() if conv.timestamp else None
     } for conv in conversations])
 
-@app.route('/mood_history', methods=['GET'])
+@app.route('/api/mood_history', methods=['GET'])
 def get_mood_history():
     # For now, return empty list as we haven't implemented mood persistence
     return jsonify([])
 
-@app.route('/mood_entry', methods=['POST'])
+@app.route('/api/mood_entry', methods=['POST'])
 def add_mood_entry():
     try:
         data = request.get_json()
