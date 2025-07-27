@@ -1,11 +1,11 @@
 {
-    "name": "ai_buddy_web",
-    "short_name": "ai_buddy_web",
+    "name": "AI Mental Health Assistant",
+    "short_name": "AI Mental Health",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#667EEA",
+    "theme_color": "#667EEA",
+    "description": "Your supportive companion for mental health and emotional well-being. Get 24/7 support, confidential chat, and coping strategies.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
