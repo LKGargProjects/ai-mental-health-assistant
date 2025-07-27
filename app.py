@@ -42,7 +42,7 @@ ENVIRONMENT = os.environ.get('ENVIRONMENT', 'local')
 
 # Try Redis first, fallback to filesystem
 redis_url = os.environ.get('REDIS_URL')
-if redis_url and redis_url != 'port':
+if redis_url and redis_url != 'port' and redis_url.strip():
     try:
         # Test Redis connection
         redis_client = redis.from_url(redis_url)
@@ -55,7 +55,7 @@ if redis_url and redis_url != 'port':
         app.config['SESSION_TYPE'] = 'filesystem'
         app.config['SESSION_REDIS'] = None
 else:
-    app.logger.info("ℹ️ No REDIS_URL found, using filesystem sessions")
+    app.logger.info("ℹ️ No REDIS_URL found or invalid, using filesystem sessions")
     app.config['SESSION_TYPE'] = 'filesystem'
     app.config['SESSION_REDIS'] = None
 
@@ -63,16 +63,32 @@ app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = False  # Disable signing for now
 
 # Initialize extensions
-db.init_app(app)
-Session(app)
+try:
+    db.init_app(app)
+    Session(app)
+    app.logger.info("✅ Database and session extensions initialized")
+except Exception as e:
+    app.logger.error(f"❌ Failed to initialize database extensions: {e}")
+    # Continue without database if needed
 
 # Rate limiting with Redis backend
-limiter = Limiter(
-    key_func=get_remote_address,
-    app=app,
-    default_limits=["100 per day", "20 per hour"],
-    storage_uri=os.environ.get('REDIS_URL', 'memory://')
-)
+try:
+    limiter = Limiter(
+        key_func=get_remote_address,
+        app=app,
+        default_limits=["100 per day", "20 per hour"],
+        storage_uri=os.environ.get('REDIS_URL', 'memory://')
+    )
+    app.logger.info("✅ Rate limiter initialized")
+except Exception as e:
+    app.logger.error(f"❌ Failed to initialize rate limiter: {e}")
+    # Create a simple limiter without Redis
+    limiter = Limiter(
+        key_func=get_remote_address,
+        app=app,
+        default_limits=["100 per day", "20 per hour"],
+        storage_uri='memory://'
+    )
 
 # Get API keys from environment
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -199,7 +215,31 @@ def ping():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "healthy", "timestamp": datetime.utcnow()})
+    try:
+        # Test basic functionality
+        health_status = {
+            "status": "healthy", 
+            "timestamp": datetime.utcnow().isoformat(),
+            "environment": ENVIRONMENT,
+            "provider": PROVIDER,
+            "has_gemini_key": bool(GEMINI_API_KEY),
+            "has_openai_key": bool(OPENAI_API_KEY),
+            "has_perplexity_key": bool(PPLX_API_KEY),
+            "redis_url_set": bool(os.environ.get('REDIS_URL')),
+            "port": os.environ.get('PORT', '5050')
+        }
+        return jsonify(health_status)
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 500
+
+@app.route("/deploy-test", methods=["GET"])
+def deploy_test():
+    """Simple endpoint to test if deployment is working"""
+    return jsonify({
+        "message": "Deployment test successful",
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": ENVIRONMENT
+    })
 
 @app.route("/stats", methods=["GET"])
 def stats():
@@ -243,7 +283,12 @@ def add_mood_entry():
         return jsonify({"error": str(e)}), 400
 
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+        app.logger.info("✅ Database tables created successfully")
+    except Exception as e:
+        app.logger.error(f"❌ Failed to create database tables: {e}")
+        # Continue without database if needed
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
