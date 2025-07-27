@@ -2,7 +2,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import uuid
-from cryptography.fernet import Fernet
 import os
 
 db = SQLAlchemy()
