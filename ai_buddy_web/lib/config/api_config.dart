@@ -2,7 +2,7 @@ class ApiConfig {
   // Development
   static const String localUrl = 'http://localhost:5058';
   
-  // Production (Render)
+  // Production (Render) - Update this with your actual Render URL
   static const String productionUrl = 'https://ai-mental-health-api.onrender.com';
   
   // Get the appropriate URL based on environment
