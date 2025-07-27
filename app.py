@@ -143,7 +143,17 @@ def chat():
         session_id = get_or_create_session()
         
         # Analyze message for crisis indicators
-        risk_level, resources = detect_crisis_level(message)
+        risk_score, resources = detect_crisis_level(message)
+        
+        # Convert numeric risk score to string risk level for response
+        if risk_score >= 0.8:
+            risk_level = 'high'
+        elif risk_score >= 0.5:
+            risk_level = 'medium'
+        elif risk_score >= 0.2:
+            risk_level = 'low'
+        else:
+            risk_level = 'none'
         
         # Get AI response based on provider
         if PROVIDER == 'openai' and OPENAI_API_KEY:
@@ -159,7 +169,7 @@ def chat():
         conversation_log = ConversationLog(
             session_id=session_id,
             provider=PROVIDER,
-            risk_score=risk_level
+            risk_score=risk_score
         )
         db.session.add(conversation_log)
         
@@ -200,6 +210,9 @@ def chat():
 
 @app.route("/", methods=["GET"])
 def index():
+    app.logger.info(f"Root route called. Static folder: {app.static_folder}")
+    app.logger.info(f"Static folder exists: {os.path.exists(app.static_folder)}")
+    app.logger.info(f"Index.html exists: {os.path.exists(os.path.join(app.static_folder, 'index.html'))}")
     return send_from_directory(app.static_folder, 'index.html')
 
 @app.route("/api/ping", methods=["GET"])

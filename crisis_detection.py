@@ -4,6 +4,7 @@ from datetime import datetime
 def detect_crisis_level(message):
     """
     Analyze message for crisis indicators and return risk level and resources.
+    Returns numeric risk score (0.0 to 1.0) and resources.
     """
     message = message.lower()
     
@@ -14,7 +15,7 @@ def detect_crisis_level(message):
     
     # Check for high risk
     if any(keyword in message for keyword in high_risk_keywords):
-        return 'high', [
+        return 1.0, [
             'National Suicide Prevention Lifeline: 988',
             'Crisis Text Line: Text HOME to 741741',
             'Emergency: Call 911'
@@ -22,7 +23,7 @@ def detect_crisis_level(message):
     
     # Check for medium risk
     if any(keyword in message for keyword in medium_risk_keywords):
-        return 'medium', [
+        return 0.7, [
             'Crisis Text Line: Text HOME to 741741',
             'Find a Therapist: https://www.psychologytoday.com/us/therapists',
             'SAMHSA National Helpline: 1-800-662-4357'
@@ -30,9 +31,9 @@ def detect_crisis_level(message):
     
     # Check for low risk
     if any(keyword in message for keyword in low_risk_keywords):
-        return 'low', [
+        return 0.3, [
             'Find a Therapist: https://www.psychologytoday.com/us/therapists',
             'Mental Health Resources: https://www.nimh.nih.gov/health'
         ]
     
-    return 'none', None
+    return 0.0, None
