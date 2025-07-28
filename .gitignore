@@ -16,6 +16,8 @@ ENV/
 .pub-cache/
 .pub/
 build/
+# Only include web build files
+!ai_buddy_web/build/web/
 .metadata
 *.iml
 .idea/
@@ -46,3 +48,6 @@ instance/
 # Dependencies
 node_modules/
 jspm_packages/
+
+#Miscellaneous
+full_project.md
