@@ -253,6 +253,10 @@ def index():
 def test():
     return "Test route working!"
 
+@app.route("/simple", methods=["GET"])
+def simple():
+    return "Simple route working!"
+
 @app.route("/api/ping", methods=["GET"])
 def ping():
     return "pong", 200
