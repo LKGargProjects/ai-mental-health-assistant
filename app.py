@@ -131,6 +131,7 @@ def ensure_session_id_is_str():
 @app.route("/api/chat", methods=["POST"])
 @limiter.limit("30 per minute")
 def chat():
+    print("🔥🔥🔥 NEW VERSION OF CHAT FUNCTION IS RUNNING! 🔥🔥🔥")
     try:
         data = request.get_json()
         if not data or 'message' not in data:
@@ -166,6 +167,8 @@ def chat():
             response = "I understand you're sharing something personal. I'm here to listen and support you. Would you like to tell me more about how you're feeling?"
 
         # Log conversation
+        print("DEBUG: risk_score to be inserted:", risk_score, type(risk_score))
+        assert isinstance(risk_score, float), f"risk_score is not float: {risk_score} ({type(risk_score)})"
         conversation_log = ConversationLog(
             session_id=session_id,
             provider=PROVIDER,
@@ -297,5 +300,5 @@ with app.app_context():
         # Continue without database if needed
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5050))
+    port = int(os.environ.get("PORT", 5055))
     app.run(host="0.0.0.0", port=port, debug=False)
