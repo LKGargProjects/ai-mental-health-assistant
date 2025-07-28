@@ -15,9 +15,10 @@ ENV/
 .packages
 .pub-cache/
 .pub/
-build/
-# Only include web build files
+# Exclude all build directories except web
+ai_buddy_web/build/
 !ai_buddy_web/build/web/
+!ai_buddy_web/build/web/**
 .metadata
 *.iml
 .idea/
