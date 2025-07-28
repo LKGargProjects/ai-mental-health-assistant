@@ -249,6 +249,10 @@ def index():
         </html>
         """.format(app.static_folder, os.path.exists(app.static_folder), os.path.exists(os.path.join(app.static_folder, 'index.html')))
 
+@app.route("/test", methods=["GET"])
+def test():
+    return "Test route working!"
+
 @app.route("/api/ping", methods=["GET"])
 def ping():
     return "pong", 200
