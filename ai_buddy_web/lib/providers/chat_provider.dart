@@ -36,10 +36,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
-    final userMessage = Message(
-      content: content,
-      isUser: true,
-    );
+    final userMessage = Message(content: content, isUser: true);
 
     _messages.add(userMessage);
     _isLoading = true;
@@ -52,15 +49,21 @@ class ChatProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = 'Failed to send message';
-      _messages.add(Message(
-        content: 'Failed to get response. Please try again.',
-        isUser: false,
-        type: MessageType.error,
-      ));
+      _messages.add(
+        Message(
+          content: 'Failed to get response. Please try again.',
+          isUser: false,
+          type: MessageType.error,
+        ),
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> prefetchSession() async {
+    await _loadChatHistory();
   }
 
   void clearChat() {
@@ -68,4 +71,4 @@ class ChatProvider extends ChangeNotifier {
     _apiService.clearSession();
     notifyListeners();
   }
-} 
+}

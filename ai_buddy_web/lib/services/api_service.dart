@@ -34,7 +34,16 @@ class ApiService {
   }
 
   Future<Message> sendMessage(String content) async {
+    // Ensure session is created and available before sending the first message
     await _setupSession();
+    String? sessionId = await _storage.read(key: 'session_id');
+    if (sessionId == null) {
+      // Defensive: try to get session again
+      final response = await _dio.get('/api/get_or_create_session');
+      sessionId = response.data['session_id'];
+      await _storage.write(key: 'session_id', value: sessionId);
+      _dio.options.headers['X-Session-ID'] = sessionId;
+    }
     try {
       final response = await _dio.post(
         '/api/chat',
