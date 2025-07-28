@@ -216,7 +216,38 @@ def index():
     app.logger.info(f"Root route called. Static folder: {app.static_folder}")
     app.logger.info(f"Static folder exists: {os.path.exists(app.static_folder)}")
     app.logger.info(f"Index.html exists: {os.path.exists(os.path.join(app.static_folder, 'index.html'))}")
-    return send_from_directory(app.static_folder, 'index.html')
+    
+    # Try to serve the Flutter web app
+    if os.path.exists(app.static_folder) and os.path.exists(os.path.join(app.static_folder, 'index.html')):
+        return send_from_directory(app.static_folder, 'index.html')
+    else:
+        # Fallback: return a simple HTML page with links to the API
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>AI Mental Health Assistant</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                .container { max-width: 600px; margin: 0 auto; }
+                .api-link { display: block; margin: 10px 0; padding: 10px; background: #f0f0f0; text-decoration: none; color: #333; }
+                .api-link:hover { background: #e0e0e0; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>AI Mental Health Assistant</h1>
+                <p>The Flutter web app is not available. Here are the API endpoints:</p>
+                <a href="/api/health" class="api-link">Health Check</a>
+                <a href="/api/deploy-test" class="api-link">Deploy Test</a>
+                <a href="/api/stats" class="api-link">Statistics</a>
+                <p>Static folder: {}</p>
+                <p>Static folder exists: {}</p>
+                <p>Index.html exists: {}</p>
+            </div>
+        </body>
+        </html>
+        """.format(app.static_folder, os.path.exists(app.static_folder), os.path.exists(os.path.join(app.static_folder, 'index.html')))
 
 @app.route("/api/ping", methods=["GET"])
 def ping():
