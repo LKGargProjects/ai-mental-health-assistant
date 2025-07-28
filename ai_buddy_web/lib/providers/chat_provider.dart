@@ -36,15 +36,17 @@ class ChatProvider extends ChangeNotifier {
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
-    final userMessage = Message(content: content, isUser: true);
-
-    _messages.add(userMessage);
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
+      // Send message to backend first
       final aiMessage = await _apiService.sendMessage(content);
+
+      // Only add user message to UI after backend successfully processes it
+      final userMessage = Message(content: content, isUser: true);
+      _messages.add(userMessage);
       _messages.add(aiMessage);
       _error = null;
     } catch (e) {

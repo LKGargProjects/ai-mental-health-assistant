@@ -4,6 +4,7 @@ from flask_session import Session
 from dotenv import load_dotenv
 import os
 import redis
+import json
 from datetime import datetime
 import uuid
 
@@ -13,7 +14,7 @@ load_dotenv()
 from providers.gemini import get_gemini_response
 from providers.perplexity import get_perplexity_response
 from providers.openai import get_openai_response
-from models import db, UserSession, ConversationLog, CrisisEvent
+from models import db, UserSession, Message, ConversationLog, CrisisEvent
 from crisis_detection import detect_crisis_level
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -98,25 +99,34 @@ PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
 
 def get_or_create_session():
     """Get or create anonymous user session"""
-    # Try to get existing session from Flask session
-    session_id = session.get('session_id')
-    
-    if not session_id:
-        # Create new session
-        session_id = str(uuid.uuid4())
+    # First check if session ID is provided in header (from frontend)
+    header_session_id = request.headers.get('X-Session-ID')
+    if header_session_id:
+        # Use the session ID from frontend
+        session_id = header_session_id
+        # Store it in Flask session for consistency
         session['session_id'] = session_id
-        
-        # Create new user session in database
-        try:
-            user_session = UserSession(id=session_id)
-            db.session.add(user_session)
-            db.session.commit()
-            app.logger.info(f"✅ Created new session: {session_id}")
-        except Exception as e:
-            db.session.rollback()
-            app.logger.warning(f"⚠️ Session {session_id} might already exist: {e}")
+        app.logger.info(f"ℹ️ Using session from header: {session_id}")
     else:
-        app.logger.info(f"ℹ️ Using existing session: {session_id}")
+        # Try to get existing session from Flask session
+        session_id = session.get('session_id')
+        
+        if not session_id:
+            # Create new session
+            session_id = str(uuid.uuid4())
+            session['session_id'] = session_id
+            
+            # Create new user session in database
+            try:
+                user_session = UserSession(id=session_id)
+                db.session.add(user_session)
+                db.session.commit()
+                app.logger.info(f"✅ Created new session: {session_id}")
+            except Exception as e:
+                db.session.rollback()
+                app.logger.warning(f"⚠️ Session {session_id} might already exist: {e}")
+        else:
+            app.logger.info(f"ℹ️ Using existing session: {session_id}")
     
     return session_id
 
@@ -166,7 +176,26 @@ def chat():
         else:
             response = "I understand you're sharing something personal. I'm here to listen and support you. Would you like to tell me more about how you're feeling?"
 
-        # Log conversation
+        # Store user message
+        user_message = Message(
+            session_id=session_id,
+            content=message,
+            is_user=True,
+            risk_level=risk_level
+        )
+        db.session.add(user_message)
+        
+        # Store AI response
+        ai_message = Message(
+            session_id=session_id,
+            content=response,
+            is_user=False,
+            risk_level=risk_level,
+            resources=json.dumps(resources) if resources else None
+        )
+        db.session.add(ai_message)
+        
+        # Log conversation metadata
         print("DEBUG: risk_score to be inserted:", risk_score, type(risk_score))
         assert isinstance(risk_score, float), f"risk_score is not float: {risk_score} ({type(risk_score)})"
         conversation_log = ConversationLog(
@@ -304,26 +333,39 @@ def get_or_create_session_endpoint():
 
 @app.route('/api/chat_history', methods=['GET'])
 def get_chat_history():
-    session_id = session.get('session_id')
+    # Use the same session logic as chat endpoint
+    session_id = get_or_create_session()
     if not session_id:
         return jsonify([])
     
-    conversations = ConversationLog.query.filter_by(session_id=session_id).all()
+    messages = Message.query.filter_by(session_id=session_id).order_by(Message.timestamp).all()
     return jsonify([{
-        'id': conv.id,
-        'provider': conv.provider,
-        'risk_score': conv.risk_score,
-        'timestamp': conv.timestamp.isoformat() if conv.timestamp else None
-    } for conv in conversations])
+        'id': msg.id,
+        'content': msg.content,
+        'isUser': msg.is_user,
+        'timestamp': msg.timestamp.isoformat() if msg.timestamp else None,
+        'riskLevel': msg.risk_level,
+        'resources': json.loads(msg.resources) if msg.resources else None
+    } for msg in messages])
 
 @app.route('/api/mood_history', methods=['GET'])
 def get_mood_history():
+    # Use the same session logic as other endpoints
+    session_id = get_or_create_session()
+    if not session_id:
+        return jsonify([])
+    
     # For now, return empty list as we haven't implemented mood persistence
     return jsonify([])
 
 @app.route('/api/mood_entry', methods=['POST'])
 def add_mood_entry():
     try:
+        # Use the same session logic as other endpoints
+        session_id = get_or_create_session()
+        if not session_id:
+            return jsonify({"error": "No session available"}), 400
+            
         data = request.get_json()
         # For now, just echo back the entry as we haven't implemented persistence
         return jsonify(data)
