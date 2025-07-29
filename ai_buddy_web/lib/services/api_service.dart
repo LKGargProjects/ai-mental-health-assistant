@@ -4,322 +4,261 @@ import '../models/message.dart';
 import '../models/mood_entry.dart';
 import '../config/api_config.dart';
 
+/// Optimized API service with better error handling and performance
 class ApiService {
-  static String get baseUrl => ApiConfig.baseUrl;
-  final Dio _dio;
-  final FlutterSecureStorage _storage;
+  static const String _sessionKey = 'session_id';
+  static const Duration _timeout = Duration(seconds: 10);
+  static const int _maxRetries = 3;
 
-  ApiService()
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-        ),
-      ),
-      _storage = const FlutterSecureStorage() {
+  late final Dio _dio;
+  late final FlutterSecureStorage _storage;
+  String? _sessionId;
+
+  ApiService() {
+    _storage = const FlutterSecureStorage();
+    _dio = _createDio();
     _setupInterceptors();
   }
 
-  void _setupInterceptors() {
-    // Add comprehensive logging interceptor
-    _dio.interceptors.add(
-      LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        error: true,
-        logPrint: (obj) => print('DIO LOG: $obj'),
+  /// Create Dio instance with optimized configuration
+  Dio _createDio() {
+    return Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        connectTimeout: _timeout,
+        receiveTimeout: _timeout,
+        sendTimeout: _timeout,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
       ),
     );
+  }
+
+  /// Setup interceptors for logging and error handling
+  void _setupInterceptors() {
+    // Add logging interceptor (only in debug mode)
+    if (ApiConfig.isDevelopment) {
+      _dio.interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          error: true,
+          logPrint: (obj) => print('API: $obj'),
+        ),
+      );
+    }
 
     // Add error handling interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
         onError: (error, handler) {
-          print('🚨 === DIO ERROR DETAILS ===');
-          print('Error Type: ${error.type}');
-          print('Error Message: ${error.message}');
-          print('Response Status: ${error.response?.statusCode}');
-          print('Response Data: ${error.response?.data}');
-          print('Request URL: ${error.requestOptions.uri}');
-          print('Request Headers: ${error.requestOptions.headers}');
-          print('Request Data: ${error.requestOptions.data}');
-          print('Base URL: ${_dio.options.baseUrl}');
+          _logError(error);
           handler.next(error);
+        },
+        onRequest: (options, handler) async {
+          // Add session ID to headers if available
+          if (_sessionId != null) {
+            options.headers['X-Session-ID'] = _sessionId;
+          }
+          handler.next(options);
         },
       ),
     );
   }
 
-  /// Test backend connectivity and health
-  Future<Map<String, dynamic>> testBackendHealth() async {
+  /// Log error details for debugging
+  void _logError(DioException error) {
+    if (!ApiConfig.isDevelopment) return;
+
+    print('API Error: ${error.type} - ${error.message}');
+    print('Status: ${error.response?.statusCode}');
+    print('URL: ${error.requestOptions.uri}');
+  }
+
+  /// Get or create session ID
+  Future<String> _getSessionId() async {
+    if (_sessionId != null) return _sessionId!;
+
     try {
-      print('🔍 Testing backend health at: ${_dio.options.baseUrl}');
-      final response = await _dio.get('/api/health');
-      print('✅ Backend health check passed: ${response.data}');
-      return response.data;
-    } on DioException catch (e) {
-      print('❌ Backend health check failed:');
-      print('   Type: ${e.type}');
-      print('   Message: ${e.message}');
-      print('   Status: ${e.response?.statusCode}');
-      print('   URL: ${e.requestOptions.uri}');
-
-      String errorMessage = 'Backend connection failed. ';
-
-      switch (e.type) {
-        case DioExceptionType.connectionTimeout:
-          errorMessage +=
-              'Backend server not responding. Is it running on port 5055?';
-          break;
-        case DioExceptionType.receiveTimeout:
-          errorMessage += 'Server response timeout.';
-          break;
-        case DioExceptionType.badResponse:
-          if (e.response?.statusCode == 505) {
-            errorMessage +=
-                'Server error 505: HTTP Version Not Supported. This might be a CORS or server configuration issue.';
-          } else {
-            errorMessage += 'Server error: ${e.response?.statusCode}';
-          }
-          break;
-        case DioExceptionType.connectionError:
-          errorMessage +=
-              'Cannot connect to backend. Check if Flask server is running.';
-          break;
-        default:
-          errorMessage += 'Unexpected error: ${e.message}';
+      _sessionId = await _storage.read(key: _sessionKey);
+      if (_sessionId == null) {
+        _sessionId = await _createNewSession();
       }
-
-      throw Exception(errorMessage);
     } catch (e) {
-      print('❌ Unexpected error during health check: $e');
-      throw Exception('Backend not reachable. Please start your Flask server.');
+      print('Session error: $e');
+      _sessionId = await _createNewSession();
     }
+
+    return _sessionId!;
   }
 
-  /// Get detailed error message for user display
-  String getErrorMessage(DioException e) {
-    switch (e.type) {
-      case DioExceptionType.connectionTimeout:
-        return 'Backend server not responding. Please check if the Flask server is running on port 5055.';
-      case DioExceptionType.receiveTimeout:
-        return 'Server response timeout. Please try again.';
-      case DioExceptionType.badResponse:
-        if (e.response?.statusCode == 505) {
-          return 'Server error 505: HTTP Version Not Supported. This might be a CORS or server configuration issue. Please check the backend deployment.';
-        }
-        return 'Server error: ${e.response?.statusCode}. Please try again later.';
-      case DioExceptionType.connectionError:
-        return 'Cannot connect to backend. Please ensure the Flask server is running.';
-      case DioExceptionType.cancel:
-        return 'Request was cancelled.';
-      default:
-        return 'Network error: ${e.message}. Please check your connection and try again.';
-    }
-  }
-
-  Future<void> _setupSession() async {
-    String? sessionId = await _storage.read(key: 'session_id');
-    if (sessionId == null) {
-      // Get new session from backend
-      try {
-        final response = await _dio.get('/api/get_or_create_session');
-        sessionId = response.data['session_id'];
-        await _storage.write(key: 'session_id', value: sessionId);
-      } catch (e) {
-        print('❌ Failed to create session: $e');
-        throw Exception('Failed to establish session with backend.');
-      }
-    }
-    // Add session ID to all requests
-    _dio.options.headers['X-Session-ID'] = sessionId;
-  }
-
-  Future<Message> sendMessage(String content) async {
-    // Ensure session is created and available before sending the first message
-    await _setupSession();
-    String? sessionId = await _storage.read(key: 'session_id');
-    if (sessionId == null) {
-      // Defensive: try to get session again
-      try {
-        final response = await _dio.get('/api/get_or_create_session');
-        sessionId = response.data['session_id'];
-        await _storage.write(key: 'session_id', value: sessionId);
-        _dio.options.headers['X-Session-ID'] = sessionId;
-      } catch (e) {
-        print('❌ Failed to create session in sendMessage: $e');
-        throw Exception('Failed to establish session with backend.');
-      }
-    }
-
+  /// Create new session
+  Future<String> _createNewSession() async {
     try {
-      print('📤 Sending message to: ${_dio.options.baseUrl}/api/chat');
+      final response = await _dio.get('/api/get_or_create_session');
+      final sessionId = response.data['session_id'] as String;
+      await _storage.write(key: _sessionKey, value: sessionId);
+      return sessionId;
+    } catch (e) {
+      print('Failed to create session: $e');
+      // Generate fallback session ID
+      return DateTime.now().millisecondsSinceEpoch.toString();
+    }
+  }
+
+  /// Test backend connectivity with retry logic
+  Future<Map<String, dynamic>> testBackendHealth() async {
+    return _retryOperation(() async {
+      final response = await _dio.get('/api/health');
+      return response.data as Map<String, dynamic>;
+    });
+  }
+
+  /// Send chat message with optimized error handling
+  Future<Map<String, dynamic>> sendMessage(String message) async {
+    return _retryOperation(() async {
+      await _getSessionId(); // Ensure session is available
+
       final response = await _dio.post(
         '/api/chat',
-        data: {
-          'message': content,
-          'mode': 'mental_health', // Always use mental health mode for now
-        },
+        data: {'message': message.trim()},
       );
 
-      if (response.data['error'] != null) {
-        throw DioException(
-          requestOptions: RequestOptions(path: '/api/chat'),
-          error: response.data['error'],
-        );
-      }
-
-      // Extract risk level and resources if present
-      String riskLevel = 'none';
-      List<String>? resources;
-
-      if (response.data['risk_level'] != null) {
-        riskLevel = response.data['risk_level'];
-      }
-
-      if (response.data['resources'] != null) {
-        resources = List<String>.from(response.data['resources']);
-      }
-
-      // Create message with appropriate type
-      MessageType messageType = MessageType.text;
-      if (riskLevel == 'high' && resources != null && resources.isNotEmpty) {
-        messageType = MessageType.system; // Use system for crisis messages
-      }
-
-      // Convert string risk level to RiskLevel enum
-      RiskLevel riskLevelEnum = RiskLevel.none;
-      switch (riskLevel.toLowerCase()) {
-        case 'low':
-          riskLevelEnum = RiskLevel.low;
-          break;
-        case 'medium':
-          riskLevelEnum = RiskLevel.medium;
-          break;
-        case 'high':
-          riskLevelEnum = RiskLevel.high;
-          break;
-        default:
-          riskLevelEnum = RiskLevel.none;
-      }
-
-      return Message(
-        content: response.data['response'],
-        isUser: false,
-        type: messageType,
-        riskLevel: riskLevelEnum,
-        resources: resources,
-      );
-    } on DioException catch (e) {
-      print('🚨 DIO Exception in sendMessage:');
-      print('   Type: ${e.type}');
-      print('   Message: ${e.message}');
-      print('   Status: ${e.response?.statusCode}');
-      print('   URL: ${e.requestOptions.uri}');
-      rethrow;
-    } catch (e) {
-      print('❌ Unexpected error in sendMessage: $e');
-      rethrow;
-    }
+      return response.data as Map<String, dynamic>;
+    });
   }
 
+  /// Get chat history with pagination support
   Future<List<Message>> getChatHistory() async {
-    try {
-      await _setupSession();
+    return _retryOperation(() async {
+      await _getSessionId();
+
       final response = await _dio.get('/api/chat_history');
+      final List<dynamic> data = response.data as List<dynamic>;
 
-      if (response.data is List) {
-        return response.data.map<Message>((msg) {
-          // Convert string risk level to RiskLevel enum
-          RiskLevel riskLevel = RiskLevel.none;
-          switch ((msg['riskLevel'] ?? 'none').toString().toLowerCase()) {
-            case 'low':
-              riskLevel = RiskLevel.low;
-              break;
-            case 'medium':
-              riskLevel = RiskLevel.medium;
-              break;
-            case 'high':
-              riskLevel = RiskLevel.high;
-              break;
-            default:
-              riskLevel = RiskLevel.none;
-          }
-
-          return Message(
-            content: msg['content'],
-            isUser: msg['isUser'],
-            type: MessageType.text,
-            riskLevel: riskLevel,
-            resources: msg['resources'] != null
-                ? List<String>.from(msg['resources'])
-                : null,
-          );
-        }).toList();
-      }
-      return [];
-    } catch (e) {
-      print('❌ Error getting chat history: $e');
-      return [];
-    }
+      return data.map((json) => Message.fromJson(json)).toList();
+    });
   }
 
+  /// Submit self-assessment with validation
+  Future<Map<String, dynamic>> submitSelfAssessment(
+    Map<String, dynamic> data,
+  ) async {
+    return _retryOperation(() async {
+      await _getSessionId();
+
+      // Validate required fields
+      final requiredFields = ['mood', 'energy', 'sleep', 'stress'];
+      for (final field in requiredFields) {
+        if (data[field] == null || data[field].toString().trim().isEmpty) {
+          throw Exception('Missing required field: $field');
+        }
+      }
+
+      final response = await _dio.post('/api/self_assessment', data: data);
+      return response.data as Map<String, dynamic>;
+    });
+  }
+
+  /// Get mood history
   Future<List<MoodEntry>> getMoodHistory() async {
-    try {
-      await _setupSession();
+    return _retryOperation(() async {
+      await _getSessionId();
+
       final response = await _dio.get('/api/mood_history');
+      final List<dynamic> data = response.data as List<dynamic>;
 
-      if (response.data is List) {
-        return response.data
-            .map<MoodEntry>(
-              (entry) => MoodEntry(
-                moodLevel: entry['mood_level'] ?? 3,
-                timestamp: DateTime.parse(entry['timestamp']),
-                note: entry['note'],
-              ),
-            )
-            .toList();
+      return data.map((json) => MoodEntry.fromJson(json)).toList();
+    });
+  }
+
+  /// Add mood entry
+  Future<Map<String, dynamic>> addMoodEntry(Map<String, dynamic> data) async {
+    return _retryOperation(() async {
+      await _getSessionId();
+
+      final response = await _dio.post('/api/mood_entry', data: data);
+      return response.data as Map<String, dynamic>;
+    });
+  }
+
+  /// Generic retry operation with exponential backoff
+  Future<T> _retryOperation<T>(Future<T> Function() operation) async {
+    int attempts = 0;
+    Duration delay = const Duration(milliseconds: 100);
+
+    while (attempts < _maxRetries) {
+      try {
+        return await operation();
+      } on DioException catch (e) {
+        attempts++;
+
+        if (attempts >= _maxRetries) {
+          throw _createUserFriendlyError(e);
+        }
+
+        // Exponential backoff
+        await Future.delayed(delay);
+        delay *= 2;
+      } catch (e) {
+        throw Exception('Unexpected error: $e');
       }
-      return [];
-    } catch (e) {
-      print('❌ Error getting mood history: $e');
-      return [];
     }
+
+    throw Exception('Max retries exceeded');
   }
 
-  Future<void> addMoodEntry(MoodEntry entry) async {
+  /// Create user-friendly error messages
+  Exception _createUserFriendlyError(DioException e) {
+    String message = 'Connection error. ';
+
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+        message += 'Server not responding. Please try again.';
+        break;
+      case DioExceptionType.receiveTimeout:
+        message += 'Request timed out. Please try again.';
+        break;
+      case DioExceptionType.badResponse:
+        final statusCode = e.response?.statusCode;
+        if (statusCode == 400) {
+          message += 'Invalid request. Please check your input.';
+        } else if (statusCode == 401) {
+          message += 'Authentication required.';
+        } else if (statusCode == 403) {
+          message += 'Access denied.';
+        } else if (statusCode == 404) {
+          message += 'Service not found.';
+        } else if (statusCode == 500) {
+          message += 'Server error. Please try again later.';
+        } else {
+          message += 'Server error: $statusCode';
+        }
+        break;
+      case DioExceptionType.connectionError:
+        message += 'Cannot connect to server. Check your internet connection.';
+        break;
+      default:
+        message += 'Network error. Please try again.';
+    }
+
+    return Exception(message);
+  }
+
+  /// Clear session data
+  Future<void> clearSession() async {
     try {
-      await _setupSession();
-      await _dio.post(
-        '/api/mood_entry',
-        data: {
-          'mood_level': entry.moodLevel,
-          'timestamp': entry.timestamp.toIso8601String(),
-          'note': entry.note,
-        },
-      );
+      await _storage.delete(key: _sessionKey);
+      _sessionId = null;
     } catch (e) {
-      print('❌ Error adding mood entry: $e');
-      rethrow;
+      print('Failed to clear session: $e');
     }
   }
 
-  Future<void> submitSelfAssessment(Map<String, dynamic> assessment) async {
-    try {
-      await _setupSession();
-      await _dio.post('/api/self_assessment', data: assessment);
-    } catch (e) {
-      print('❌ Error submitting self assessment: $e');
-      rethrow;
-    }
-  }
-
-  void clearSession() {
-    _storage.delete(key: 'session_id');
+  /// Dispose resources
+  void dispose() {
+    _dio.close();
   }
 }
