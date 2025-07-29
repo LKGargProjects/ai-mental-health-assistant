@@ -303,16 +303,16 @@ def index():
         return send_from_directory(app.static_folder, 'index.html')
     else:
         # Fallback: return a simple HTML page with links to the API
-        return """
+        return f"""
         <!DOCTYPE html>
         <html>
         <head>
             <title>AI Mental Health Assistant</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                .container { max-width: 600px; margin: 0 auto; }
-                .api-link { display: block; margin: 10px 0; padding: 10px; background: #f0f0f0; text-decoration: none; color: #333; }
-                .api-link:hover { background: #e0e0e0; }
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                .container {{ max-width: 600px; margin: 0 auto; }}
+                .api-link {{ display: block; margin: 10px 0; padding: 10px; background: #f0f0f0; text-decoration: none; color: #333; }}
+                .api-link:hover {{ background: #e0e0e0; }}
             </style>
         </head>
         <body>
@@ -322,13 +322,13 @@ def index():
                 <a href="/api/health" class="api-link">Health Check</a>
                 <a href="/api/deploy-test" class="api-link">Deploy Test</a>
                 <a href="/api/stats" class="api-link">Statistics</a>
-                <p>Static folder: {}</p>
-                <p>Static folder exists: {}</p>
-                <p>Index.html exists: {}</p>
+                <p>Static folder: {app.static_folder}</p>
+                <p>Static folder exists: {os.path.exists(app.static_folder)}</p>
+                <p>Index.html exists: {os.path.exists(os.path.join(app.static_folder, 'index.html'))}</p>
             </div>
         </body>
         </html>
-        """.format(app.static_folder, os.path.exists(app.static_folder), os.path.exists(os.path.join(app.static_folder, 'index.html')))
+        """
 
 @app.route("/test", methods=["GET"])
 def test():
