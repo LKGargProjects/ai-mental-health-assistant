@@ -44,16 +44,15 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod'
 
 # Database configuration with fallback
 database_url = os.environ.get('DATABASE_URL')
-print(f"DEBUG: DATABASE_URL from env: {database_url}")
+# Database URL loaded from environment
 if database_url and database_url.strip() and database_url != 'port':
     # Convert postgresql:// to postgresql+psycopg:// for psycopg3
     if database_url.startswith('postgresql://'):
         database_url = database_url.replace('postgresql://', 'postgresql+psycopg://')
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    print(f"Using PostgreSQL: {database_url}")
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
-    print("Using SQLite fallback")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -231,7 +230,7 @@ def chat():
         db.session.add(ai_message)
         
         # Log conversation metadata
-        print("DEBUG: risk_score to be inserted:", risk_score, type(risk_score))
+        # Risk score processed for database insertion
         # Ensure risk_score is float - convert string risk levels to numeric values
         if isinstance(risk_score, str):
             # Convert string risk levels to numeric values
@@ -248,7 +247,7 @@ def chat():
             except (ValueError, TypeError):
                 risk_score = 0.0
         
-        print("DEBUG: Final risk_score after conversion:", risk_score, type(risk_score))
+        # Risk score converted to float for database storage
         
         conversation_log = ConversationLog(
             session_id=session_id,
@@ -513,7 +512,7 @@ def submit_self_assessment():
                 if value is not None and value != "" and value != "null" and value != "None":
                     cleaned_data[field] = value.strip() if isinstance(value, str) else value
         
-        app.logger.info(f"✅ Cleaned assessment data: {cleaned_data}")
+        app.logger.info(f"Assessment data processed: {cleaned_data}")
         
         # For now, just return success without database operations
         return jsonify({

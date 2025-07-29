@@ -32,7 +32,7 @@ class ApiService {
         requestBody: true,
         responseBody: true,
         error: true,
-        logPrint: (obj) => print('🌐 DIO LOG: $obj'),
+        logPrint: (obj) => print('DIO LOG: $obj'),
       ),
     );
 

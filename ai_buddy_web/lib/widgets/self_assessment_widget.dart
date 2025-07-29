@@ -91,7 +91,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
           requestBody: true,
           responseBody: true,
           error: true,
-          logPrint: (obj) => print('🌐 SELF-ASSESSMENT LOG: $obj'),
+          logPrint: (obj) => print('SELF-ASSESSMENT LOG: $obj'),
         ),
       );
 
