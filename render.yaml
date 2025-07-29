@@ -1,10 +1,11 @@
 services:
+  # Backend API Service
   - type: web
     name: ai-mental-health-backend
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: ./startup.sh
+    startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.6
@@ -24,6 +25,23 @@ services:
         value: gemini
       - key: PORT
         value: 10000
+      - key: ENVIRONMENT
+        value: production
+      - key: REDIS_URL
+        value: redis://localhost:6379
+
+  # Frontend Web Service (Flutter Web)
+  - type: web
+    name: ai-mental-health-frontend
+    env: static
+    plan: free
+    buildCommand: |
+      cd ai_buddy_web
+      flutter build web --release
+    staticPublishPath: ./ai_buddy_web/build/web
+    envVars:
+      - key: API_URL
+        value: https://ai-mental-health-backend.onrender.com
 
 databases:
   - name: ai-mental-health-db
