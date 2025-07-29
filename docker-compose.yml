@@ -1,33 +1,81 @@
 version: '3.8'
 
 services:
-  web:
+  # =============================================================================
+  # BACKEND SERVICE (Flask API)
+  # =============================================================================
+  backend:
     build: .
     ports:
-      - "10000:10000"
+      - "${BACKEND_PORT:-5055}:${BACKEND_PORT:-5055}"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - SECRET_KEY=${SECRET_KEY}
+      - PORT=${BACKEND_PORT:-5055}
+      - DATABASE_URL=postgresql+psycopg://ai_buddy:ai_buddy_password@db:5432/mental_health
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - ENVIRONMENT=${ENVIRONMENT:-local}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PPLX_API_KEY=${PPLX_API_KEY}
       - AI_PROVIDER=${AI_PROVIDER:-gemini}
-      - PORT=10000
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - db
+      - redis
     restart: unless-stopped
+    volumes:
+      - ./instance:/app/instance
+      - ./flask_session:/app/flask_session
+    networks:
+      - ai-buddy-network
 
+  # =============================================================================
+  # DATABASE SERVICE (PostgreSQL)
+  # =============================================================================
   db:
     image: postgres:14
     environment:
-      - POSTGRES_DB=mental_health
-      - POSTGRES_USER=ai_buddy
-      - POSTGRES_PASSWORD=ai_buddy_password
+      - POSTGRES_DB=${POSTGRES_DB:-mental_health}
+      - POSTGRES_USER=${POSTGRES_USER:-ai_buddy}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ai_buddy_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     restart: unless-stopped
+    networks:
+      - ai-buddy-network
+
+  # =============================================================================
+  # REDIS SERVICE (Session Storage)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
+    networks:
+      - ai-buddy-network
+
+  # =============================================================================
+  # FLUTTER WEB SERVICE (Frontend)
+  # =============================================================================
+  flutter-web:
+    build:
+      context: ./ai_buddy_web
+      dockerfile: Dockerfile.web
+    ports:
+      - "${FLUTTER_WEB_PORT:-8080}:8080"
+    environment:
+      - API_URL=http://backend:${BACKEND_PORT:-5055}
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - ai-buddy-network
 
 volumes:
-  postgres_data: 
+  postgres_data:
+
+networks:
+  ai-buddy-network:
+    driver: bridge 
