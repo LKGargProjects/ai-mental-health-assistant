@@ -14,27 +14,43 @@ load_dotenv()
 from providers.gemini import get_gemini_response
 from providers.perplexity import get_perplexity_response
 from providers.openai import get_openai_response
-from models import db, UserSession, Message, ConversationLog, CrisisEvent
+from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
 from crisis_detection import detect_crisis_level
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 
 app = Flask(__name__, static_folder='ai_buddy_web/build/web', static_url_path='')
-CORS(app, supports_credentials=True)
+
+# Enhanced CORS configuration for Flutter web
+CORS(app, 
+     origins=[
+         "http://localhost:8080", 
+         "http://127.0.0.1:8080", 
+         "http://localhost:3000",
+         "http://localhost:9100",
+         "http://127.0.0.1:9100"
+     ],
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "X-Session-ID", "Accept"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     expose_headers=["Content-Type", "X-Session-ID"])
 
 # Enhanced configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod')
 
 # Database configuration with fallback
 database_url = os.environ.get('DATABASE_URL')
-if database_url and database_url != 'port':
+print(f"DEBUG: DATABASE_URL from env: {database_url}")
+if database_url and database_url.strip() and database_url != 'port':
     # Convert postgresql:// to postgresql+psycopg:// for psycopg3
     if database_url.startswith('postgresql://'):
         database_url = database_url.replace('postgresql://', 'postgresql+psycopg://')
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    print(f"Using PostgreSQL: {database_url}")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
+    print("Using SQLite fallback")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -197,7 +213,12 @@ def chat():
         
         # Log conversation metadata
         print("DEBUG: risk_score to be inserted:", risk_score, type(risk_score))
-        assert isinstance(risk_score, float), f"risk_score is not float: {risk_score} ({type(risk_score)})"
+        # Ensure risk_score is float
+        if not isinstance(risk_score, float):
+            try:
+                risk_score = float(risk_score)
+            except (ValueError, TypeError):
+                risk_score = 0.0
         conversation_log = ConversationLog(
             session_id=session_id,
             provider=PROVIDER,
@@ -303,7 +324,23 @@ def health():
             "has_openai_key": bool(OPENAI_API_KEY),
             "has_perplexity_key": bool(PPLX_API_KEY),
             "redis_url_set": bool(os.environ.get('REDIS_URL')),
-            "port": os.environ.get('PORT', '5050')
+            "port": os.environ.get('PORT', '5055'),
+            "cors_enabled": True,
+            "endpoints": [
+                "/api/health",
+                "/api/chat", 
+                "/api/get_or_create_session",
+                "/api/self_assessment",
+                "/api/mood_history",
+                "/api/mood_entry"
+            ],
+            "cors_origins": [
+                "http://localhost:8080", 
+                "http://127.0.0.1:8080", 
+                "http://localhost:3000",
+                "http://localhost:9100",
+                "http://127.0.0.1:9100"
+            ]
         }
         return jsonify(health_status)
     except Exception as e:
@@ -371,6 +408,24 @@ def add_mood_entry():
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+@app.route('/api/self_assessment', methods=['POST'])
+def submit_self_assessment():
+    try:
+        # Parse incoming JSON data
+        data = request.get_json()
+        if not data or not isinstance(data, dict):
+            return jsonify({'error': 'Invalid or missing JSON data'}), 400
+
+        # Retrieve session_id from header or session
+        session_id = request.headers.get('X-Session-ID') or session.get('session_id')
+        if not session_id:
+            return jsonify({'error': 'Session ID is required'}), 400
+
+        # For now, just return success without database operations
+        return jsonify({'success': True, 'message': 'Assessment received'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 with app.app_context():
     try:

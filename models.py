@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import uuid
 import os
+from sqlalchemy.dialects.postgresql import JSONB
 
 db = SQLAlchemy()
 
@@ -44,3 +45,13 @@ class CrisisEvent(db.Model):
     risk_level = db.Column(db.String(20))
     intervention_taken = db.Column(db.String(100))
     escalated = db.Column(db.Boolean, default=False)
+
+class SelfAssessmentEntry(db.Model):
+    __tablename__ = 'self_assessment_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(36), db.ForeignKey('user_sessions.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    assessment_data = db.Column(JSONB, nullable=False)
+
+    def __repr__(self):
+        return f'<SelfAssessmentEntry id={self.id} session_id={self.session_id}>'

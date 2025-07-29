@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 
 class ApiConfig {
   // Development
-  static const String localUrl = 'http://localhost:5050';
+  static const String localUrl = 'http://localhost:5055';
 
   // Production (Render)
   static const String productionUrl =

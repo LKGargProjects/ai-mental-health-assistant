@@ -5,6 +5,8 @@ import 'providers/chat_provider.dart';
 import 'providers/mood_provider.dart';
 import 'widgets/chat_message_widget.dart';
 import 'widgets/mood_tracker.dart';
+import 'widgets/self_assessment_widget.dart';
+import 'widgets/startup_screen.dart';
 import 'models/message.dart';
 
 void main() {
@@ -49,7 +51,9 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _showMoodTracker = false;
+  bool _showAssessment = false;
   bool _hasStartedChat = false;
+  bool _isBackendReady = false;
 
   @override
   void dispose() {
@@ -72,6 +76,17 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Show startup screen if backend is not ready
+    if (!_isBackendReady) {
+      return StartupScreen(
+        onBackendReady: () {
+          setState(() {
+            _isBackendReady = true;
+          });
+        },
+      );
+    }
+
     final screenSize = MediaQuery.of(context).size;
     final isWeb = kIsWeb;
     final isMobile = screenSize.width < 600;
@@ -154,7 +169,9 @@ class _HomePageState extends State<HomePage> {
                           padding: EdgeInsets.all(20.0),
                           child: MoodTrackerWidget(),
                         )
-                      : _hasStartedChat
+                      : _showAssessment
+                      ? const SelfAssessmentWidget()
+                      : _hasStartedChat || _hasMessages()
                       ? _buildChatInterface()
                       : _buildWelcomeInterface(),
                 ),
@@ -169,6 +186,7 @@ class _HomePageState extends State<HomePage> {
                       onPressed: () {
                         setState(() {
                           _showMoodTracker = !_showMoodTracker;
+                          _showAssessment = false;
                           if (_showMoodTracker) {
                             _hasStartedChat = false;
                           }
@@ -182,6 +200,25 @@ class _HomePageState extends State<HomePage> {
                       tooltip: _showMoodTracker
                           ? 'Show Chat'
                           : 'Show Mood Tracker',
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _showAssessment = !_showAssessment;
+                          _showMoodTracker = false;
+                          if (_showAssessment) {
+                            _hasStartedChat = false;
+                          }
+                        });
+                      },
+                      icon: Icon(
+                        _showAssessment ? Icons.chat : Icons.assessment,
+                        color: Colors.white,
+                        size: isMobile ? 24 : 28,
+                      ),
+                      tooltip: _showAssessment
+                          ? 'Show Chat'
+                          : 'Self Assessment',
                     ),
                   ],
                 ),
@@ -454,5 +491,10 @@ class _HomePageState extends State<HomePage> {
     chatProvider.sendMessage(text);
     _messageController.clear();
     _scrollToBottom();
+  }
+
+  bool _hasMessages() {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    return chatProvider.messages.isNotEmpty;
   }
 }

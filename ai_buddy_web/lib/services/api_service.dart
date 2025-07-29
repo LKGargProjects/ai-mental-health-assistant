@@ -13,13 +13,46 @@ class ApiService {
     : _dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
         ),
       ),
-      _storage = const FlutterSecureStorage();
+      _storage = const FlutterSecureStorage() {
+    _setupInterceptors();
+  }
+
+  void _setupInterceptors() {
+    // Add comprehensive logging interceptor
+    _dio.interceptors.add(
+      LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+        error: true,
+        logPrint: (obj) => print('🌐 DIO LOG: $obj'),
+      ),
+    );
+
+    // Add error handling interceptor
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (error, handler) {
+          print('🚨 === DIO ERROR DETAILS ===');
+          print('Error Type: ${error.type}');
+          print('Error Message: ${error.message}');
+          print('Response Status: ${error.response?.statusCode}');
+          print('Response Data: ${error.response?.data}');
+          print('Request URL: ${error.requestOptions.uri}');
+          print('Request Headers: ${error.requestOptions.headers}');
+          print('Request Data: ${error.requestOptions.data}');
+          handler.next(error);
+        },
+      ),
+    );
+  }
 
   Future<void> _setupSession() async {
     String? sessionId = await _storage.read(key: 'session_id');
@@ -144,5 +177,64 @@ class ApiService {
 
   Future<void> clearSession() async {
     await _storage.delete(key: 'session_id');
+  }
+
+  /// Test backend connectivity and health
+  Future<Map<String, dynamic>> testBackendHealth() async {
+    try {
+      print('🔍 Testing backend health...');
+      final response = await _dio.get('/api/health');
+      print('✅ Backend health check passed: ${response.data}');
+      return response.data;
+    } on DioException catch (e) {
+      print('❌ Backend health check failed:');
+      print('   Type: ${e.type}');
+      print('   Message: ${e.message}');
+      print('   Status: ${e.response?.statusCode}');
+
+      String errorMessage = 'Backend connection failed. ';
+
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+          errorMessage +=
+              'Backend server not responding. Is it running on port 5055?';
+          break;
+        case DioExceptionType.receiveTimeout:
+          errorMessage += 'Server response timeout.';
+          break;
+        case DioExceptionType.badResponse:
+          errorMessage += 'Server error: ${e.response?.statusCode}';
+          break;
+        case DioExceptionType.connectionError:
+          errorMessage +=
+              'Cannot connect to backend. Check if Flask server is running.';
+          break;
+        default:
+          errorMessage += 'Unexpected error: ${e.message}';
+      }
+
+      throw Exception(errorMessage);
+    } catch (e) {
+      print('❌ Unexpected error during health check: $e');
+      throw Exception('Backend not reachable. Please start your Flask server.');
+    }
+  }
+
+  /// Get detailed error message for user display
+  String getErrorMessage(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+        return 'Backend server not responding. Please check if the Flask server is running on port 5055.';
+      case DioExceptionType.receiveTimeout:
+        return 'Server response timeout. Please try again.';
+      case DioExceptionType.badResponse:
+        return 'Server error: ${e.response?.statusCode}. Please try again later.';
+      case DioExceptionType.connectionError:
+        return 'Cannot connect to backend. Please ensure the Flask server is running.';
+      case DioExceptionType.cancel:
+        return 'Request was cancelled.';
+      default:
+        return 'Network error: ${e.message}. Please check your connection and try again.';
+    }
   }
 }
