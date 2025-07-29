@@ -229,10 +229,12 @@ def chat():
             except (ValueError, TypeError):
                 risk_score = 0.0
         
+        print("DEBUG: Final risk_score after conversion:", risk_score, type(risk_score))
+        
         conversation_log = ConversationLog(
             session_id=session_id,
             provider=PROVIDER,
-            risk_score=risk_score
+            risk_score=float(risk_score)  # Explicitly convert to float
         )
         db.session.add(conversation_log)
         
