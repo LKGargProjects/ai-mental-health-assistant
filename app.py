@@ -213,12 +213,22 @@ def chat():
         
         # Log conversation metadata
         print("DEBUG: risk_score to be inserted:", risk_score, type(risk_score))
-        # Ensure risk_score is float
-        if not isinstance(risk_score, float):
+        # Ensure risk_score is float - convert string risk levels to numeric values
+        if isinstance(risk_score, str):
+            # Convert string risk levels to numeric values
+            risk_level_mapping = {
+                'none': 0.0,
+                'low': 0.1,
+                'medium': 0.5,
+                'high': 0.9
+            }
+            risk_score = risk_level_mapping.get(risk_score.lower(), 0.0)
+        elif not isinstance(risk_score, float):
             try:
                 risk_score = float(risk_score)
             except (ValueError, TypeError):
                 risk_score = 0.0
+        
         conversation_log = ConversationLog(
             session_id=session_id,
             provider=PROVIDER,
