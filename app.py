@@ -29,7 +29,9 @@ CORS(app,
          "http://127.0.0.1:8080", 
          "http://localhost:3000",
          "http://localhost:9100",
-         "http://127.0.0.1:9100"
+         "http://127.0.0.1:9100",
+         "https://ai-mental-health-assistant-tddc.onrender.com",
+         "https://*.onrender.com"
      ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "X-Session-ID", "Accept"],
@@ -325,33 +327,59 @@ def ping():
 
 @app.route("/api/health", methods=["GET"])
 def health():
+    """Health check endpoint"""
     try:
-        # Test basic functionality
+        # Get environment info
+        environment = os.environ.get('ENVIRONMENT', 'local')
+        port = os.environ.get('PORT', '5055')
+        
+        # Check database connection
+        db_status = "healthy"
+        try:
+            db.session.execute("SELECT 1")
+        except Exception as e:
+            db_status = f"unhealthy: {str(e)}"
+        
+        # Check Redis connection
+        redis_status = "healthy"
+        try:
+            if app.config.get('SESSION_TYPE') == 'redis':
+                redis_client = app.config.get('SESSION_REDIS')
+                if redis_client:
+                    redis_client.ping()
+                else:
+                    redis_status = "not configured"
+            else:
+                redis_status = "using filesystem"
+        except Exception as e:
+            redis_status = f"unhealthy: {str(e)}"
+        
         health_status = {
-            "status": "healthy", 
+            "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
-            "environment": ENVIRONMENT,
+            "environment": environment,
+            "port": port,
             "provider": PROVIDER,
-            "has_gemini_key": bool(GEMINI_API_KEY),
-            "has_openai_key": bool(OPENAI_API_KEY),
-            "has_perplexity_key": bool(PPLX_API_KEY),
-            "redis_url_set": bool(os.environ.get('REDIS_URL')),
-            "port": os.environ.get('PORT', '5055'),
+            "database": db_status,
+            "redis": redis_status,
             "cors_enabled": True,
+            "cors_origins": [
+                "http://localhost:8080",
+                "http://127.0.0.1:8080", 
+                "http://localhost:3000",
+                "http://localhost:9100",
+                "http://127.0.0.1:9100",
+                "https://ai-mental-health-assistant-tddc.onrender.com",
+                "https://*.onrender.com"
+            ],
             "endpoints": [
                 "/api/health",
                 "/api/chat", 
                 "/api/get_or_create_session",
-                "/api/self_assessment",
+                "/api/chat_history",
                 "/api/mood_history",
-                "/api/mood_entry"
-            ],
-            "cors_origins": [
-                "http://localhost:8080", 
-                "http://127.0.0.1:8080", 
-                "http://localhost:3000",
-                "http://localhost:9100",
-                "http://127.0.0.1:9100"
+                "/api/mood_entry",
+                "/api/self_assessment"
             ]
         }
         return jsonify(health_status)
