@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, session, render_template, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from flask_session import Session
 from dotenv import load_dotenv
 import os
@@ -124,6 +125,22 @@ def get_or_create_session():
         session_id = header_session_id
         # Store it in Flask session for consistency
         session['session_id'] = session_id
+        
+        # Ensure the session exists in database
+        try:
+            user_session = UserSession.query.get(session_id)
+            if not user_session:
+                # Create the session in database if it doesn't exist
+                user_session = UserSession(id=session_id)
+                db.session.add(user_session)
+                db.session.commit()
+                app.logger.info(f"✅ Created missing session in database: {session_id}")
+            else:
+                app.logger.info(f"ℹ️ Found existing session in database: {session_id}")
+        except Exception as e:
+            db.session.rollback()
+            app.logger.warning(f"⚠️ Error ensuring session exists: {e}")
+        
         app.logger.info(f"ℹ️ Using session from header: {session_id}")
     else:
         # Try to get existing session from Flask session
@@ -336,7 +353,7 @@ def health():
         # Check database connection
         db_status = "healthy"
         try:
-            db.session.execute("SELECT 1")
+            db.session.execute(text("SELECT 1"))
         except Exception as e:
             db_status = f"unhealthy: {str(e)}"
         
@@ -449,22 +466,64 @@ def add_mood_entry():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@app.route('/api/self_assessment', methods=['POST'])
+@app.route('/api/self_assessment', methods=['POST', 'GET'])
 def submit_self_assessment():
     try:
-        # Parse incoming JSON data
+        # Handle GET request (for frontend compatibility)
+        if request.method == 'GET':
+            return jsonify({'message': 'Self assessment endpoint is available'}), 200
+            
+        # Handle POST request
         data = request.get_json()
+        app.logger.info(f"📝 Self assessment data received: {data}")
+        
         if not data or not isinstance(data, dict):
+            app.logger.error(f"❌ Invalid data format: {data}")
             return jsonify({'error': 'Invalid or missing JSON data'}), 400
 
         # Retrieve session_id from header or session
         session_id = request.headers.get('X-Session-ID') or session.get('session_id')
         if not session_id:
+            app.logger.error("❌ No session ID provided")
             return jsonify({'error': 'Session ID is required'}), 400
 
+        # Clean and validate the data
+        cleaned_data = {}
+        required_fields = ['mood', 'energy', 'sleep', 'stress', 'notes']
+        optional_fields = ['crisis_level', 'anxiety_level']
+        
+        # Validate required fields
+        for field in required_fields:
+            if field not in data:
+                app.logger.error(f"❌ Missing required field: {field}")
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+            
+            value = data[field]
+            if value is None or (isinstance(value, str) and value.strip() == ''):
+                app.logger.error(f"❌ Required field {field} is empty or null")
+                return jsonify({'error': f'Required field {field} cannot be empty'}), 400
+            
+            cleaned_data[field] = value.strip() if isinstance(value, str) else value
+        
+        # Handle optional fields - only include if they have valid values
+        for field in optional_fields:
+            if field in data:
+                value = data[field]
+                # Only include if value is not None, not empty string, and not "null" string
+                if value is not None and value != "" and value != "null" and value != "None":
+                    cleaned_data[field] = value.strip() if isinstance(value, str) else value
+        
+        app.logger.info(f"✅ Cleaned assessment data: {cleaned_data}")
+        
         # For now, just return success without database operations
-        return jsonify({'success': True, 'message': 'Assessment received'}), 201
+        return jsonify({
+            'success': True, 
+            'message': 'Assessment received successfully', 
+            'data': cleaned_data,
+            'session_id': session_id
+        }), 201
     except Exception as e:
+        app.logger.error(f"❌ Self assessment error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 with app.app_context():

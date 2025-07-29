@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'dart:convert';
 import '../config/api_config.dart';
+import '../services/api_service.dart';
 
 class SelfAssessmentWidget extends StatefulWidget {
   final String? sessionId;
@@ -25,8 +26,8 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
   String _selectedEnergy = 'medium';
   String _selectedSleep = 'fair';
   String _selectedStress = 'medium';
-  String? _selectedCrisisLevel;
-  String? _selectedAnxietyLevel;
+  String _selectedCrisisLevel = ''; // Use empty string instead of null
+  String _selectedAnxietyLevel = ''; // Use empty string instead of null
 
   bool _isSubmitting = false;
 
@@ -71,54 +72,79 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
     });
 
     try {
-      final dio = Dio();
-      final assessmentData = {
-        'mood': _selectedMood,
-        'energy': _selectedEnergy,
-        'sleep': _selectedSleep,
-        'stress': _selectedStress,
-        'notes': _notesController.text.trim(),
-        if (_selectedCrisisLevel != null) 'crisis_level': _selectedCrisisLevel,
-        if (_selectedAnxietyLevel != null)
-          'anxiety_level': _selectedAnxietyLevel,
-      };
-
-      final response = await dio.post(
-        '${ApiConfig.baseUrl}/self_assessment',
-        data: assessmentData,
-        options: Options(
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConfig.baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
             if (widget.sessionId != null) 'X-Session-ID': widget.sessionId,
           },
         ),
       );
 
-      if (response.statusCode == 201) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Assessment submitted successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+      // Add logging interceptor
+      dio.interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          error: true,
+          logPrint: (obj) => print('🌐 SELF-ASSESSMENT LOG: $obj'),
+        ),
+      );
 
-          // Reset form
-          _formKey.currentState!.reset();
-          _notesController.clear();
-          setState(() {
-            _selectedMood = 'neutral';
-            _selectedEnergy = 'medium';
-            _selectedSleep = 'fair';
-            _selectedStress = 'medium';
-            _selectedCrisisLevel = null;
-            _selectedAnxietyLevel = null;
-          });
+      // Build assessment data with proper null handling
+      final Map<String, dynamic> assessmentData = {
+        'mood': _selectedMood,
+        'energy': _selectedEnergy,
+        'sleep': _selectedSleep,
+        'stress': _selectedStress,
+        'notes': _notesController.text.trim(),
+      };
 
-          widget.onAssessmentSubmitted?.call();
-        }
+      // Only add optional fields if they have valid values (not null or empty)
+      if (_selectedCrisisLevel.isNotEmpty) {
+        assessmentData['crisis_level'] = _selectedCrisisLevel;
+      }
+
+      if (_selectedAnxietyLevel.isNotEmpty) {
+        assessmentData['anxiety_level'] = _selectedAnxietyLevel;
+      }
+
+      print('📤 Sending self-assessment data: $assessmentData');
+      final response = await dio.post(
+        '/api/self_assessment',
+        data: assessmentData,
+      );
+      print('✅ Self-assessment response: ${response.data}');
+
+      // If we reach here, the submission was successful
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Assessment submitted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Reset form
+        _formKey.currentState!.reset();
+        _notesController.clear();
+        setState(() {
+          _selectedMood = 'neutral';
+          _selectedEnergy = 'medium';
+          _selectedSleep = 'fair';
+          _selectedStress = 'medium';
+          _selectedCrisisLevel = '';
+          _selectedAnxietyLevel = '';
+        });
+
+        widget.onAssessmentSubmitted?.call();
       }
     } catch (e) {
+      print('❌ Self-assessment error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -267,7 +293,9 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedCrisisLevel,
+                value: _selectedCrisisLevel.isEmpty
+                    ? null
+                    : _selectedCrisisLevel,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: 'Select crisis level (if applicable)',
@@ -282,7 +310,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
                   ),
                 ],
                 onChanged: (value) =>
-                    setState(() => _selectedCrisisLevel = value),
+                    setState(() => _selectedCrisisLevel = value ?? ''),
               ),
               const SizedBox(height: 16),
 
@@ -293,7 +321,9 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedAnxietyLevel,
+                value: _selectedAnxietyLevel.isEmpty
+                    ? null
+                    : _selectedAnxietyLevel,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: 'Select anxiety level (if applicable)',
@@ -308,7 +338,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
                   ),
                 ],
                 onChanged: (value) =>
-                    setState(() => _selectedAnxietyLevel = value),
+                    setState(() => _selectedAnxietyLevel = value ?? ''),
               ),
               const SizedBox(height: 16),
 

@@ -6,23 +6,25 @@ class ApiConfig {
   static String get _apiUrl {
     // Check if we're in a web environment and can access window.location
     if (kIsWeb) {
-      // For web, try to get from environment or use default
-      // In production, this will be set by the build process
-      const String? apiUrl = String.fromEnvironment('API_URL');
-      if (apiUrl != null && apiUrl.isNotEmpty) {
-        return apiUrl;
-      }
-
       // Check if we're in production (not localhost)
       if (Uri.base.host != 'localhost' && Uri.base.host != '127.0.0.1') {
-        return 'https://ai-mental-health-assistant-tddc.onrender.com';
+        final url = 'https://ai-mental-health-assistant-tddc.onrender.com';
+        print('🌐 API Config: Using production URL: $url');
+        return url;
       }
 
-      // Default local development URL
-      return 'http://localhost:5055';
+      // For local development, use relative URLs to work with nginx proxy
+      // This allows the nginx container to proxy /api/ requests to the backend
+      final url = '';
+      print('🌐 API Config: Using relative URL (empty string) for nginx proxy');
+      print('🌐 API Config: Uri.base.host = ${Uri.base.host}');
+      print('🌐 API Config: Uri.base = ${Uri.base}');
+      return url;
     } else {
       // For mobile apps, always use production URL
-      return 'https://ai-mental-health-assistant-tddc.onrender.com';
+      final url = 'https://ai-mental-health-assistant-tddc.onrender.com';
+      print('🌐 API Config: Using mobile production URL: $url');
+      return url;
     }
   }
 
