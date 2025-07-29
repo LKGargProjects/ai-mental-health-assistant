@@ -8,22 +8,17 @@ class ApiConfig {
     if (kIsWeb) {
       // Check if we're in production (not localhost)
       if (Uri.base.host != 'localhost' && Uri.base.host != '127.0.0.1') {
-        final url = 'https://ai-mental-health-assistant-tddc.onrender.com';
-        print('🌐 API Config: Using production URL: $url');
+        final url = 'https://ai-mental-health-backend.onrender.com';
         return url;
       }
 
       // For local development, use relative URLs to work with nginx proxy
       // This allows the nginx container to proxy /api/ requests to the backend
       final url = '';
-      print('🌐 API Config: Using relative URL (empty string) for nginx proxy');
-      print('🌐 API Config: Uri.base.host = ${Uri.base.host}');
-      print('🌐 API Config: Uri.base = ${Uri.base}');
       return url;
     } else {
       // For mobile apps, always use production URL
-      final url = 'https://ai-mental-health-assistant-tddc.onrender.com';
-      print('🌐 API Config: Using mobile production URL: $url');
+      final url = 'https://ai-mental-health-backend.onrender.com';
       return url;
     }
   }

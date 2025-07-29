@@ -37,7 +37,7 @@ services:
     plan: free
     buildCommand: |
       cd ai_buddy_web
-      flutter build web --release
+      flutter build web --release --web-renderer canvaskit
     staticPublishPath: ./ai_buddy_web/build/web
     envVars:
       - key: API_URL

@@ -11,16 +11,6 @@ import 'models/message.dart';
 import 'config/api_config.dart';
 
 void main() {
-  // Debug logging for API configuration
-  print('🚀 === FLUTTER APP STARTING ===');
-  print('🌐 kIsWeb: $kIsWeb');
-  if (kIsWeb) {
-    print('🌐 Uri.base.host: ${Uri.base.host}');
-    print('🌐 Uri.base: ${Uri.base}');
-    print('🌐 ApiConfig.baseUrl: ${ApiConfig.baseUrl}');
-    print('🌐 ApiConfig.environment: ${ApiConfig.environment}');
-    print('🌐 ApiConfig.debugInfo: ${ApiConfig.debugInfo}');
-  }
   runApp(const MyApp());
 }
 
