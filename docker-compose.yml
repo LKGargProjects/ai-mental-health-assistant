@@ -25,6 +25,7 @@ services:
     volumes:
       - ./instance:/app/instance
       - ./flask_session:/app/flask_session
+      - .:/app
     networks:
       - ai-buddy-network
 
