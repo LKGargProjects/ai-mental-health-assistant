@@ -149,11 +149,11 @@ def create_app() -> Flask:
     # Load configuration
     app.config.from_object(Config)
     
-    # Set SQLAlchemy database URI with explicit psycopg2 driver
+    # Set SQLAlchemy database URI with explicit psycopg driver
     if Config.DATABASE_URL:
-        # Force use of psycopg2 driver
-        if 'postgresql://' in Config.DATABASE_URL and 'psycopg2' not in Config.DATABASE_URL:
-            Config.DATABASE_URL = Config.DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://')
+        # Force use of psycopg driver
+        if 'postgresql://' in Config.DATABASE_URL and 'psycopg' not in Config.DATABASE_URL:
+            Config.DATABASE_URL = Config.DATABASE_URL.replace('postgresql://', 'postgresql+psycopg://')
         app.config['SQLALCHEMY_DATABASE_URI'] = Config.DATABASE_URL
     else:
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
