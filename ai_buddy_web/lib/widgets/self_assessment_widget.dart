@@ -210,157 +210,147 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Self Assessment'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'How are you feeling today?',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'How are you feeling today?',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 24),
 
-              // Mood Selection
-              _buildSelectionGrid(
-                title: 'Mood',
-                options: _moodOptions,
-                selectedValue: _selectedMood,
-                onChanged: (value) => setState(() => _selectedMood = value),
-                showIcons: true,
-              ),
+            // Mood Selection
+            _buildSelectionGrid(
+              title: 'Mood',
+              options: _moodOptions,
+              selectedValue: _selectedMood,
+              onChanged: (value) => setState(() => _selectedMood = value),
+              showIcons: true,
+            ),
 
-              // Energy Level
-              _buildSelectionGrid(
-                title: 'Energy Level',
-                options: _levelOptions,
-                selectedValue: _selectedEnergy,
-                onChanged: (value) => setState(() => _selectedEnergy = value),
-              ),
+            // Energy Level
+            _buildSelectionGrid(
+              title: 'Energy Level',
+              options: _levelOptions,
+              selectedValue: _selectedEnergy,
+              onChanged: (value) => setState(() => _selectedEnergy = value),
+            ),
 
-              // Sleep Quality
-              _buildSelectionGrid(
-                title: 'Sleep Quality',
-                options: _sleepOptions,
-                selectedValue: _selectedSleep,
-                onChanged: (value) => setState(() => _selectedSleep = value),
-              ),
+            // Sleep Quality
+            _buildSelectionGrid(
+              title: 'Sleep Quality',
+              options: _sleepOptions,
+              selectedValue: _selectedSleep,
+              onChanged: (value) => setState(() => _selectedSleep = value),
+            ),
 
-              // Stress Level
-              _buildSelectionGrid(
-                title: 'Stress Level',
-                options: _levelOptions,
-                selectedValue: _selectedStress,
-                onChanged: (value) => setState(() => _selectedStress = value),
-              ),
+            // Stress Level
+            _buildSelectionGrid(
+              title: 'Stress Level',
+              options: _levelOptions,
+              selectedValue: _selectedStress,
+              onChanged: (value) => setState(() => _selectedStress = value),
+            ),
 
-              // Crisis Level (Optional)
-              const Text(
-                'Crisis Level (Optional)',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            // Crisis Level (Optional)
+            const Text(
+              'Crisis Level (Optional)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedCrisisLevel.isEmpty ? null : _selectedCrisisLevel,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Select crisis level (if applicable)',
               ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedCrisisLevel.isEmpty
-                    ? null
-                    : _selectedCrisisLevel,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Select crisis level (if applicable)',
-                ),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('None')),
-                  ..._levelOptions.map(
-                    (option) => DropdownMenuItem(
-                      value: option['value'],
-                      child: Text(option['label']),
-                    ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('None')),
+                ..._levelOptions.map(
+                  (option) => DropdownMenuItem(
+                    value: option['value'],
+                    child: Text(option['label']),
                   ),
-                ],
-                onChanged: (value) =>
-                    setState(() => _selectedCrisisLevel = value ?? ''),
-              ),
-              const SizedBox(height: 16),
-
-              // Anxiety Level (Optional)
-              const Text(
-                'Anxiety Level (Optional)',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedAnxietyLevel.isEmpty
-                    ? null
-                    : _selectedAnxietyLevel,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Select anxiety level (if applicable)',
                 ),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('None')),
-                  ..._levelOptions.map(
-                    (option) => DropdownMenuItem(
-                      value: option['value'],
-                      child: Text(option['label']),
-                    ),
-                  ),
-                ],
-                onChanged: (value) =>
-                    setState(() => _selectedAnxietyLevel = value ?? ''),
-              ),
-              const SizedBox(height: 16),
+              ],
+              onChanged: (value) =>
+                  setState(() => _selectedCrisisLevel = value ?? ''),
+            ),
+            const SizedBox(height: 16),
 
-              // Notes
-              const Text(
-                'Additional Notes',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            // Anxiety Level (Optional)
+            const Text(
+              'Anxiety Level (Optional)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedAnxietyLevel.isEmpty
+                  ? null
+                  : _selectedAnxietyLevel,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Select anxiety level (if applicable)',
               ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _notesController,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText:
-                      'Describe how you\'re feeling, any concerns, or thoughts...',
+              items: [
+                const DropdownMenuItem(value: null, child: Text('None')),
+                ..._levelOptions.map(
+                  (option) => DropdownMenuItem(
+                    value: option['value'],
+                    child: Text(option['label']),
+                  ),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please add some notes about how you\'re feeling';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
+              ],
+              onChanged: (value) =>
+                  setState(() => _selectedAnxietyLevel = value ?? ''),
+            ),
+            const SizedBox(height: 16),
 
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitAssessment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
+            // Notes
+            const Text(
+              'Additional Notes (Optional)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _notesController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Share any additional thoughts or feelings...',
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Submit Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isSubmitting ? null : _submitAssessment,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: _isSubmitting
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Submit Assessment',
-                          style: TextStyle(fontSize: 16),
+                ),
+                child: _isSubmitting
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'Submit Assessment',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
-                ),
+                      ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
