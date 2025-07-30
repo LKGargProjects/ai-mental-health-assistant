@@ -80,6 +80,26 @@ if flutter build web --release --web-renderer canvaskit; then
         echo "=== Build Information ==="
         echo "Build directory: $(pwd)/build/web"
         echo "Build size: $(du -sh build/web | cut -f1)"
+        # Copy Flutter build to Flask static folder
+        echo "Copying Flutter build to Flask static folder..."
+
+        # Create static directory if it doesn't exist
+        mkdir -p ../static
+
+        # Copy built Flutter files to static folder
+        echo "Copying Flutter build files..."
+        cp -r build/web/* ../static/
+        echo "✅ Flutter files copied to static folder"
+
+        # Verify the copy
+        if [ -f "../static/index.html" ]; then
+            echo "✅ index.html found in static folder"
+            echo "Static folder contents:"
+            ls -la ../static/
+        else
+            echo "❌ index.html not found in static folder"
+            exit 1
+        fi
         echo "Files count: $(find build/web -type f | wc -l)"
         
     else
