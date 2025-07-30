@@ -72,28 +72,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
     });
 
     try {
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: ApiConfig.baseUrl,
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            if (widget.sessionId != null) 'X-Session-ID': widget.sessionId,
-          },
-        ),
-      );
-
-      // Add logging interceptor
-      dio.interceptors.add(
-        LogInterceptor(
-          requestBody: true,
-          responseBody: true,
-          error: true,
-          logPrint: (obj) => print('SELF-ASSESSMENT LOG: $obj'),
-        ),
-      );
+      final apiService = ApiService();
 
       // Build assessment data with proper null handling
       final Map<String, dynamic> assessmentData = {
@@ -114,11 +93,8 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
       }
 
       print('📤 Sending self-assessment data: $assessmentData');
-      final response = await dio.post(
-        '/api/self_assessment',
-        data: assessmentData,
-      );
-      print('✅ Self-assessment response: ${response.data}');
+      final response = await apiService.submitSelfAssessment(assessmentData);
+      print('✅ Self-assessment response: $response');
 
       // If we reach here, the submission was successful
       if (mounted) {
