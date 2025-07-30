@@ -39,7 +39,15 @@ class MoodProvider extends ChangeNotifier {
 
     try {
       final entry = MoodEntry(moodLevel: moodLevel, note: note);
-      await _apiService.addMoodEntry(entry);
+
+      // Convert MoodEntry to Map for API call
+      final data = {
+        'mood_level': moodLevel,
+        'note': note,
+        'timestamp': entry.timestamp.toIso8601String(),
+      };
+
+      await _apiService.addMoodEntry(data);
       _moodEntries = [..._moodEntries, entry];
       _error = null;
     } catch (e) {

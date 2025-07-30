@@ -1,14 +1,14 @@
 """
 AI Mental Health Assistant - Flask Backend
-Optimized for performance and maintainability
+Optimized for single codebase usage across development, Docker, and Render production
 """
 
 import os
 import json
 import uuid
 import redis
-from datetime import datetime
-from typing import Dict, Any, Optional, Tuple
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, Tuple, List
 
 from flask import Flask, request, jsonify, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -29,51 +29,211 @@ from providers.openai import get_openai_response
 from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
 from crisis_detection import detect_crisis_level
 
-# Configuration constants
+def _detect_environment() -> str:
+    """Detect current environment automatically for single codebase usage"""
+    if os.environ.get('RENDER'):
+        return 'production'
+    elif os.environ.get('DOCKER_ENV') or os.environ.get('DOCKER'):
+        return 'docker'
+    elif os.environ.get('ENVIRONMENT'):
+        return os.environ.get('ENVIRONMENT')
+    else:
+        return 'local'
+
+def _get_environment_config(environment: str) -> Dict[str, Any]:
+    """Get environment-specific configuration for single codebase usage"""
+    configs = {
+        'local': {
+            'port': 5055,
+            'database_url': 'postgresql+psycopg://ai_buddy:ai_buddy_password@localhost:5432/mental_health',
+            'redis_url': 'redis://localhost:6379',
+            'cors_origins': [
+                'http://localhost:8080', 
+                'http://127.0.0.1:8080',
+                'http://localhost:3000',
+                'http://localhost:9100',
+                'http://127.0.0.1:9100'
+            ],
+        },
+        'docker': {
+            'port': 5055,
+            'database_url': 'postgresql+psycopg://ai_buddy:ai_buddy_password@db:5432/mental_health',
+            'redis_url': 'redis://redis:6379',
+            'cors_origins': [
+                'http://localhost:8080', 
+                'http://127.0.0.1:8080',
+                'http://localhost:3000',
+                'http://localhost:9100',
+                'http://127.0.0.1:9100'
+            ],
+        },
+        'production': {
+            'port': 10000,
+            'database_url': os.environ.get('DATABASE_URL'),
+            'redis_url': 'redis://localhost:6379',
+            'cors_origins': [
+                'https://ai-mental-health-assistant-tddc.onrender.com',
+                'https://*.onrender.com',
+                'https://ai-mental-health-backend.onrender.com'
+            ],
+        }
+    }
+    return configs.get(environment, configs['local'])
+
+# Configuration constants with environment detection
+ENVIRONMENT = _detect_environment()
+ENV_CONFIG = _get_environment_config(ENVIRONMENT)
+
 class Config:
-    """Centralized configuration management"""
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod')
-    ENVIRONMENT = os.environ.get('ENVIRONMENT', 'local')
-    AI_PROVIDER = os.environ.get('AI_PROVIDER', 'gemini')
-    PORT = int(os.environ.get('PORT', 5055))
+    """Configuration class for single codebase usage"""
+    
+    # Environment detection
+    ENVIRONMENT = os.getenv('ENVIRONMENT', 'local')
+    RENDER = os.getenv('RENDER', 'false').lower() == 'true'
+    DOCKER_ENV = os.getenv('DOCKER_ENV', 'false').lower() == 'true'
     
     # Database configuration
-    DATABASE_URL = os.environ.get('DATABASE_URL')
-    if DATABASE_URL and DATABASE_URL.strip() and DATABASE_URL != 'port':
-        if DATABASE_URL.startswith('postgresql://'):
-            DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg://')
-        SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    if RENDER:
+        # Production (Render) configuration
+        DATABASE_URL = os.getenv('DATABASE_URL')
+        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+    elif DOCKER_ENV:
+        # Docker environment
+        DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://ai_buddy:ai_buddy_password@db:5432/mental_health')
     else:
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///mental_health.db'
-    
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+        # Local development
+        DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://ai_buddy:ai_buddy_password@localhost:5432/mental_health')
     
     # Redis configuration
-    REDIS_URL = os.environ.get('REDIS_URL')
+    if RENDER:
+        REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
+    elif DOCKER_ENV:
+        REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379')
+    else:
+        REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
     
-    # CORS origins
-    CORS_ORIGINS = [
-        "http://localhost:8080", 
-        "http://127.0.0.1:8080", 
-        "http://localhost:3000",
-        "http://localhost:9100",
-        "http://127.0.0.1:9100",
-        "https://ai-mental-health-assistant-tddc.onrender.com",
-        "https://*.onrender.com"
-    ]
+    # Flask configuration
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+    SESSION_TYPE = os.getenv('SESSION_TYPE', 'redis')
+    
+    # Server configuration
+    PORT = int(os.getenv('PORT', 5055))
+    BACKEND_PORT = int(os.getenv('BACKEND_PORT', 5055))
+    
+    # AI Provider configuration
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+    PPLX_API_KEY = os.getenv('PPLX_API_KEY')
+    AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
+    
+    # CORS configuration
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:8080,http://localhost:3000').split(',')
+    
+    # Rate limiting
+    RATE_LIMIT_ENABLED = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() == 'true'
+    RATE_LIMIT_REQUESTS = int(os.getenv('RATE_LIMIT_REQUESTS', 30))
+    RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', 60))
+    
+    # Logging
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    
+    # Version and build info
+    VERSION = os.getenv('VERSION', '1.0.0')
+    BUILD_TIME = os.getenv('BUILD_TIME', 'unknown')
 
 def create_app() -> Flask:
-    """Application factory pattern for better testing and modularity"""
-    app = Flask(__name__, static_folder='ai_buddy_web/build/web', static_url_path='')
+    """Application factory pattern for single codebase usage"""
+app = Flask(__name__)
+    
+    # Load configuration
     app.config.from_object(Config)
     
+    # Temporarily use SQLite for testing
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
     # Initialize extensions
     _init_extensions(app)
     
+    # Initialize database tables
+    _init_database(app)
+    
     # Register routes
     _register_routes(app)
+    _register_additional_routes(app)
     
     return app
+
+def _init_database(app: Flask) -> None:
+    """Initialize database with tables"""
+    with app.app_context():
+        try:
+            # Create tables if they don't exist
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id VARCHAR(255) PRIMARY KEY,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) REFERENCES sessions(id),
+                    content TEXT NOT NULL,
+                    is_user BOOLEAN NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    message_type VARCHAR(50) DEFAULT 'text'
+                )
+            """))
+            
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS mood_entries (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) REFERENCES sessions(id),
+                    mood_level INTEGER NOT NULL CHECK (mood_level >= 1 AND mood_level <= 5),
+                    note TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS self_assessments (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) REFERENCES sessions(id),
+                    mood INTEGER,
+                    energy INTEGER,
+                    sleep INTEGER,
+                    stress INTEGER,
+                    social INTEGER,
+                    work INTEGER,
+                    notes TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS crisis_detections (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) REFERENCES sessions(id),
+                    message TEXT NOT NULL,
+                    risk_level VARCHAR(50) NOT NULL,
+                    risk_score DECIMAL(3,2) NOT NULL,
+                    keywords TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            db.session.commit()
+            app.logger.info("Database tables initialized successfully")
+            
+        except Exception as e:
+            app.logger.error(f"Database initialization error: {e}")
+            db.session.rollback()
+            raise
+
 
 def _init_extensions(app: Flask) -> None:
     """Initialize Flask extensions with proper error handling"""
@@ -85,12 +245,12 @@ def _init_extensions(app: Flask) -> None:
         _setup_session(app)
         
         # Initialize rate limiter
-        _setup_rate_limiter(app)
+        app.limiter = _setup_rate_limiter(app)
         
         # Setup CORS
         _setup_cors(app)
         
-        app.logger.info("All extensions initialized successfully")
+        app.logger.info(f"All extensions initialized successfully for environment: {app.config.get('ENVIRONMENT')}")
         
     except Exception as e:
         app.logger.error(f"Failed to initialize extensions: {e}")
@@ -102,30 +262,30 @@ def _setup_session(app: Flask) -> None:
     
     if redis_url and redis_url != 'port' and redis_url.strip():
         try:
-            redis_client = redis.from_url(redis_url)
+        redis_client = redis.from_url(redis_url)
             redis_client.ping()
-            app.config['SESSION_TYPE'] = 'redis'
-            app.config['SESSION_REDIS'] = redis_client
+        app.config['SESSION_TYPE'] = 'redis'
+        app.config['SESSION_REDIS'] = redis_client
             app.logger.info("Redis sessions enabled")
-        except Exception as e:
+    except Exception as e:
             app.logger.warning(f"Redis connection failed: {e}, using filesystem sessions")
             app.config['SESSION_TYPE'] = 'filesystem'
             app.config['SESSION_REDIS'] = None
     else:
         app.logger.info("No REDIS_URL found, using filesystem sessions")
-        app.config['SESSION_TYPE'] = 'filesystem'
-        app.config['SESSION_REDIS'] = None
-    
-    app.config['SESSION_PERMANENT'] = False
+    app.config['SESSION_TYPE'] = 'filesystem'
+    app.config['SESSION_REDIS'] = None
+
+app.config['SESSION_PERMANENT'] = False
     app.config['SESSION_USE_SIGNER'] = False
-    
-    Session(app)
+
+Session(app)
 
 def _setup_rate_limiter(app: Flask) -> Limiter:
     """Configure rate limiting"""
     return Limiter(
-        key_func=get_remote_address,
-        app=app,
+    key_func=get_remote_address,
+    app=app,
         default_limits=["500 per day", "100 per hour"],
         storage_uri=app.config.get('REDIS_URL', 'memory://')
     )
@@ -153,7 +313,7 @@ def _register_routes(app: Flask) -> None:
     @app.route("/", methods=["GET"])
     def index():
         """Serve the Flutter web app or fallback page"""
-        app.logger.info(f"Root route called. Static folder: {app.static_folder}")
+        app.logger.info(f"Root route called. Environment: {app.config.get('ENVIRONMENT')}")
         
         if os.path.exists(app.static_folder) and os.path.exists(os.path.join(app.static_folder, 'index.html')):
             return send_from_directory(app.static_folder, 'index.html')
@@ -162,7 +322,7 @@ def _register_routes(app: Flask) -> None:
 
     @app.route("/api/health", methods=["GET"])
     def health():
-        """Enhanced health check endpoint"""
+        """Enhanced health check endpoint with environment info"""
         try:
             # Check database connection
             db_status = _check_database_health()
@@ -180,6 +340,12 @@ def _register_routes(app: Flask) -> None:
                 "redis": redis_status,
                 "cors_enabled": True,
                 "cors_origins": app.config.get('CORS_ORIGINS', []),
+                "deployment": {
+                    "platform": _detect_platform(),
+                    "environment": app.config.get('ENVIRONMENT'),
+                    "version": os.environ.get('VERSION', '1.0.0'),
+                    "build_time": os.environ.get('BUILD_TIME', datetime.utcnow().isoformat()),
+                },
                 "endpoints": [
                     "/api/health",
                     "/api/chat", 
@@ -226,7 +392,7 @@ def _register_routes(app: Flask) -> None:
             return jsonify({"error": "Internal server error"}), 500
 
     # Additional routes...
-    _register_additional_routes(app)
+    # _register_additional_routes(app)  # Removed duplicate call
 
 def _get_or_create_session() -> str:
     """Get or create user session with proper error handling"""
@@ -237,16 +403,29 @@ def _get_or_create_session() -> str:
     
     try:
         # Check if session exists in database
-        existing_session = UserSession.query.filter_by(session_id=session_id).first()
+        existing_session = db.session.execute(
+            text("SELECT id FROM sessions WHERE id = :session_id"),
+            {'session_id': session_id}
+        ).fetchone()
+        
         if not existing_session:
-            new_session = UserSession(session_id=session_id)
-            db.session.add(new_session)
+            # Create new session in database
+            db.session.execute(
+                text("INSERT INTO sessions (id, created_at, last_activity) VALUES (:session_id, NOW(), NOW())"),
+                {'session_id': session_id}
+            )
             db.session.commit()
             app.logger.info(f"Created new session: {session_id}")
         else:
+            # Update last activity
+            db.session.execute(
+                text("UPDATE sessions SET last_activity = NOW() WHERE id = :session_id"),
+                {'session_id': session_id}
+            )
+            db.session.commit()
             app.logger.info(f"Using existing session: {session_id}")
             
-    except Exception as e:
+        except Exception as e:
         app.logger.error(f"Session management error: {e}")
         # Continue without database session if needed
     
@@ -269,7 +448,7 @@ def _process_chat_message(message: str, session_id: str) -> Tuple[str, str]:
         
         # Detect crisis level
         risk_level = detect_crisis_level(message)
-        
+
         # Log conversation
         _log_conversation(session_id, message, ai_response, risk_level)
         
@@ -333,8 +512,17 @@ def _check_redis_health() -> str:
     except Exception as e:
         return f"unhealthy: {str(e)}"
 
+def _detect_platform() -> str:
+    """Detect deployment platform for single codebase usage"""
+    if os.environ.get('RENDER'):
+        return 'render'
+    elif os.environ.get('DOCKER_ENV') or os.environ.get('DOCKER'):
+        return 'docker'
+    else:
+        return 'local'
+
 def _get_fallback_html(app: Flask) -> str:
-    """Generate fallback HTML page"""
+    """Generate fallback HTML page with environment info"""
     return f"""
     <!DOCTYPE html>
     <html>
@@ -345,52 +533,641 @@ def _get_fallback_html(app: Flask) -> str:
             .container {{ max-width: 600px; margin: 0 auto; }}
             .api-link {{ display: block; margin: 10px 0; padding: 10px; background: #f0f0f0; text-decoration: none; color: #333; }}
             .api-link:hover {{ background: #e0e0e0; }}
+            .env-info {{ background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }}
         </style>
     </head>
     <body>
         <div class="container">
             <h1>AI Mental Health Assistant</h1>
+            <div class="env-info">
+                <h3>Environment Information</h3>
+                <p><strong>Environment:</strong> {app.config.get('ENVIRONMENT')}</p>
+                <p><strong>Platform:</strong> {_detect_platform()}</p>
+                <p><strong>Port:</strong> {app.config.get('PORT')}</p>
+                <p><strong>Static Folder:</strong> {app.static_folder}</p>
+                <p><strong>Static Folder Exists:</strong> {os.path.exists(app.static_folder)}</p>
+                <p><strong>Index.html Exists:</strong> {os.path.exists(os.path.join(app.static_folder, 'index.html'))}</p>
+            </div>
             <p>The Flutter web app is not available. Here are the API endpoints:</p>
             <a href="/api/health" class="api-link">Health Check</a>
             <a href="/api/deploy-test" class="api-link">Deploy Test</a>
             <a href="/api/stats" class="api-link">Statistics</a>
-            <p>Static folder: {app.static_folder}</p>
-            <p>Static folder exists: {os.path.exists(app.static_folder)}</p>
-            <p>Index.html exists: {os.path.exists(os.path.join(app.static_folder, 'index.html'))}</p>
         </div>
     </body>
     </html>
     """
+
+def _enhanced_crisis_detection(message: str) -> Tuple[str, float, List[str]]:
+    """Enhanced crisis detection with keyword analysis"""
+    message_lower = message.lower()
+    
+    # Crisis keywords with weights
+    crisis_keywords = {
+        'suicide': 1.0, 'kill myself': 1.0, 'want to die': 1.0, 'end it all': 1.0,
+        'self harm': 0.9, 'cut myself': 0.9, 'hurt myself': 0.9,
+        'hopeless': 0.8, 'no hope': 0.8, 'worthless': 0.8, 'useless': 0.8,
+        'depressed': 0.7, 'depression': 0.7, 'anxiety': 0.6, 'panic': 0.6,
+        'lonely': 0.5, 'alone': 0.5, 'isolated': 0.5,
+        'stress': 0.4, 'overwhelmed': 0.4, 'can\'t cope': 0.4
+    }
+    
+    found_keywords = []
+    total_score = 0.0
+    
+    for keyword, weight in crisis_keywords.items():
+        if keyword in message_lower:
+            found_keywords.append(keyword)
+            total_score += weight
+    
+    # Normalize score
+    max_possible_score = sum(crisis_keywords.values())
+    normalized_score = total_score / max_possible_score if max_possible_score > 0 else 0
+    
+    # Determine risk level
+    if normalized_score >= 0.8:
+        risk_level = 'crisis'
+    elif normalized_score >= 0.6:
+        risk_level = 'high'
+    elif normalized_score >= 0.4:
+        risk_level = 'medium'
+    else:
+        risk_level = 'low'
+    
+    return risk_level, normalized_score, found_keywords
+
+
+def _get_crisis_response(risk_level: str, risk_score: float) -> str:
+    """Get appropriate crisis response based on risk level"""
+    responses = {
+        'crisis': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call the National Suicide Prevention Lifeline at 988 or text HOME to 741741 to reach the Crisis Text Line. You're not alone, and help is available 24/7.",
+        'high': "I'm worried about what you're experiencing. These feelings are serious and you deserve support. Please consider reaching out to a mental health professional or calling 988 for immediate support. You don't have to face this alone.",
+        'medium': "I can see you're going through a difficult time. It's important to take these feelings seriously. Consider talking to someone you trust or reaching out to a mental health professional. You're showing strength by sharing this.",
+        'low': "Thank you for sharing how you're feeling. It's normal to have difficult moments, and it's okay to not be okay. Consider reaching out to friends, family, or a mental health professional for support."
+    }
+    return responses.get(risk_level, responses['low'])
+
+
+def _get_crisis_resources(risk_level: str) -> Dict[str, Any]:
+    """Get crisis resources based on risk level"""
+    resources = {
+        'crisis': {
+            'immediate': [
+                {'name': 'National Suicide Prevention Lifeline', 'number': '988', 'available': '24/7'},
+                {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+                {'name': 'Emergency Services', 'number': '911', 'available': '24/7'}
+            ],
+            'online': [
+                {'name': 'Crisis Chat', 'url': 'https://www.crisischat.org/'},
+                {'name': 'IMAlive', 'url': 'https://www.imalive.org/'}
+            ]
+        },
+        'high': {
+            'immediate': [
+                {'name': 'National Suicide Prevention Lifeline', 'number': '988', 'available': '24/7'},
+                {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'}
+            ],
+            'online': [
+                {'name': 'Find a Therapist', 'url': 'https://www.psychologytoday.com/us/therapists'},
+                {'name': 'Mental Health Resources', 'url': 'https://www.nami.org/help'}
+            ]
+        },
+        'medium': {
+            'immediate': [
+                {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'}
+            ],
+            'online': [
+                {'name': 'Find a Therapist', 'url': 'https://www.psychologytoday.com/us/therapists'},
+                {'name': 'Mental Health Resources', 'url': 'https://www.nami.org/help'}
+            ]
+        },
+        'low': {
+            'immediate': [],
+            'online': [
+                {'name': 'Mental Health Resources', 'url': 'https://www.nami.org/help'},
+                {'name': 'Self-Care Tips', 'url': 'https://www.mind.org.uk/information-support/tips-for-everyday-living/'}
+            ]
+        }
+    }
+    return resources.get(risk_level, resources['low'])
+
+
+def _get_personalized_recommendations(avg_mood: float, recent_entries: List) -> List[Dict[str, Any]]:
+    """Get personalized wellness recommendations based on mood"""
+    recommendations = []
+    
+    if avg_mood <= 2.0:
+        # Low mood recommendations
+        recommendations.extend([
+            {
+                'type': 'immediate',
+                'title': 'Reach Out for Support',
+                'description': 'Consider talking to a trusted friend, family member, or mental health professional.',
+                'action': 'Call a friend or family member'
+            },
+            {
+                'type': 'activity',
+                'title': 'Gentle Physical Activity',
+                'description': 'Even a short walk can help improve your mood and energy levels.',
+                'action': 'Take a 10-minute walk outside'
+            },
+            {
+                'type': 'self_care',
+                'title': 'Practice Self-Compassion',
+                'description': 'Be kind to yourself. It\'s okay to not be okay.',
+                'action': 'Write down 3 things you\'re grateful for'
+            }
+        ])
+    elif avg_mood <= 3.5:
+        # Moderate mood recommendations
+        recommendations.extend([
+            {
+                'type': 'activity',
+                'title': 'Engage in Enjoyable Activities',
+                'description': 'Do something you normally enjoy, even if you don\'t feel like it initially.',
+                'action': 'Listen to your favorite music or watch a movie'
+            },
+            {
+                'type': 'social',
+                'title': 'Social Connection',
+                'description': 'Connect with others, even if it\'s just a brief conversation.',
+                'action': 'Send a message to a friend'
+            },
+            {
+                'type': 'routine',
+                'title': 'Maintain Daily Routine',
+                'description': 'Stick to your regular schedule to provide structure and stability.',
+                'action': 'Follow your usual daily routine'
+            }
+        ])
+    else:
+        # Good mood recommendations
+        recommendations.extend([
+            {
+                'type': 'maintenance',
+                'title': 'Maintain Positive Habits',
+                'description': 'Keep up with activities that contribute to your well-being.',
+                'action': 'Continue your current positive routines'
+            },
+            {
+                'type': 'growth',
+                'title': 'Personal Development',
+                'description': 'Use your positive energy to work on personal goals.',
+                'action': 'Set a small goal for the week'
+            },
+            {
+                'type': 'gratitude',
+                'title': 'Practice Gratitude',
+                'description': 'Reflect on what\'s going well in your life.',
+                'action': 'Write down 5 things you appreciate today'
+            }
+        ])
+    
+    return recommendations
+
+
+def _get_default_recommendations() -> List[Dict[str, Any]]:
+    """Get default wellness recommendations"""
+    return [
+        {
+            'type': 'general',
+            'title': 'Start with Small Steps',
+            'description': 'Begin with simple activities that can improve your mood.',
+            'action': 'Take a few deep breaths and stretch'
+        },
+        {
+            'type': 'connection',
+            'title': 'Reach Out',
+            'description': 'Connect with someone you trust.',
+            'action': 'Send a message to a friend or family member'
+        },
+        {
+            'type': 'self_care',
+            'title': 'Practice Self-Care',
+            'description': 'Do something kind for yourself.',
+            'action': 'Take a warm shower or bath'
+        }
+    ]
+
+
+def _analyze_mood_pattern(entries: List) -> Dict[str, Any]:
+    """Analyze mood patterns from recent entries"""
+    if not entries:
+        return {'pattern': 'insufficient_data', 'trend': 'unknown'}
+    
+    mood_levels = [entry.mood_level for entry in entries]
+    
+    # Calculate trend
+    if len(mood_levels) >= 2:
+        recent_avg = sum(mood_levels[:3]) / min(3, len(mood_levels))
+        older_avg = sum(mood_levels[3:6]) / min(3, len(mood_levels[3:]))
+        
+        if recent_avg > older_avg + 0.5:
+            trend = 'improving'
+        elif recent_avg < older_avg - 0.5:
+            trend = 'declining'
+        else:
+            trend = 'stable'
+    else:
+        trend = 'insufficient_data'
+    
+    # Identify patterns
+    if len(mood_levels) >= 3:
+        if all(level <= 2 for level in mood_levels[:3]):
+            pattern = 'consistently_low'
+        elif all(level >= 4 for level in mood_levels[:3]):
+            pattern = 'consistently_high'
+        elif mood_levels[0] < mood_levels[1] < mood_levels[2]:
+            pattern = 'improving'
+        elif mood_levels[0] > mood_levels[1] > mood_levels[2]:
+            pattern = 'declining'
+        else:
+            pattern = 'fluctuating'
+    else:
+        pattern = 'insufficient_data'
+    
+    return {
+        'pattern': pattern,
+        'trend': trend,
+        'recent_moods': mood_levels[:5],
+        'average': round(sum(mood_levels) / len(mood_levels), 2)
+    }
+
+
+def _log_crisis_detection(session_id: str, message: str, risk_level: str, risk_score: float, keywords: List[str]) -> None:
+    """Log crisis detection for monitoring"""
+    try:
+        db.session.execute(
+            text("""
+                INSERT INTO crisis_detections (session_id, message, risk_level, risk_score, keywords, timestamp)
+                VALUES (:session_id, :message, :risk_level, :risk_score, :keywords, :timestamp)
+            """),
+            {
+                'session_id': session_id,
+                'message': message,
+                'risk_level': risk_level,
+                'risk_score': risk_score,
+                'keywords': ','.join(keywords),
+                'timestamp': datetime.utcnow()
+            }
+        )
+        db.session.commit()
+    except Exception as e:
+        app.logger.error(f"Failed to log crisis detection: {e}")
+        db.session.rollback()
+
 
 def _register_additional_routes(app: Flask) -> None:
     """Register additional API routes"""
     
     @app.route("/api/get_or_create_session", methods=['GET'])
     def get_or_create_session_endpoint():
-        """Get or create session endpoint"""
+        """Get or create user session"""
         session_id = _get_or_create_session()
-        return jsonify({"session_id": session_id})
+        return jsonify({'session_id': session_id})
 
     @app.route('/api/chat_history', methods=['GET'])
     def get_chat_history():
-        """Get chat history for current session"""
-        session_id = request.headers.get('X-Session-ID')
-        if not session_id:
-            return jsonify([])
-        
+        """Get chat history for the current session"""
         try:
-            messages = ConversationLog.query.filter_by(session_id=session_id).order_by(ConversationLog.timestamp.desc()).limit(50).all()
-            return jsonify([{
-                'user_message': msg.user_message,
-                'ai_response': msg.ai_response,
-                'risk_level': msg.risk_level,
-                'timestamp': msg.timestamp.isoformat()
-            } for msg in messages])
-        except Exception as e:
-            app.logger.error(f"Chat history error: {e}")
-            return jsonify([])
+            session_id = request.headers.get('X-Session-ID')
+            if not session_id:
+                return jsonify({'error': 'Session ID required'}), 400
 
-    @app.route('/api/self_assessment', methods=['POST', 'GET'])
+            # Get chat messages from database
+            messages = db.session.execute(
+                text("""
+                    SELECT content, is_user, timestamp 
+                    FROM chat_messages 
+                    WHERE session_id = :session_id 
+                    ORDER BY timestamp ASC 
+                    LIMIT 50
+                """),
+                {'session_id': session_id}
+            ).fetchall()
+
+            chat_history = []
+            for message in messages:
+                chat_history.append({
+                    'content': message.content,
+                    'is_user': message.is_user,
+                    'timestamp': message.timestamp.isoformat() if message.timestamp else None
+                })
+
+            return jsonify(chat_history)
+
+        except Exception as e:
+            app.logger.error(f"Error getting chat history: {e}")
+            return jsonify({'error': 'Failed to get chat history'}), 500
+
+    @app.route('/api/mood_history', methods=['GET'])
+    @app.limiter.limit("30 per minute")
+    def get_mood_history():
+        """Get mood history for the current session"""
+        try:
+            session_id = request.headers.get('X-Session-ID')
+            if not session_id:
+                return jsonify({'error': 'Session ID required'}), 400
+
+            # Get mood entries from database
+            entries = db.session.execute(
+                text("""
+                    SELECT mood_level, note, timestamp 
+                    FROM mood_entries 
+                    WHERE session_id = :session_id 
+                    ORDER BY timestamp DESC 
+                    LIMIT 50
+                """),
+                {'session_id': session_id}
+            ).fetchall()
+
+            mood_history = []
+            for entry in entries:
+                mood_history.append({
+                    'mood_level': entry.mood_level,
+                    'note': entry.note,
+                    'timestamp': entry.timestamp.isoformat() if entry.timestamp else None
+                })
+
+            return jsonify(mood_history)
+
+        except Exception as e:
+            app.logger.error(f"Error getting mood history: {e}")
+            return jsonify({'error': 'Failed to get mood history'}), 500
+
+    @app.route('/api/mood_entry', methods=['POST'])
+    @app.limiter.limit("30 per minute")
+    def add_mood_entry():
+        """Add a new mood entry"""
+        try:
+            session_id = request.headers.get('X-Session-ID')
+            if not session_id:
+                return jsonify({'error': 'Session ID required'}), 400
+
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+
+            mood_level = data.get('mood_level')
+            note = data.get('note', '')
+            timestamp = data.get('timestamp')
+
+            if not mood_level or not isinstance(mood_level, int) or mood_level < 1 or mood_level > 5:
+                return jsonify({'error': 'Invalid mood level (1-5 required)'}), 400
+
+            # Parse timestamp if provided, otherwise use current time
+            if timestamp:
+                try:
+                    entry_timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                except ValueError:
+                    entry_timestamp = datetime.utcnow()
+            else:
+                entry_timestamp = datetime.utcnow()
+
+            # Insert mood entry into database
+            db.session.execute(
+                text("""
+                    INSERT INTO mood_entries (session_id, mood_level, note, timestamp)
+                    VALUES (:session_id, :mood_level, :note, :timestamp)
+                """),
+                {
+                    'session_id': session_id,
+                    'mood_level': mood_level,
+                    'note': note,
+                    'timestamp': entry_timestamp
+                }
+            )
+            db.session.commit()
+
+    return jsonify({
+                'message': 'Mood entry added successfully',
+                'mood_level': mood_level,
+                'note': note,
+                'timestamp': entry_timestamp.isoformat()
+            })
+
+        except Exception as e:
+            app.logger.error(f"Error adding mood entry: {e}")
+            db.session.rollback()
+            return jsonify({'error': 'Failed to add mood entry'}), 500
+
+    @app.route('/api/crisis_detection', methods=['POST'])
+    @app.limiter.limit("10 per minute")
+    def crisis_detection():
+        """Enhanced crisis detection with immediate response"""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+
+            message = data.get('message', '')
+            session_id = request.headers.get('X-Session-ID')
+            
+            if not message:
+                return jsonify({'error': 'Message required'}), 400
+
+            # Enhanced crisis detection
+            risk_level, risk_score, keywords = _enhanced_crisis_detection(message)
+            
+            # Immediate response based on risk level
+            response = _get_crisis_response(risk_level, risk_score)
+            
+            # Log crisis detection
+            _log_crisis_detection(session_id, message, risk_level, risk_score, keywords)
+            
+            return jsonify({
+                'risk_level': risk_level,
+                'risk_score': risk_score,
+                'keywords': keywords,
+                'response': response,
+                'immediate_action_required': risk_level in ['high', 'crisis'],
+                'resources': _get_crisis_resources(risk_level)
+            })
+
+        except Exception as e:
+            app.logger.error(f"Crisis detection error: {e}")
+            return jsonify({'error': 'Failed to process crisis detection'}), 500
+
+    @app.route('/api/mood_analytics', methods=['GET'])
+    @app.limiter.limit("30 per minute")
+    def mood_analytics():
+        """Get mood analytics and trends"""
+        try:
+            session_id = request.headers.get('X-Session-ID')
+            if not session_id:
+                return jsonify({'error': 'Session ID required'}), 400
+
+            # Get mood entries from database
+            entries = db.session.execute(
+                text("""
+                    SELECT mood_level, note, timestamp 
+                    FROM mood_entries 
+                    WHERE session_id = :session_id 
+                    ORDER BY timestamp DESC 
+                    LIMIT 100
+                """),
+                {'session_id': session_id}
+            ).fetchall()
+
+            if not entries:
+    return jsonify({
+                    'message': 'No mood data available',
+                    'analytics': {
+                        'average_mood': 0,
+                        'mood_trend': 'stable',
+                        'total_entries': 0,
+                        'weekly_average': 0,
+                        'mood_distribution': {}
+                    }
+                })
+
+            # Calculate analytics
+            mood_levels = [entry.mood_level for entry in entries]
+            average_mood = sum(mood_levels) / len(mood_levels)
+            
+            # Mood trend calculation
+            recent_moods = mood_levels[:7] if len(mood_levels) >= 7 else mood_levels
+            older_moods = mood_levels[7:14] if len(mood_levels) >= 14 else []
+            
+            if older_moods:
+                recent_avg = sum(recent_moods) / len(recent_moods)
+                older_avg = sum(older_moods) / len(older_moods)
+                if recent_avg > older_avg + 0.5:
+                    trend = 'improving'
+                elif recent_avg < older_avg - 0.5:
+                    trend = 'declining'
+                else:
+                    trend = 'stable'
+            else:
+                trend = 'stable'
+
+            # Mood distribution
+            mood_distribution = {}
+            for level in range(1, 6):
+                count = mood_levels.count(level)
+                mood_distribution[f"level_{level}"] = count
+
+            # Weekly average
+            week_ago = datetime.utcnow() - timedelta(days=7)
+            weekly_entries = [entry for entry in entries if entry.timestamp >= week_ago]
+            weekly_average = sum(entry.mood_level for entry in weekly_entries) / len(weekly_entries) if weekly_entries else 0
+
+            return jsonify({
+                'analytics': {
+                    'average_mood': round(average_mood, 2),
+                    'mood_trend': trend,
+                    'total_entries': len(entries),
+                    'weekly_average': round(weekly_average, 2),
+                    'mood_distribution': mood_distribution,
+                    'recent_entries': len(recent_moods)
+                }
+            })
+
+        except Exception as e:
+            app.logger.error(f"Mood analytics error: {e}")
+            return jsonify({'error': 'Failed to get mood analytics'}), 500
+
+    @app.route('/api/wellness_recommendations', methods=['GET'])
+    @app.limiter.limit("30 per minute")
+    def wellness_recommendations():
+        """Get personalized wellness recommendations"""
+        try:
+            session_id = request.headers.get('X-Session-ID')
+    if not session_id:
+                return jsonify({'error': 'Session ID required'}), 400
+
+            # Get recent mood data
+            recent_entries = db.session.execute(
+                text("""
+                    SELECT mood_level, note, timestamp 
+                    FROM mood_entries 
+                    WHERE session_id = :session_id 
+                    ORDER BY timestamp DESC 
+                    LIMIT 10
+                """),
+                {'session_id': session_id}
+            ).fetchall()
+
+            if not recent_entries:
+                return jsonify({
+                    'recommendations': _get_default_recommendations(),
+                    'message': 'No recent mood data available'
+                })
+
+            # Calculate average mood
+            avg_mood = sum(entry.mood_level for entry in recent_entries) / len(recent_entries)
+            
+            # Get personalized recommendations
+            recommendations = _get_personalized_recommendations(avg_mood, recent_entries)
+            
+            return jsonify({
+                'recommendations': recommendations,
+                'current_mood_average': round(avg_mood, 2),
+                'analysis': _analyze_mood_pattern(recent_entries)
+            })
+
+        except Exception as e:
+            app.logger.error(f"Wellness recommendations error: {e}")
+            return jsonify({'error': 'Failed to get recommendations'}), 500
+
+    @app.route('/api/metrics', methods=['GET'])
+    def metrics():
+        """Prometheus metrics endpoint"""
+        try:
+            import psutil
+            import time
+            
+            metrics = []
+            
+            # System metrics
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            # Application metrics
+            current_time = time.time()
+            
+            # Database connection health
+            db_health = _check_database_health()
+            redis_health = _check_redis_health()
+            
+            # Build metrics in Prometheus format
+            metrics.append(f"# HELP app_cpu_usage CPU usage percentage")
+            metrics.append(f"# TYPE app_cpu_usage gauge")
+            metrics.append(f"app_cpu_usage {cpu_percent}")
+            
+            metrics.append(f"# HELP app_memory_usage Memory usage percentage")
+            metrics.append(f"# TYPE app_memory_usage gauge")
+            metrics.append(f"app_memory_usage {memory.percent}")
+            
+            metrics.append(f"# HELP app_disk_usage Disk usage percentage")
+            metrics.append(f"# TYPE app_disk_usage gauge")
+            metrics.append(f"app_disk_usage {disk.percent}")
+            
+            metrics.append(f"# HELP app_uptime_seconds Application uptime in seconds")
+            metrics.append(f"# TYPE app_uptime_seconds counter")
+            metrics.append(f"app_uptime_seconds {current_time}")
+            
+            metrics.append(f"# HELP app_database_health Database health status")
+            metrics.append(f"# TYPE app_database_health gauge")
+            metrics.append(f"app_database_health {1 if 'healthy' in db_health else 0}")
+            
+            metrics.append(f"# HELP app_redis_health Redis health status")
+            metrics.append(f"# TYPE app_redis_health gauge")
+            metrics.append(f"app_redis_health {1 if 'healthy' in redis_health else 0}")
+            
+            # Request metrics (if available)
+            if hasattr(app, 'request_count'):
+                metrics.append(f"# HELP app_requests_total Total number of requests")
+                metrics.append(f"# TYPE app_requests_total counter")
+                metrics.append(f"app_requests_total {app.request_count}")
+            
+            return '\n'.join(metrics), 200, {'Content-Type': 'text/plain'}
+            
+    except Exception as e:
+            app.logger.error(f"Metrics collection error: {e}")
+            return f"# ERROR: {str(e)}", 500, {'Content-Type': 'text/plain'}
+
+    @app.route('/api/self_assessment', methods=['POST'])
     def submit_self_assessment():
         """Handle self-assessment submissions"""
         if request.method == 'GET':
@@ -428,11 +1205,11 @@ def _register_additional_routes(app: Flask) -> None:
 app = create_app()
 
 if __name__ == '__main__':
-    with app.app_context():
+with app.app_context():
         try:
-            db.create_all()
+    db.create_all()
             app.logger.info("Database tables created successfully")
         except Exception as e:
             app.logger.error(f"Database initialization error: {e}")
-    
+
     app.run(host='0.0.0.0', port=app.config.get('PORT', 5055), debug=False)

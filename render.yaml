@@ -29,6 +29,14 @@ services:
         value: production
       - key: REDIS_URL
         value: redis://localhost:6379
+      - key: RENDER
+        value: true
+      - key: VERSION
+        value: 1.0.0
+      - key: BUILD_TIME
+        generateValue: true
+      - key: PLATFORM
+        value: render
 
 databases:
   - name: ai-mental-health-db

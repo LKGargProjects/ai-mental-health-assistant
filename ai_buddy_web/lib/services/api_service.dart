@@ -117,7 +117,7 @@ class ApiService {
   }
 
   /// Send chat message with optimized error handling
-  Future<Map<String, dynamic>> sendMessage(String message) async {
+  Future<Message> sendMessage(String message) async {
     return _retryOperation(() async {
       await _getSessionId(); // Ensure session is available
 
@@ -126,7 +126,12 @@ class ApiService {
         data: {'message': message.trim()},
       );
 
-      return response.data as Map<String, dynamic>;
+      final data = response.data as Map<String, dynamic>;
+      return Message(
+        content: data['response'] as String,
+        isUser: false,
+        type: MessageType.text,
+      );
     });
   }
 
@@ -182,6 +187,35 @@ class ApiService {
       final response = await _dio.post('/api/mood_entry', data: data);
       return response.data as Map<String, dynamic>;
     });
+  }
+
+  /// Get user-friendly error message from DioException
+  String getErrorMessage(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+        return 'Server not responding. Please try again.';
+      case DioExceptionType.receiveTimeout:
+        return 'Request timed out. Please try again.';
+      case DioExceptionType.badResponse:
+        final statusCode = e.response?.statusCode;
+        if (statusCode == 400) {
+          return 'Invalid request. Please check your input.';
+        } else if (statusCode == 401) {
+          return 'Authentication required.';
+        } else if (statusCode == 403) {
+          return 'Access denied.';
+        } else if (statusCode == 404) {
+          return 'Service not found.';
+        } else if (statusCode == 500) {
+          return 'Server error. Please try again later.';
+        } else {
+          return 'Server error: $statusCode';
+        }
+      case DioExceptionType.connectionError:
+        return 'Cannot connect to server. Check your internet connection.';
+      default:
+        return 'Network error. Please try again.';
+    }
   }
 
   /// Generic retry operation with exponential backoff

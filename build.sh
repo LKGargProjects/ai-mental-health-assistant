@@ -1,17 +1,116 @@
 #!/bin/bash
 set -e
 
+echo "=== Starting build process for single codebase deployment ==="
+echo "Environment: ${ENVIRONMENT:-local}"
+echo "Platform: ${PLATFORM:-unknown}"
+echo "Python version: $(python --version)"
+
+# Set build timestamp
+export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+echo "Build time: $BUILD_TIME"
+
+# Install Python dependencies
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
+# Install Flutter with version management
 echo "Installing Flutter..."
-wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.32.8-stable.tar.xz
-tar xf flutter_linux_3.32.8-stable.tar.xz
+FLUTTER_VERSION="3.32.8"
+FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+
+# Check if Flutter is already installed
+if [ ! -d "flutter" ]; then
+    echo "Downloading Flutter ${FLUTTER_VERSION}..."
+    wget -q "${FLUTTER_URL}"
+    tar xf "flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+    rm "flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+    echo "✅ Flutter downloaded successfully"
+else
+    echo "✅ Flutter already installed"
+fi
+
 export PATH="$PATH:`pwd`/flutter/bin"
 
+# Verify Flutter installation
+echo "Verifying Flutter installation..."
+if flutter --version; then
+    echo "✅ Flutter verification successful"
+else
+    echo "❌ Flutter verification failed"
+    exit 1
+fi
+
+# Build Flutter web app
 echo "Building Flutter web app..."
 cd ai_buddy_web
-flutter config --enable-web
-flutter build web --release --web-renderer canvaskit
 
-echo "Build completed successfully!" 
+# Configure Flutter for web
+echo "Configuring Flutter for web..."
+flutter config --enable-web
+
+# Clean previous builds
+echo "Cleaning previous builds..."
+flutter clean
+
+# Get dependencies
+echo "Getting Flutter dependencies..."
+flutter pub get
+
+# Build with error handling and validation
+echo "Building Flutter web app with release configuration..."
+if flutter build web --release --web-renderer canvaskit; then
+    echo "✅ Flutter build completed successfully!"
+    
+    # Verify build output
+    if [ -d "build/web" ] && [ -f "build/web/index.html" ]; then
+        echo "✅ Build artifacts verified"
+        
+        # Check for critical files
+        critical_files=("index.html" "main.dart.js" "flutter.js")
+        for file in "${critical_files[@]}"; do
+            if [ -f "build/web/$file" ]; then
+                echo "✅ Found $file"
+            else
+                echo "⚠️ Missing $file"
+            fi
+        done
+        
+        # Display build info
+        echo "=== Build Information ==="
+        echo "Build directory: $(pwd)/build/web"
+        echo "Build size: $(du -sh build/web | cut -f1)"
+        echo "Files count: $(find build/web -type f | wc -l)"
+        
+    else
+        echo "❌ Build artifacts missing"
+        echo "Expected: build/web/index.html"
+        echo "Found: $(ls -la build/web/ 2>/dev/null || echo 'No build/web directory')"
+        exit 1
+    fi
+else
+    echo "❌ Flutter build failed"
+    echo "Build error details:"
+    flutter build web --release --web-renderer canvaskit 2>&1 || true
+    exit 1
+fi
+
+# Return to root directory
+cd ..
+
+# Create build info file
+echo "Creating build info..."
+cat > build_info.json << EOF
+{
+  "build_time": "$BUILD_TIME",
+  "environment": "${ENVIRONMENT:-local}",
+  "platform": "${PLATFORM:-unknown}",
+  "flutter_version": "$FLUTTER_VERSION",
+  "python_version": "$(python --version 2>&1)",
+  "build_status": "success"
+}
+EOF
+
+echo "=== Build process completed successfully! ==="
+echo "Build info saved to: build_info.json"
+echo "Ready for deployment to: ${ENVIRONMENT:-local} environment" 

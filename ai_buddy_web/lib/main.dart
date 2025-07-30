@@ -486,16 +486,90 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           _buildBottomButton(
             icon: Icons.help_outline,
             label: 'Resources',
-            onPressed: () {
-              // TODO: Implement resources
-            },
+            onPressed: () => _showResources(context),
           ),
           _buildBottomButton(
             icon: Icons.settings,
             label: 'Settings',
-            onPressed: () {
-              // TODO: Implement settings
-            },
+            onPressed: () => _showSettings(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show resources dialog
+  void _showResources(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mental Health Resources'),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'If you\'re in crisis or need immediate help:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text('• National Suicide Prevention Lifeline: 988'),
+              Text('• Crisis Text Line: Text HOME to 741741'),
+              Text('• Emergency Services: 911'),
+              SizedBox(height: 16),
+              Text(
+                'Additional Resources:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text('• Find a therapist near you'),
+              Text('• Mental health apps and tools'),
+              Text('• Support groups and communities'),
+              Text('• Educational resources'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show settings dialog
+  void _showSettings(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Settings'),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('App Settings:'),
+              SizedBox(height: 8),
+              Text('• Notification preferences'),
+              Text('• Privacy settings'),
+              Text('• Data export'),
+              Text('• Account management'),
+              SizedBox(height: 16),
+              Text('AI Assistant Settings:'),
+              SizedBox(height: 8),
+              Text('• Conversation style'),
+              Text('• Response length'),
+              Text('• Crisis detection sensitivity'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
           ),
         ],
       ),

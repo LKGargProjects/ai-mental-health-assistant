@@ -12,12 +12,15 @@ services:
       - PORT=${BACKEND_PORT:-5055}
       - DATABASE_URL=postgresql+psycopg://ai_buddy:ai_buddy_password@db:5432/mental_health
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - ENVIRONMENT=${ENVIRONMENT:-local}
+      - ENVIRONMENT=docker
+      - DOCKER_ENV=true
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PPLX_API_KEY=${PPLX_API_KEY}
       - AI_PROVIDER=${AI_PROVIDER:-gemini}
       - REDIS_URL=redis://redis:6379
+      - VERSION=${VERSION:-1.0.0}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
     depends_on:
       - db
       - redis
@@ -28,6 +31,12 @@ services:
       - .:/app
     networks:
       - ai-buddy-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:${BACKEND_PORT:-5055}/api/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # =============================================================================
   # DATABASE SERVICE (PostgreSQL)
@@ -45,6 +54,11 @@ services:
     restart: unless-stopped
     networks:
       - ai-buddy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_buddy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # =============================================================================
   # REDIS SERVICE (Session Storage)
@@ -56,6 +70,11 @@ services:
     restart: unless-stopped
     networks:
       - ai-buddy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   # =============================================================================
   # FLUTTER WEB SERVICE (Frontend)
@@ -68,11 +87,22 @@ services:
       - "${FLUTTER_WEB_PORT:-8080}:8080"
     environment:
       - API_URL=http://backend:${BACKEND_PORT:-5055}
+      - ENVIRONMENT=docker
+      - DOCKER_ENV=true
+      - VERSION=${VERSION:-1.0.0}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - ai-buddy-network
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t && curl -f http://localhost:8080 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
