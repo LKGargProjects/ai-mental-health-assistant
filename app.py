@@ -144,15 +144,22 @@ class Config:
 
 def create_app() -> Flask:
     """Application factory pattern for single codebase usage"""
-app = Flask(__name__)
+    app = Flask(__name__)
     
     # Load configuration
     app.config.from_object(Config)
     
-    # Temporarily use SQLite for testing
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
+    # Set SQLAlchemy database URI with explicit psycopg2 driver
+    if Config.DATABASE_URL:
+        # Force use of psycopg2 driver
+        if 'postgresql://' in Config.DATABASE_URL and 'psycopg2' not in Config.DATABASE_URL:
+            Config.DATABASE_URL = Config.DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://')
+        app.config['SQLALCHEMY_DATABASE_URI'] = Config.DATABASE_URL
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
+    
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
     # Initialize extensions
     _init_extensions(app)
     
@@ -262,30 +269,30 @@ def _setup_session(app: Flask) -> None:
     
     if redis_url and redis_url != 'port' and redis_url.strip():
         try:
-        redis_client = redis.from_url(redis_url)
+            redis_client = redis.from_url(redis_url)
             redis_client.ping()
-        app.config['SESSION_TYPE'] = 'redis'
-        app.config['SESSION_REDIS'] = redis_client
+            app.config['SESSION_TYPE'] = 'redis'
+            app.config['SESSION_REDIS'] = redis_client
             app.logger.info("Redis sessions enabled")
-    except Exception as e:
+        except Exception as e:
             app.logger.warning(f"Redis connection failed: {e}, using filesystem sessions")
             app.config['SESSION_TYPE'] = 'filesystem'
             app.config['SESSION_REDIS'] = None
     else:
         app.logger.info("No REDIS_URL found, using filesystem sessions")
-    app.config['SESSION_TYPE'] = 'filesystem'
-    app.config['SESSION_REDIS'] = None
+        app.config['SESSION_TYPE'] = 'filesystem'
+        app.config['SESSION_REDIS'] = None
 
-app.config['SESSION_PERMANENT'] = False
+    app.config['SESSION_PERMANENT'] = False
     app.config['SESSION_USE_SIGNER'] = False
 
-Session(app)
+    Session(app)
 
 def _setup_rate_limiter(app: Flask) -> Limiter:
     """Configure rate limiting"""
     return Limiter(
-    key_func=get_remote_address,
-    app=app,
+        key_func=get_remote_address,
+        app=app,
         default_limits=["500 per day", "100 per hour"],
         storage_uri=app.config.get('REDIS_URL', 'memory://')
     )
@@ -425,7 +432,7 @@ def _get_or_create_session() -> str:
             db.session.commit()
             app.logger.info(f"Using existing session: {session_id}")
             
-        except Exception as e:
+    except Exception as e:
         app.logger.error(f"Session management error: {e}")
         # Continue without database session if needed
     
@@ -938,7 +945,7 @@ def _register_additional_routes(app: Flask) -> None:
             )
             db.session.commit()
 
-    return jsonify({
+            return jsonify({
                 'message': 'Mood entry added successfully',
                 'mood_level': mood_level,
                 'note': note,
@@ -1009,7 +1016,7 @@ def _register_additional_routes(app: Flask) -> None:
             ).fetchall()
 
             if not entries:
-    return jsonify({
+                return jsonify({
                     'message': 'No mood data available',
                     'analytics': {
                         'average_mood': 0,
@@ -1072,7 +1079,7 @@ def _register_additional_routes(app: Flask) -> None:
         """Get personalized wellness recommendations"""
         try:
             session_id = request.headers.get('X-Session-ID')
-    if not session_id:
+            if not session_id:
                 return jsonify({'error': 'Session ID required'}), 400
 
             # Get recent mood data
@@ -1163,7 +1170,7 @@ def _register_additional_routes(app: Flask) -> None:
             
             return '\n'.join(metrics), 200, {'Content-Type': 'text/plain'}
             
-    except Exception as e:
+        except Exception as e:
             app.logger.error(f"Metrics collection error: {e}")
             return f"# ERROR: {str(e)}", 500, {'Content-Type': 'text/plain'}
 
@@ -1205,9 +1212,9 @@ def _register_additional_routes(app: Flask) -> None:
 app = create_app()
 
 if __name__ == '__main__':
-with app.app_context():
+    with app.app_context():
         try:
-    db.create_all()
+            db.create_all()
             app.logger.info("Database tables created successfully")
         except Exception as e:
             app.logger.error(f"Database initialization error: {e}")
