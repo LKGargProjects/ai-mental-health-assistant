@@ -8,7 +8,7 @@ import '../config/api_config.dart';
 /// Optimized API service with better error handling and performance
 class ApiService {
   static const String _sessionKey = 'session_id';
-  static const Duration _timeout = Duration(seconds: 10);
+  static const Duration _timeout = Duration(seconds: 30);
   static const int _maxRetries = 3;
 
   late final Dio _dio;
