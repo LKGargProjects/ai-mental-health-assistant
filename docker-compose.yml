@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # =============================================================================
   # BACKEND SERVICE (Flask API)
@@ -14,9 +12,9 @@ services:
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - ENVIRONMENT=docker
       - DOCKER_ENV=true
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - PPLX_API_KEY=${PPLX_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - PPLX_API_KEY=${PPLX_API_KEY:-}
       - AI_PROVIDER=${AI_PROVIDER:-gemini}
       - REDIS_URL=redis://redis:6379
       - VERSION=${VERSION:-1.0.0}
@@ -28,7 +26,6 @@ services:
     volumes:
       - ./instance:/app/instance
       - ./flask_session:/app/flask_session
-      - .:/app
     networks:
       - ai-buddy-network
     healthcheck:

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/message.dart';
 import '../models/mood_entry.dart';
@@ -39,7 +40,7 @@ class ApiService {
   /// Setup interceptors for logging and error handling
   void _setupInterceptors() {
     // Add logging interceptor (only in debug mode)
-    if (ApiConfig.isDevelopment) {
+    if (kDebugMode) {
       _dio.interceptors.add(
         LogInterceptor(
           requestBody: true,
@@ -70,7 +71,7 @@ class ApiService {
 
   /// Log error details for debugging
   void _logError(DioException error) {
-    if (!ApiConfig.isDevelopment) return;
+    if (!kDebugMode) return;
 
     print('API Error: ${error.type} - ${error.message}');
     print('Status: ${error.response?.statusCode}');

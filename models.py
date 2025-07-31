@@ -32,9 +32,11 @@ class ConversationLog(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.String(36), db.ForeignKey('user_sessions.id'))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    provider = db.Column(db.String(20))
+    user_message = db.Column(db.Text, nullable=False)
+    ai_response = db.Column(db.Text, nullable=False)
+    risk_level = db.Column(db.String(20), default='low')
     risk_score = db.Column(db.Float, default=0.0)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     
 class CrisisEvent(db.Model):
     __tablename__ = 'crisis_events'

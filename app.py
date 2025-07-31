@@ -422,7 +422,9 @@ def _get_or_create_session() -> str:
                 {'session_id': session_id}
             )
             db.session.commit()
-            app.logger.info(f"Created new session: {session_id}")
+            # Use current_app for logging in request context
+            from flask import current_app
+            current_app.logger.info(f"Created new session: {session_id}")
         else:
             # Update last activity
             db.session.execute(
@@ -430,10 +432,14 @@ def _get_or_create_session() -> str:
                 {'session_id': session_id}
             )
             db.session.commit()
-            app.logger.info(f"Using existing session: {session_id}")
+            # Use current_app for logging in request context
+            from flask import current_app
+            current_app.logger.info(f"Using existing session: {session_id}")
             
     except Exception as e:
-        app.logger.error(f"Session management error: {e}")
+        # Use current_app for logging in request context
+        from flask import current_app
+        current_app.logger.error(f"Session management error: {e}")
         # Continue without database session if needed
     
     return session_id
@@ -442,7 +448,8 @@ def _process_chat_message(message: str, session_id: str) -> Tuple[str, str]:
     """Process chat message with AI provider and crisis detection"""
     try:
         # Get AI response based on configured provider
-        provider = app.config.get('AI_PROVIDER', 'gemini')
+        from flask import current_app
+        provider = current_app.config.get('AI_PROVIDER', 'gemini')
         
         if provider == 'gemini':
             ai_response = get_gemini_response(message)
@@ -462,7 +469,9 @@ def _process_chat_message(message: str, session_id: str) -> Tuple[str, str]:
         return ai_response, risk_level
         
     except Exception as e:
-        app.logger.error(f"Message processing error: {e}")
+        # Use current_app for logging in request context
+        from flask import current_app
+        current_app.logger.error(f"Message processing error: {e}")
         return "I'm having trouble processing your message right now. Please try again.", "low"
 
 def _log_conversation(session_id: str, user_message: str, ai_response: str, risk_level: str) -> None:
@@ -484,7 +493,9 @@ def _log_conversation(session_id: str, user_message: str, ai_response: str, risk
         db.session.commit()
         
     except Exception as e:
-        app.logger.error(f"Failed to log conversation: {e}")
+        # Use current_app for logging in request context
+        from flask import current_app
+        current_app.logger.error(f"Failed to log conversation: {e}")
 
 def _convert_risk_level_to_score(risk_level: str) -> float:
     """Convert risk level string to numeric score"""
@@ -507,8 +518,9 @@ def _check_database_health() -> str:
 def _check_redis_health() -> str:
     """Check Redis connection health"""
     try:
-        if app.config.get('SESSION_TYPE') == 'redis':
-            redis_client = app.config.get('SESSION_REDIS')
+        from flask import current_app
+        if current_app.config.get('SESSION_TYPE') == 'redis':
+            redis_client = current_app.config.get('SESSION_REDIS')
             if redis_client:
                 redis_client.ping()
                 return "healthy"
@@ -819,7 +831,9 @@ def _log_crisis_detection(session_id: str, message: str, risk_level: str, risk_s
         )
         db.session.commit()
     except Exception as e:
-        app.logger.error(f"Failed to log crisis detection: {e}")
+        # Use current_app for logging in request context
+        from flask import current_app
+        current_app.logger.error(f"Failed to log crisis detection: {e}")
         db.session.rollback()
 
 
