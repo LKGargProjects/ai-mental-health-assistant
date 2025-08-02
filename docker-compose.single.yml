@@ -53,7 +53,7 @@ services:
   db:
     image: postgres:14
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-mental_health}
+      - POSTGRES_DB=${POSTGRES_DB:-ai_buddy}
       - POSTGRES_USER=${POSTGRES_USER:-ai_buddy}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ai_buddy_password}
     volumes:

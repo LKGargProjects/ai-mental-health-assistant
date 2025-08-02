@@ -57,6 +57,50 @@
 - ✅ Provide clear error messages and solutions
 - ✅ Maintain system stability throughout changes
 
+### Testing Protocol
+- ✅ Follow standardized testing protocol from DEPLOYMENT_PROTOCOL.md
+- ✅ Test thoroughly before committing any changes
+- ✅ Rebuild containers when API configurations change
+- ✅ Test all platforms (Web, iOS, Android) after changes
+- ✅ Verify both local and production environments
+- ✅ Check Docker container health before testing
+- ✅ Follow proper rebuild sequence: stop → rebuild → test
+
+### Version Management Protocol
+- ✅ ALWAYS verify current running versions before making changes
+- ✅ Check which version is deployed on Render vs local
+- ✅ Verify Flutter web build matches current code
+- ✅ Test iOS/Android apps to confirm they're using correct API
+- ✅ Clear browser cache when testing web app changes
+- ✅ Rebuild Flutter web app when API config changes
+- ✅ Update static files when Flutter web is rebuilt
+- ✅ Document version differences between platforms
+
+### Systematic Testing Checklist
+- ✅ **Step 1: Version Check** - What version is currently running?
+- ✅ **Step 2: Environment Check** - Local vs Production vs Render
+- ✅ **Step 3: Platform Check** - Web vs iOS vs Android versions
+- ✅ **Step 4: API Check** - Which API endpoints are being used?
+- ✅ **Step 5: Rebuild Check** - Does code change require rebuild?
+- ✅ **Step 6: Test Check** - Test all platforms after changes
+- ✅ **Step 7: Document Check** - Update version documentation
+
+### Database Configuration Protocol
+- ✅ **ALWAYS verify database configuration** before testing
+- ✅ **Check DATABASE_URL matches POSTGRES_DB** in docker-compose
+- ✅ **Verify database exists** when container starts
+- ✅ **Check for database connection errors** in logs
+- ✅ **Ensure database schema is created** on first run
+- ✅ **Test database connectivity** before testing app features
+
+### Error Analysis Protocol
+- ✅ **Read logs completely** before making assumptions
+- ✅ **Identify root cause** from error messages
+- ✅ **Check configuration mismatches** (database names, ports, etc.)
+- ✅ **Verify all environment variables** are set correctly
+- ✅ **Test each component individually** (DB, Redis, App)
+- ✅ **Provide clear status information** to user with exact commands
+
 ## 📝 How to Modify Rules
 
 1. **Edit this file** to change project-specific rules
