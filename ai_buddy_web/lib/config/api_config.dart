@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
-  // Development - use nginx proxy for web
-  static const String localUrl = 'http://localhost:8080';
+  // Development - use production API for consistency
+  static const String localUrl = 'https://ai-mental-health-assistant-tddc.onrender.com';
 
   // Production (Render)
   static const String productionUrl =
@@ -15,10 +15,8 @@ class ApiConfig {
       return productionUrl;
     }
 
-    // For web, check if we're in production
-    if (Uri.base.host != 'localhost' && Uri.base.host != '127.0.0.1') {
-      return productionUrl;
-    }
-    return localUrl;
+    // For web, always use production URL for consistency
+    // This eliminates local container issues and follows our rules
+    return productionUrl;
   }
 }
