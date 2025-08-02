@@ -5,10 +5,7 @@ import '../models/message.dart';
 class CrisisResourcesWidget extends StatelessWidget {
   final RiskLevel riskLevel;
 
-  const CrisisResourcesWidget({
-    super.key,
-    required this.riskLevel,
-  });
+  const CrisisResourcesWidget({super.key, required this.riskLevel});
 
   @override
   Widget build(BuildContext context) {
@@ -23,25 +20,19 @@ class CrisisResourcesWidget extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.warning_rounded,
-                  color: _getIconColor(context),
-                ),
+                Icon(Icons.warning_rounded, color: _getIconColor(context)),
                 const SizedBox(width: 8),
                 Text(
                   _getTitle(),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: _getIconColor(context),
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: _getIconColor(context),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              _getMessage(),
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text(_getMessage(), style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -71,7 +62,7 @@ class CrisisResourcesWidget extends StatelessWidget {
       case RiskLevel.medium:
         return Theme.of(context).colorScheme.secondaryContainer;
       case RiskLevel.low:
-        return Theme.of(context).colorScheme.surfaceVariant;
+        return Theme.of(context).colorScheme.surfaceContainerHighest;
       default:
         return Theme.of(context).colorScheme.surface;
     }
@@ -144,11 +135,7 @@ class CrisisResourcesWidget extends StatelessWidget {
     // Add emergency resources for high risk
     if (riskLevel == RiskLevel.high) {
       resources.addAll([
-        CrisisResource(
-          label: 'Call 988',
-          url: 'tel:988',
-          icon: Icons.phone,
-        ),
+        CrisisResource(label: 'Call 988', url: 'tel:988', icon: Icons.phone),
         CrisisResource(
           label: '988 Lifeline Chat',
           url: 'https://988lifeline.org/chat/',
@@ -192,4 +179,4 @@ class CrisisResource {
     required this.url,
     required this.icon,
   });
-} 
+}

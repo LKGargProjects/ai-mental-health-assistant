@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
-  // Development
-  static const String localUrl = 'http://127.0.0.1:5055';
+  // Development - use nginx proxy for web
+  static const String localUrl = 'http://localhost:8080';
 
   // Production (Render)
   static const String productionUrl =

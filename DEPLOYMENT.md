@@ -12,12 +12,12 @@ This application is designed to run on Docker and Render only. No local Flask de
 
 ### Local Docker Testing
 ```bash
-# Build and start all services
-docker-compose up --build
+# Build and start single container with external services
+docker-compose -f docker-compose.single.yml up --build
 
 # Access the application
-# Backend API: http://localhost:5055
-# Flutter Web: http://localhost:8080
+# Single Container: http://localhost:8080 (Flutter Web + API)
+# Direct API: http://localhost:5055 (Flask API only)
 # Database: localhost:5432
 # Redis: localhost:6379
 ```
@@ -30,13 +30,13 @@ Copy `env.example` to `.env` and configure:
 
 ## Render Deployment
 
-### Backend Service
+### Single Container Service
 1. Connect your GitHub repository to Render
 2. Create a new Web Service
 3. Configure:
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `bash startup.sh`
-   - **Environment**: Python 3.9
+   - **Build Command**: `docker build -t ai-buddy-app .`
+   - **Start Command**: `docker run -p $PORT:80 ai-buddy-app`
+   - **Environment**: Docker
 
 ### Environment Variables (Render)
 Set these in Render dashboard:
@@ -49,6 +49,8 @@ PPLX_API_KEY=your-perplexity-api-key
 AI_PROVIDER=gemini
 ENVIRONMENT=production
 RENDER=true
+DATABASE_URL=postgresql://user:password@host:5432/database
+REDIS_URL=redis://host:6379
 ```
 
 ### Database (Render)

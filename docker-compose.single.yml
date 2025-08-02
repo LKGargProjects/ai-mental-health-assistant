@@ -1,0 +1,93 @@
+services:
+  # =============================================================================
+  # SINGLE CONTAINER APP (Flask API + Flutter Web)
+  # =============================================================================
+  app:
+    build: .
+    ports:
+      - "${WEB_PORT:-8080}:80"
+      - "${API_PORT:-5055}:5055"
+    environment:
+      # Flask Configuration
+      - PORT=${API_PORT:-5055}
+      - DATABASE_URL=postgresql+psycopg://ai_buddy:ai_buddy_password@db:5432/mental_health
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - ENVIRONMENT=docker
+      - DOCKER_ENV=true
+      
+      # AI Provider Configuration
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - PPLX_API_KEY=${PPLX_API_KEY:-}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379
+      
+      # App Configuration
+      - VERSION=${VERSION:-1.0.0}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
+      
+      # Web Configuration
+      - WEB_PORT=${WEB_PORT:-8080}
+      - API_PORT=${API_PORT:-5055}
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    volumes:
+      - ./instance:/app/instance
+      - ./flask_session:/app/flask_session
+    networks:
+      - ai-buddy-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health && curl -f http://localhost:5055/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =============================================================================
+  # DATABASE SERVICE (PostgreSQL)
+  # =============================================================================
+  db:
+    image: postgres:14
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-mental_health}
+      - POSTGRES_USER=${POSTGRES_USER:-ai_buddy}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ai_buddy_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    networks:
+      - ai-buddy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_buddy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # REDIS SERVICE (Session Storage)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
+    networks:
+      - ai-buddy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+networks:
+  ai-buddy-network:
+    driver: bridge 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum MessageType { text, error, system }
+
 enum RiskLevel { none, low, medium, high }
 
 class Message {
@@ -20,8 +21,8 @@ class Message {
     this.type = MessageType.text,
     this.riskLevel = RiskLevel.none,
     this.resources,
-  })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        timestamp = timestamp ?? DateTime.now();
+  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+       timestamp = timestamp ?? DateTime.now();
 
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
@@ -60,7 +61,7 @@ class Message {
       return Theme.of(context).colorScheme.error;
     }
     if (type == MessageType.system) {
-      return Theme.of(context).colorScheme.surfaceVariant;
+      return Theme.of(context).colorScheme.surfaceContainerHighest;
     }
     return isUser
         ? Theme.of(context).colorScheme.primary
@@ -78,4 +79,4 @@ class Message {
         ? Theme.of(context).colorScheme.onPrimary
         : Theme.of(context).colorScheme.onSecondaryContainer;
   }
-} 
+}
