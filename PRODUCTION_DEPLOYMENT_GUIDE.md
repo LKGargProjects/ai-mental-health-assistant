@@ -1,171 +1,104 @@
 # Production Deployment Guide - Geography-Specific Crisis Detection
 
-## 🚀 **Deployment Overview**
-This guide covers deploying the geography-specific crisis detection feature to production.
+## 🚀 Deployment Status
 
-## ✅ **Pre-Deployment Checklist**
+**✅ DEPLOYED:** Geography-specific crisis detection with India-specific helplines
 
-### **Backend Changes**
-- ✅ Geography-specific crisis resources implemented
-- ✅ IP geolocation functionality added
-- ✅ API response structure updated with crisis_msg and crisis_numbers
-- ✅ Country override capability added
-- ✅ Fallback mechanism for unsupported countries
-- ✅ All automated tests passing
+**🌐 Production URL:** https://ai-mental-health-assistant-tddc.onrender.com
 
-### **Frontend Changes**
-- ✅ Message model updated with crisis data fields
-- ✅ API service enhanced to handle geography-specific responses
-- ✅ CrisisResourcesWidget updated to display country-specific resources
-- ✅ ChatMessageWidget updated to pass crisis data
-- ✅ ChatProvider updated to support country parameter
+**📅 Deployment Date:** Current session
 
-## 📋 **Deployment Steps**
+## 📋 Production Testing Checklist
 
-### **Step 1: Verify Local Testing**
-```bash
-# Run comprehensive tests
-python3 test_geography_crisis_detection.py
+### **Phase 1: Basic Functionality Testing**
+- [ ] **App loads correctly** on production URL
+- [ ] **Chat interface works** - can send and receive messages
+- [ ] **Crisis detection works** - "i want to die" triggers crisis response
+- [ ] **Geography detection works** - shows India-specific helplines
+- [ ] **Crisis widget displays** for high-risk messages
+- [ ] **Helpline buttons work** - launch phone/SMS correctly
 
-# Test backend API
-curl -X POST http://localhost:5055/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "I want to die", "country": "in"}' | jq
+### **Phase 2: Geography-Specific Testing**
+- [ ] **India-specific helplines** display correctly:
+  - [ ] iCall Helpline: 022-25521111
+  - [ ] AASRA: 91-22-27546669
+  - [ ] Crisis Text Line: HOME to 741741
+- [ ] **Crisis message** shows India-specific content
+- [ ] **Phone buttons** launch external dialer
+- [ ] **SMS button** launches text messaging
 
-# Test frontend build
-cd ai_buddy_web && flutter build web --release
-```
+### **Phase 3: Edge Case Testing**
+- [ ] **Non-crisis messages** don't show crisis widget
+- [ ] **Different countries** get appropriate resources
+- [ ] **IP geolocation** works for real users
+- [ ] **Fallback resources** work for unsupported countries
+- [ ] **Error handling** works gracefully
 
-### **Step 2: Deploy to Render**
-The deployment is automatic via Git push to the main branch.
+### **Phase 4: MVP User Testing**
+- [ ] **Share with MVP testers** in India
+- [ ] **Test crisis detection** with real users
+- [ ] **Verify helpline functionality** in real environment
+- [ ] **Collect user feedback** on experience
+- [ ] **Monitor for issues** and bugs
 
-**Files to be deployed:**
-- `app.py` - Backend with geography-specific crisis detection
-- `ai_buddy_web/lib/` - Frontend with crisis resource integration
-- `requirements.txt` - Updated dependencies
-- `render.yaml` - Production configuration
+## 🧪 Testing Commands
 
-### **Step 3: Verify Production Deployment**
-```bash
-# Test production API
-curl -X POST https://ai-mental-health-assistant-tddc.onrender.com/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "I want to die", "country": "in"}' | jq
-
-# Expected response includes:
-# - crisis_msg: India-specific crisis message
-# - crisis_numbers: India helpline numbers
-# - risk_level: "crisis"
-```
-
-## 🔧 **Production Configuration**
-
-### **Environment Variables**
-- `RENDER=true` - Production environment flag
-- `ENVIRONMENT=production` - Environment identifier
-- `DATABASE_URL` - Production database connection
-- `REDIS_URL` - Production Redis connection
-- `AI_PROVIDER=gemini` - AI service provider
-
-### **Dependencies**
-- `requests==2.32.4` - For IP geolocation
-- All existing Flask dependencies
-- Flutter web build dependencies
-
-## 📊 **Post-Deployment Testing**
-
-### **API Endpoint Tests**
-1. **India Crisis Detection**
-   ```bash
-   curl -X POST https://ai-mental-health-assistant-tddc.onrender.com/api/chat \
-     -H "Content-Type: application/json" \
-     -d '{"message": "I want to die", "country": "in"}'
-   ```
-   **Expected**: iCall Helpline (022-25521111), AASRA (91-22-27546669)
-
-2. **US Crisis Detection**
-   ```bash
-   curl -X POST https://ai-mental-health-assistant-tddc.onrender.com/api/chat \
-     -H "Content-Type: application/json" \
-     -d '{"message": "I want to die", "country": "us"}'
-   ```
-   **Expected**: National Suicide Prevention Lifeline (988)
-
-3. **UK Crisis Detection**
-   ```bash
-   curl -X POST https://ai-mental-health-assistant-tddc.onrender.com/api/chat \
-     -H "Content-Type: application/json" \
-     -d '{"message": "I want to die", "country": "uk"}'
-   ```
-   **Expected**: Samaritans (116 123), SHOUT Text Line
-
-4. **Generic Fallback**
-   ```bash
-   curl -X POST https://ai-mental-health-assistant-tddc.onrender.com/api/chat \
-     -H "Content-Type: application/json" \
-     -d '{"message": "I want to die", "country": "xx"}'
-   ```
-   **Expected**: Befrienders Worldwide
-
-### **Frontend Integration Tests**
-1. **Web App Access**: https://ai-mental-health-assistant-tddc.onrender.com
-2. **Crisis Detection**: Type "I want to die" in chat
-3. **Crisis Resources**: Verify crisis widget appears with appropriate helplines
-4. **Button Functionality**: Test clicking crisis resource buttons
-
-## 🔍 **Monitoring & Health Checks**
-
-### **API Health Check**
-```bash
-curl https://ai-mental-health-assistant-tddc.onrender.com/api/health
-```
-
-### **Crisis Detection Health Check**
+### **Test Crisis Detection:**
 ```bash
 curl -X POST https://ai-mental-health-assistant-tddc.onrender.com/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "test", "country": "in"}' | jq '.risk_level'
+  -d '{"message": "i want to die", "country": "in"}' | jq '.crisis_msg, .crisis_numbers'
 ```
 
-## 🚨 **Rollback Plan**
+### **Test Non-Crisis Message:**
+```bash
+curl -X POST https://ai-mental-health-assistant-tddc.onrender.com/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "hello", "country": "in"}' | jq '.risk_level'
+```
 
-If issues arise, rollback to previous version:
-1. **Git Revert**: Revert to previous commit
-2. **Database**: No schema changes required
-3. **Environment**: No environment variable changes required
-4. **Testing**: Verify rollback with health checks
+## 📊 Monitoring
 
-## 📈 **Success Metrics**
+### **Key Metrics to Monitor:**
+- [ ] **App response time** - should be under 5 seconds
+- [ ] **Crisis detection accuracy** - should trigger for crisis keywords
+- [ ] **Geography detection** - should identify user's country correctly
+- [ ] **Button functionality** - should launch phone/SMS apps
+- [ ] **Error rates** - should be minimal
 
-### **Functional Metrics**
-- ✅ Crisis detection working for all supported countries
-- ✅ Geography-specific resources displaying correctly
-- ✅ Fallback mechanism working for unsupported countries
-- ✅ Frontend integration displaying crisis resources
+### **Expected Behavior:**
+1. **User types "i want to die"** → Crisis detected
+2. **India-specific helplines** displayed in crisis widget
+3. **Phone buttons** launch external dialer with correct numbers
+4. **SMS button** launches text messaging with "HOME to 741741"
 
-### **Performance Metrics**
-- ✅ API response time < 3 seconds
-- ✅ Crisis detection accuracy maintained
-- ✅ No impact on existing functionality
-- ✅ Memory usage within acceptable limits
+## 🚨 Rollback Plan
 
-## 🎯 **Deployment Success Criteria**
+If issues are found:
+1. **Immediate:** Revert to previous commit
+2. **Investigation:** Check logs and debug locally
+3. **Fix:** Address issues and redeploy
+4. **Test:** Verify fixes work in production
 
-- ✅ **Backend API**: Returns geography-specific crisis data
-- ✅ **Frontend UI**: Displays appropriate crisis resources
-- ✅ **Country Detection**: IP-based geolocation working
-- ✅ **Fallback**: Generic resources for unsupported countries
-- ✅ **Performance**: No degradation in response times
-- ✅ **Compatibility**: Existing functionality unaffected
+## 📝 Post-Deployment Tasks
 
-## 📝 **Post-Deployment Tasks**
+- [ ] **Monitor production logs** for errors
+- [ ] **Test with real users** in India
+- [ ] **Collect feedback** on user experience
+- [ ] **Document any issues** found
+- [ ] **Plan improvements** based on feedback
 
-1. **Monitor Logs**: Check for any errors in production logs
-2. **User Testing**: Verify crisis detection works for real users
-3. **Performance Monitoring**: Track response times and usage
-4. **Feedback Collection**: Gather user feedback on crisis resources
-5. **Analytics**: Monitor crisis detection usage patterns
+## 🎯 Success Criteria
 
-## ✅ **Deployment Complete**
+**✅ Deployment Successful When:**
+- App loads without errors
+- Crisis detection works correctly
+- India-specific helplines display
+- Phone/SMS buttons function
+- MVP testers can use the feature
+- No critical errors in logs
 
-The geography-specific crisis detection feature is now deployed to production and ready for user testing. 
+---
+
+**Status:** ✅ Deployed and ready for testing
+**Next Step:** Test with MVP users in India 
