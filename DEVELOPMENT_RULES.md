@@ -333,4 +333,12 @@ Cursor.ai, as an AI coding assistant, should adhere to the following rules and p
 - ✅ **Bypassing `rm -rf` prompt in Zsh:** When using `rm -rf` with wildcards (e.g., `static/*`) in Zsh, it might prompt for confirmation. To bypass this in scripts, use `\rm -rf static/*` (to ignore aliases) or `rm -rf static/*(N)` (Zsh-specific glob qualifier).
 - ✅ **Use `yes | rm -rf static/*`** to automatically answer "y" to prompts
 - ✅ **Use `\rm -rf static/*`** to bypass shell aliases and force removal
-- ✅ **Always test automation scripts** before using in production 
+- ✅ **Always test automation scripts** before using in production
+
+### **CRISIS DETECTION & GEOGRAPHY RULES:**
+- ✅ **Geography-specific crisis resources** - Crisis messages get country-specific helplines only
+- ✅ **No mixed geography** - AI responses don't include generic crisis resources
+- ✅ **Crisis detection keywords** - Updated to include phrases like "take me from this earth"
+- ✅ **AI provider context** - Passes risk_level to AI for appropriate responses
+- ✅ **Crisis response replacement** - Crisis messages get generic supportive response without resources
+- ✅ **Structured crisis data** - Geography-specific resources provided separately via crisis_msg and crisis_numbers 

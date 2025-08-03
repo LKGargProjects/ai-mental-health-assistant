@@ -118,6 +118,10 @@ fi
 # Return to root directory
 cd ..
 
+# Make start script executable
+echo "Making start script executable..."
+chmod +x start.sh
+
 # Create build info file
 echo "Creating build info..."
 cat > build_info.json << EOF

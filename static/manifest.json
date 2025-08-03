@@ -1,0 +1,35 @@
+{
+    "name": "AI Mental Health Assistant",
+    "short_name": "AI Mental Health",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#667EEA",
+    "theme_color": "#667EEA",
+    "description": "Your supportive companion for mental health and emotional well-being. Get 24/7 support, confidential chat, and coping strategies.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
