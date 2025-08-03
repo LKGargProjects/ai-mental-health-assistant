@@ -9,7 +9,7 @@ def detect_crisis_level(message):
     message = message.lower()
     
     # Crisis keywords with risk levels
-    crisis_keywords = ['suicide', 'kill myself', 'want to die', 'end my life', 'end it all']
+    crisis_keywords = ['suicide', 'kill myself', 'want to die', 'end my life', 'end it all', 'take me from this earth', 'take me from earth', 'remove me from earth']
     high_risk_keywords = ['hopeless', 'worthless', 'can\'t go on', 'give up', 'self harm', 'hurt myself']
     medium_risk_keywords = ['sad', 'depressed', 'anxious', 'stressed', 'overwhelmed', 'lonely']
     low_risk_keywords = ['tired', 'worried', 'concerned', 'frustrated']

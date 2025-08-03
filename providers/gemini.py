@@ -20,7 +20,7 @@ def cleanup_old_conversations():
     for session_id in to_remove:
         del conversations[session_id]
 
-def get_gemini_response(message, mode='mental_health', session_id=None):
+def get_gemini_response(message, mode='mental_health', session_id=None, risk_level=None):
     """Get response from Gemini API with conversation history"""
     try:
         api_key = os.getenv('GEMINI_API_KEY')
@@ -46,14 +46,37 @@ def get_gemini_response(message, mode='mental_health', session_id=None):
         # Clean up old conversations periodically
         cleanup_old_conversations()
         
-        # Prepare the conversation history
-        history = conversations[session_id]
+        # For crisis-related messages, clear history to avoid AI learning crisis resources
+        crisis_keywords = ['die', 'suicide', 'kill myself', 'end my life', 'take my life', 'want to die']
+        is_crisis_message = any(keyword in message.lower() for keyword in crisis_keywords)
         
-        # Prepare the prompt with context
-        system_message = """You are a supportive AI assistant for high school students. 
-        Respond with empathy and understanding. If the user seems distressed, 
-        provide emotional support and suggest healthy coping strategies. 
-        Keep responses concise and focused."""
+        if is_crisis_message:
+            # Clear history for crisis messages to prevent AI from learning crisis resources
+            history = []
+            conversations[session_id] = []
+        else:
+            # Prepare the conversation history
+            history = conversations[session_id]
+        
+        # Prepare the prompt with context based on risk level
+        if risk_level == 'crisis':
+            system_message = """You are a supportive AI assistant for high school students. 
+            The user is in crisis and needs immediate emotional support.
+            Respond with empathy, understanding, and emotional support ONLY.
+            Do NOT mention any crisis resources, helpline numbers, or specific actions.
+            Focus on emotional support and being present with the user.
+            Crisis resources will be provided separately by the system."""
+        else:
+            system_message = """You are a supportive AI assistant for high school students. 
+            Respond with empathy and understanding. If the user seems distressed, 
+            provide emotional support and suggest healthy coping strategies. 
+            Keep responses concise and focused.
+            
+            ABSOLUTE RULE: You must NEVER mention any crisis helpline numbers, phone numbers, or specific resources.
+            Examples of what NOT to mention: 988, 111, 741741, "National Suicide Prevention Lifeline", "Crisis Text Line", etc.
+            Crisis resources will be provided separately by the system.
+            Focus ONLY on emotional support, understanding, and general guidance.
+            If you mention any crisis resources, you are violating this rule."""
 
         # Build the conversation context
         conversation_context = ""
@@ -73,6 +96,22 @@ def get_gemini_response(message, mode='mental_health', session_id=None):
                 print("Empty response from Gemini")
                 return "I received an empty response. Please try again."
             
+            # For crisis messages, completely replace the AI response
+            if risk_level == 'crisis':
+                cleaned_response = """I hear how much pain you're in, and it takes incredible strength to express these feelings. Please know that you're not alone, and there are people who want to help you through this difficult time.
+
+Your feelings are valid, and it's okay to not be okay. You don't have to carry this burden alone. There are people who care about you and want to support you.
+
+Please remember that these intense feelings can pass, and there is hope for things to get better. You deserve support and care."""
+            else:
+                # For non-crisis messages, use the AI response as-is
+                cleaned_response = response.text
+            
+            # Clean up extra whitespace and formatting
+            import re
+            cleaned_response = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_response)  # Remove extra blank lines
+            cleaned_response = cleaned_response.strip()
+            
             # Store the conversation
             history.append({
                 'content': message,
@@ -80,13 +119,13 @@ def get_gemini_response(message, mode='mental_health', session_id=None):
                 'timestamp': datetime.now()
             })
             history.append({
-                'content': response.text,
+                'content': cleaned_response,
                 'is_user': False,
                 'timestamp': datetime.now()
             })
             conversations[session_id] = history
             
-            return response.text
+            return cleaned_response
         except Exception as e:
             print(f"Error generating content: {str(e)}")
             return f"Error generating response: {str(e)}"

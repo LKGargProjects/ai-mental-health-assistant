@@ -213,6 +213,7 @@
 - ✅ **Rebuild Flutter app** after changing API configuration
 - ✅ **Use incognito mode** to avoid browser cache issues
 - ✅ **Check console logs** for API endpoint verification
+- ✅ **Dynamic Environment Detection** - API config now automatically detects localhost vs production
 
 ### **API Endpoint Configuration Checklist:**
 - [ ] `ai_buddy_web/lib/config/api_config.dart` uses `http://localhost:5055` for local development
@@ -222,6 +223,9 @@
 - [ ] Crisis data fields are populated correctly
 - [ ] Geography-specific resources are returned
 - [ ] UI displays crisis widget with correct data
+- [ ] **Dynamic Environment Detection** - API config automatically detects environment
+- [ ] **No manual code changes** needed between local and production
+- [ ] **Environment detection logs** show correct environment in console
 
 ## 📝 How to Modify Rules
 
@@ -324,3 +328,9 @@ Cursor.ai, as an AI coding assistant, should adhere to the following rules and p
 - ✅ **Check console logs** for detailed debugging information
 - ✅ **Rebuild Flutter containers** when UI not updating
 - ✅ **Test in isolation** - backend first, then frontend, then integration 
+
+### **AUTOMATION & SCRIPTING RULES:**
+- ✅ **Bypassing `rm -rf` prompt in Zsh:** When using `rm -rf` with wildcards (e.g., `static/*`) in Zsh, it might prompt for confirmation. To bypass this in scripts, use `\rm -rf static/*` (to ignore aliases) or `rm -rf static/*(N)` (Zsh-specific glob qualifier).
+- ✅ **Use `yes | rm -rf static/*`** to automatically answer "y" to prompts
+- ✅ **Use `\rm -rf static/*`** to bypass shell aliases and force removal
+- ✅ **Always test automation scripts** before using in production 

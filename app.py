@@ -585,21 +585,21 @@ def _get_or_create_session() -> str:
 def _process_chat_message(message: str, session_id: str) -> Tuple[str, str]:
     """Process chat message with AI provider and crisis detection"""
     try:
-        # Get AI response based on configured provider
+        # Detect crisis level FIRST
+        risk_level = detect_crisis_level(message)
+        
+        # Get AI response based on configured provider, passing crisis level
         from flask import current_app
         provider = current_app.config.get('AI_PROVIDER', 'gemini')
         
         if provider == 'gemini':
-            ai_response = get_gemini_response(message)
+            ai_response = get_gemini_response(message, session_id=session_id, risk_level=risk_level)
         elif provider == 'openai':
-            ai_response = get_openai_response(message)
+            ai_response = get_openai_response(message, risk_level=risk_level)
         elif provider == 'perplexity':
-            ai_response = get_perplexity_response(message)
+            ai_response = get_perplexity_response(message, risk_level=risk_level)
         else:
-            ai_response = get_gemini_response(message)  # Default fallback
-        
-        # Detect crisis level
-        risk_level = detect_crisis_level(message)
+            ai_response = get_gemini_response(message, session_id=session_id, risk_level=risk_level)  # Default fallback
 
         # Log conversation
         _log_conversation(session_id, message, ai_response, risk_level)
@@ -721,6 +721,7 @@ def _enhanced_crisis_detection(message: str) -> Tuple[str, float, List[str]]:
     # Crisis keywords with weights
     crisis_keywords = {
         'suicide': 1.0, 'kill myself': 1.0, 'want to die': 1.0, 'end it all': 1.0,
+        'take me from this earth': 1.0, 'take me from earth': 1.0, 'remove me from earth': 1.0,
         'self harm': 0.9, 'cut myself': 0.9, 'hurt myself': 0.9,
         'hopeless': 0.8, 'no hope': 0.8, 'worthless': 0.8, 'useless': 0.8,
         'depressed': 0.7, 'depression': 0.7, 'anxiety': 0.6, 'panic': 0.6,
