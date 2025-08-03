@@ -32,6 +32,30 @@
    - Resources dialog
    - Settings dialog
 
+4. **Crisis Detection Test** (1 minute)
+   - Test crisis keywords trigger appropriate responses
+   - Verify risk_level field in API responses
+   - Check crisis resources display correctly
+   - Test environment consistency
+
+### **Crisis Detection Testing Protocol**
+1. **Test Crisis Keywords** (30 seconds)
+   ```bash
+   curl -X POST http://localhost:5055/api/chat \
+     -H "Content-Type: application/json" \
+     -d '{"message": "I want to die"}' | jq .
+   ```
+
+2. **Verify Response Structure** (30 seconds)
+   - Check `risk_level` field is present
+   - Verify `response` field contains appropriate message
+   - Test Flutter app displays crisis resources
+
+3. **Environment Comparison** (1 minute)
+   - Test same input on local vs production
+   - Verify consistent behavior across environments
+   - Check API response structure matches frontend expectations
+
 ### **Quick Reload Protocol**
 - **Backend changes**: `docker-compose restart backend`
 - **Frontend changes**: `flutter build web && cp -r ai_buddy_web/build/web/* static/ && docker-compose restart flutter-web`
@@ -76,6 +100,38 @@
 3. Check Redis connection
 4. Restart backend: `docker-compose restart backend`
 
+### **If Crisis Detection Not Working**
+1. Check API response structure includes `risk_level` field
+2. Verify Flutter app properly parses risk_level
+3. Test crisis keywords trigger appropriate responses
+4. Check environment differences in crisis detection
+5. Verify crisis resources display correctly
+
+### **Environment Difference Analysis**
+1. **Compare API Responses** (30 seconds)
+   ```bash
+   # Local test
+   curl -X POST http://localhost:5055/api/chat \
+     -H "Content-Type: application/json" \
+     -d '{"message": "I want to die"}' | jq .
+   
+   # Production test (replace with actual URL)
+   curl -X POST https://ai-mental-health-backend.onrender.com/api/chat \
+     -H "Content-Type: application/json" \
+     -d '{"message": "I want to die"}' | jq .
+   ```
+
+2. **Check Response Structure** (30 seconds)
+   - Verify `risk_level` field is present in both environments
+   - Check response format is consistent
+   - Test Flutter app parsing on both environments
+
+3. **Debug Environment Differences** (2 minutes)
+   - Check environment variables affect crisis detection
+   - Verify crisis detection logic is identical
+   - Test same input produces same output
+   - Check API response structure matches frontend expectations
+
 ## **Quality Assurance Checklist**
 
 ### **Before Every Push**
@@ -86,12 +142,25 @@
 - [ ] Assessment submission working
 - [ ] Mood tracking working
 - [ ] Chat functionality working
+- [ ] Crisis detection working correctly
+- [ ] Risk level field included in API responses
+- [ ] Crisis resources display appropriately
 
 ### **After Render Deployment**
 - [ ] Production URL accessible
 - [ ] Flutter app showing (not Flask fallback)
 - [ ] All features working in production
 - [ ] API calls successful
+- [ ] Crisis detection consistent with local
+- [ ] Risk level field present in production responses
+
+### **Crisis Detection Validation**
+- [ ] Crisis keywords trigger appropriate responses
+- [ ] Risk level field included in all chat responses
+- [ ] Flutter app properly parses risk_level
+- [ ] Crisis resources display based on risk level
+- [ ] Environment consistency for same inputs
+- [ ] API response format consistent across environments
 
 ## **Performance Optimization**
 - **Hot Reload**: Use `docker-compose restart` instead of full rebuild
@@ -103,4 +172,5 @@
 - **Rollback**: Git revert to last working commit
 - **Full Reset**: `docker-compose down -v && docker-compose up -d`
 - **Cache Clear**: Browser hard refresh (Ctrl+F5)
-- **Log Analysis**: `docker-compose logs` for debugging 
+- **Log Analysis**: `docker-compose logs` for debugging
+- **Crisis Detection Reset**: Rebuild Flutter app and restart services 

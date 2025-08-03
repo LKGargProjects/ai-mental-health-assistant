@@ -101,6 +101,35 @@
 - ✅ **Test each component individually** (DB, Redis, App)
 - ✅ **Provide clear status information** to user with exact commands
 
+### Crisis Detection & API Response Protocol
+- ✅ **ALWAYS verify API response structure** matches frontend expectations
+- ✅ **Check risk_level field** is properly included in API responses
+- ✅ **Test crisis detection** on both local and production environments
+- ✅ **Verify Flutter app handles** all risk levels correctly
+- ✅ **Test crisis keywords** trigger appropriate responses
+- ✅ **Check environment differences** in crisis detection behavior
+- ✅ **Verify crisis resources** are displayed correctly
+- ✅ **Test API response parsing** in Flutter app
+
+### Environment Difference Analysis Protocol
+- ✅ **Compare API responses** between local and production
+- ✅ **Check environment variables** affect crisis detection
+- ✅ **Verify crisis detection logic** is identical across environments
+- ✅ **Test same input** produces same output on both environments
+- ✅ **Check API response structure** matches frontend expectations
+- ✅ **Verify risk_level field** is included in all API responses
+- ✅ **Test crisis keywords** trigger appropriate responses
+- ✅ **Check Flutter app parsing** of API responses
+
+### API Response Validation Protocol
+- ✅ **ALWAYS include risk_level** in chat API responses
+- ✅ **Verify response structure** matches frontend expectations
+- ✅ **Test crisis detection** with known keywords
+- ✅ **Check Flutter app** properly parses risk_level
+- ✅ **Verify crisis resources** are displayed based on risk level
+- ✅ **Test environment consistency** for same inputs
+- ✅ **Check API response format** is consistent across environments
+
 ## 📝 How to Modify Rules
 
 1. **Edit this file** to change project-specific rules

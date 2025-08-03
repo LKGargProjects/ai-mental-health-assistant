@@ -128,10 +128,32 @@ class ApiService {
       );
 
       final data = response.data as Map<String, dynamic>;
+
+      // Parse risk level from response
+      RiskLevel riskLevel = RiskLevel.none;
+      if (data['risk_level'] != null) {
+        final riskLevelStr = data['risk_level'].toString().toLowerCase();
+        switch (riskLevelStr) {
+          case 'crisis':
+          case 'high':
+            riskLevel = RiskLevel.high;
+            break;
+          case 'medium':
+            riskLevel = RiskLevel.medium;
+            break;
+          case 'low':
+            riskLevel = RiskLevel.low;
+            break;
+          default:
+            riskLevel = RiskLevel.none;
+        }
+      }
+
       return Message(
         content: data['response'] as String,
         isUser: false,
         type: MessageType.text,
+        riskLevel: riskLevel,
       );
     });
   }
