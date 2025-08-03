@@ -12,6 +12,8 @@ class Message {
   final MessageType type;
   final RiskLevel riskLevel;
   final List<String>? resources;
+  final String? crisisMsg;
+  final List<Map<String, dynamic>>? crisisNumbers;
 
   Message({
     String? id,
@@ -21,6 +23,8 @@ class Message {
     this.type = MessageType.text,
     this.riskLevel = RiskLevel.none,
     this.resources,
+    this.crisisMsg,
+    this.crisisNumbers,
   }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
        timestamp = timestamp ?? DateTime.now();
 
@@ -41,6 +45,10 @@ class Message {
         orElse: () => RiskLevel.none,
       ),
       resources: (json['resources'] as List<dynamic>?)?.cast<String>(),
+      crisisMsg: json['crisis_msg'] as String?,
+      crisisNumbers: (json['crisis_numbers'] as List<dynamic>?)
+          ?.map((item) => Map<String, dynamic>.from(item))
+          .toList(),
     );
   }
 
@@ -53,6 +61,8 @@ class Message {
       'type': type.toString().split('.').last,
       'risk_level': riskLevel.toString().split('.').last,
       'resources': resources,
+      'crisis_msg': crisisMsg,
+      'crisis_numbers': crisisNumbers,
     };
   }
 

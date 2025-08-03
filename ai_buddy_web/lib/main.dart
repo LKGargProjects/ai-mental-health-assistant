@@ -329,7 +329,10 @@ class _HomePageState extends State<HomePage> {
     if (text.trim().isEmpty) return;
 
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    chatProvider.sendMessage(text);
+    // MVP Testing: Use India for crisis detection testing
+    // TODO: Implement proper country detection or user preference
+    print('🔍 DEBUG: Sending message with country: in');
+    chatProvider.sendMessage(text, country: 'in');
     _messageController.clear();
     _scrollToBottom();
   }

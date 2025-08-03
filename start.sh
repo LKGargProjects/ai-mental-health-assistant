@@ -9,4 +9,4 @@ sleep 2
 
 # Start Flask application with Gunicorn
 echo "Starting Flask application..."
-exec gunicorn -b 127.0.0.1:5055 --workers 4 --timeout 120 --keep-alive 5 app:app 
+exec gunicorn -b 0.0.0.0:5055 --workers 4 --timeout 120 --keep-alive 5 app:app 

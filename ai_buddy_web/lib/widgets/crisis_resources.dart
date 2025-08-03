@@ -4,13 +4,18 @@ import '../models/message.dart';
 
 class CrisisResourcesWidget extends StatelessWidget {
   final RiskLevel riskLevel;
+  final String? crisisMsg;
+  final List<Map<String, dynamic>>? crisisNumbers;
 
-  const CrisisResourcesWidget({super.key, required this.riskLevel});
+  const CrisisResourcesWidget({
+    super.key,
+    required this.riskLevel,
+    this.crisisMsg,
+    this.crisisNumbers,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (riskLevel == RiskLevel.none) return const SizedBox.shrink();
-
     return Card(
       color: _getBackgroundColor(context),
       child: Padding(
@@ -32,12 +37,16 @@ class CrisisResourcesWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(_getMessage(), style: Theme.of(context).textTheme.bodyMedium),
+            // Use geography-specific crisis message if available
+            Text(
+              crisisMsg ?? _getMessage(),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _getResources().map((resource) {
+              children: _getGeographySpecificResources().map((resource) {
                 return ElevatedButton.icon(
                   onPressed: () => _launchUrl(resource.url),
                   icon: Icon(resource.icon),
@@ -127,6 +136,45 @@ class CrisisResourcesWidget extends StatelessWidget {
       default:
         return '';
     }
+  }
+
+  List<CrisisResource> _getGeographySpecificResources() {
+    final resources = <CrisisResource>[];
+
+    // Use geography-specific crisis numbers if available
+    if (crisisNumbers != null && crisisNumbers!.isNotEmpty) {
+      for (final number in crisisNumbers!) {
+        final name = number['name'] as String? ?? 'Crisis Helpline';
+        final phoneNumber = number['number'] as String?;
+        final textNumber = number['text'] as String?;
+        final url = number['url'] as String?;
+
+        if (phoneNumber != null) {
+          resources.add(
+            CrisisResource(
+              label: name,
+              url: 'tel:$phoneNumber',
+              icon: Icons.phone,
+            ),
+          );
+        } else if (textNumber != null) {
+          resources.add(
+            CrisisResource(label: name, url: 'sms:741741', icon: Icons.message),
+          );
+        } else if (url != null) {
+          resources.add(
+            CrisisResource(label: name, url: url, icon: Icons.link),
+          );
+        }
+      }
+    }
+
+    // Fallback to default resources if no geography-specific ones
+    if (resources.isEmpty) {
+      return _getResources();
+    }
+
+    return resources;
   }
 
   List<CrisisResource> _getResources() {

@@ -117,14 +117,26 @@ class ApiService {
     });
   }
 
-  /// Send chat message with optimized error handling
-  Future<Message> sendMessage(String message) async {
+  /// Send chat message with optimized error handling and geography-specific crisis detection
+  Future<Message> sendMessage(String message, {String? country}) async {
     return _retryOperation(() async {
       await _getSessionId(); // Ensure session is available
 
+      // Prepare request data with optional country parameter
+      final requestData = <String, dynamic>{
+        'message': message.trim(),
+      };
+      if (country != null) {
+        requestData['country'] = country;
+        print('🔍 DEBUG: Adding country parameter: $country');
+      } else {
+        print('🔍 DEBUG: No country parameter provided');
+      }
+      print('🔍 DEBUG: Request data: $requestData');
+
       final response = await _dio.post(
         '/api/chat',
-        data: {'message': message.trim()},
+        data: requestData,
       );
 
       final data = response.data as Map<String, dynamic>;
@@ -133,20 +145,54 @@ class ApiService {
       RiskLevel riskLevel = RiskLevel.none;
       if (data['risk_level'] != null) {
         final riskLevelStr = data['risk_level'].toString().toLowerCase();
+        print('🔍 DEBUG: Raw risk_level from API: ${data['risk_level']}');
+        print('🔍 DEBUG: Processed risk_level: $riskLevelStr');
         switch (riskLevelStr) {
           case 'crisis':
           case 'high':
             riskLevel = RiskLevel.high;
+            print('🔍 DEBUG: Set riskLevel to RiskLevel.high');
             break;
           case 'medium':
             riskLevel = RiskLevel.medium;
+            print('🔍 DEBUG: Set riskLevel to RiskLevel.medium');
             break;
           case 'low':
             riskLevel = RiskLevel.low;
+            print('🔍 DEBUG: Set riskLevel to RiskLevel.low');
             break;
           default:
             riskLevel = RiskLevel.none;
+            print('🔍 DEBUG: Set riskLevel to RiskLevel.none (default)');
         }
+      } else {
+        print('🔍 DEBUG: No risk_level field in API response');
+      }
+      print('🔍 DEBUG: Final riskLevel: $riskLevel');
+
+      // Parse geography-specific crisis data
+      String? crisisMsg;
+      List<Map<String, dynamic>>? crisisNumbers;
+      
+      print('🔍 DEBUG: Full API response data: $data');
+      print('🔍 DEBUG: crisis_msg field exists: ${data.containsKey('crisis_msg')}');
+      print('🔍 DEBUG: crisis_numbers field exists: ${data.containsKey('crisis_numbers')}');
+      
+      if (data['crisis_msg'] != null) {
+        crisisMsg = data['crisis_msg'] as String;
+        print('🔍 DEBUG: Crisis message: $crisisMsg');
+      } else {
+        print('🔍 DEBUG: crisis_msg is null or missing');
+      }
+      
+      if (data['crisis_numbers'] != null) {
+        final numbersList = data['crisis_numbers'] as List<dynamic>;
+        crisisNumbers = numbersList.map((item) => 
+          Map<String, dynamic>.from(item)
+        ).toList();
+        print('🔍 DEBUG: Crisis numbers: $crisisNumbers');
+      } else {
+        print('🔍 DEBUG: crisis_numbers is null or missing');
       }
 
       return Message(
@@ -154,6 +200,8 @@ class ApiService {
         isUser: false,
         type: MessageType.text,
         riskLevel: riskLevel,
+        crisisMsg: crisisMsg,
+        crisisNumbers: crisisNumbers,
       );
     });
   }

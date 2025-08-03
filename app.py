@@ -28,6 +28,136 @@ from providers.perplexity import get_perplexity_response
 from providers.openai import get_openai_response
 from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
 from crisis_detection import detect_crisis_level
+import requests
+
+# Geography-specific crisis resources
+CRISIS_RESOURCES_BY_COUNTRY = {
+    'in': {  # India
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call iCall Helpline at 022-25521111 or AASRA at 91-22-27546669. You can also text HOME to 741741 to reach Crisis Text Line. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'iCall Helpline', 'number': '022-25521111', 'available': '24/7'},
+            {'name': 'AASRA', 'number': '91-22-27546669', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'}
+        ]
+    },
+    'us': {  # United States
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call the National Suicide Prevention Lifeline at 988 or text HOME to 741741 to reach the Crisis Text Line. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'National Suicide Prevention Lifeline', 'number': '988', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '911', 'available': '24/7'}
+        ]
+    },
+    'uk': {  # United Kingdom
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call Samaritans at 116 123 or text SHOUT to 85258. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'Samaritans', 'number': '116 123', 'available': '24/7'},
+            {'name': 'SHOUT Text Line', 'text': 'SHOUT to 85258', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '999', 'available': '24/7'}
+        ]
+    },
+    'ca': {  # Canada
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call the National Suicide Prevention Service at 1-833-456-4566 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'National Suicide Prevention Service', 'number': '1-833-456-4566', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '911', 'available': '24/7'}
+        ]
+    },
+    'au': {  # Australia
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call Lifeline at 13 11 14 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'Lifeline', 'number': '13 11 14', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '000', 'available': '24/7'}
+        ]
+    },
+    'de': {  # Germany
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call TelefonSeelsorge at 0800 111 0 111 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'TelefonSeelsorge', 'number': '0800 111 0 111', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '112', 'available': '24/7'}
+        ]
+    },
+    'fr': {  # France
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call SOS Amitié at 09 72 39 40 50 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'SOS Amitié', 'number': '09 72 39 40 50', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '112', 'available': '24/7'}
+        ]
+    },
+    'jp': {  # Japan
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call TELL Lifeline at 03-5774-0992 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'TELL Lifeline', 'number': '03-5774-0992', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '119', 'available': '24/7'}
+        ]
+    },
+    'br': {  # Brazil
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call CVV at 188 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'CVV', 'number': '188', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '192', 'available': '24/7'}
+        ]
+    },
+    'mx': {  # Mexico
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call SAPTEL at 55-5259-8121 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        'crisis_numbers': [
+            {'name': 'SAPTEL', 'number': '55-5259-8121', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'number': '911', 'available': '24/7'}
+        ]
+    },
+    'generic': {  # Fallback for unsupported countries
+        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please reach out to Befrienders Worldwide or call your local emergency services. You can also text HOME to 741741 for international crisis support. You're not alone, and help is available.",
+        'crisis_numbers': [
+            {'name': 'Befrienders Worldwide', 'url': 'https://www.befrienders.org/', 'available': '24/7'},
+            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
+            {'name': 'Emergency Services', 'note': 'Call your local emergency number', 'available': '24/7'}
+        ]
+    }
+}
+
+def get_country_code_from_ip(ip: str) -> str:
+    """Get country code from IP address using ipinfo.io"""
+    try:
+        # Skip local/private IPs
+        if ip in ['127.0.0.1', 'localhost', '::1'] or ip.startswith(('10.', '172.', '192.168.')):
+            return 'generic'
+        
+        # Use ipinfo.io for geolocation
+        response = requests.get(f'https://ipinfo.io/{ip}/json', timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            country_code = data.get('country', '').lower()
+            return country_code if country_code in CRISIS_RESOURCES_BY_COUNTRY else 'generic'
+        else:
+            return 'generic'
+    except Exception as e:
+        print(f"IP geolocation error: {e}")
+        return 'generic'
+
+def get_country_from_request(req) -> str:
+    """Get country from request - either from country parameter or IP"""
+    # Check for explicit country override
+    data = req.get_json() if req.is_json else {}
+    country = data.get('country', '').lower()
+    
+    if country and country in CRISIS_RESOURCES_BY_COUNTRY:
+        return country
+    
+    # Get IP from various headers
+    ip = req.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+    if not ip:
+        ip = req.headers.get('X-Real-IP', '')
+    if not ip:
+        ip = req.remote_addr
+    
+    return get_country_code_from_ip(ip)
 
 def _detect_environment() -> str:
     """Detect current environment automatically for single codebase usage"""
@@ -373,7 +503,7 @@ def _register_routes(app: Flask) -> None:
     @app.route("/api/chat", methods=["POST"])
     @app.limiter.limit("30 per minute")
     def chat():
-        """Enhanced chat endpoint with better error handling"""
+        """Enhanced chat endpoint with geography-specific crisis detection"""
         try:
             data = request.get_json()
             if not data or 'message' not in data:
@@ -385,13 +515,21 @@ def _register_routes(app: Flask) -> None:
             if not user_message:
                 return jsonify({"error": "Message cannot be empty"}), 400
             
+            # Get country from request
+            country = get_country_from_request(request)
+            
             # Process message with AI provider
             ai_response, risk_level = _process_chat_message(user_message, session_id)
+            
+            # Get geography-specific crisis response and resources
+            crisis_data = get_crisis_response_and_resources(risk_level, country)
             
             return jsonify({
                 "response": ai_response,
                 "risk_level": risk_level,
-                "session_id": session_id
+                "session_id": session_id,
+                "crisis_msg": crisis_data['crisis_msg'],
+                "crisis_numbers": crisis_data['crisis_numbers']
             }), 200
             
         except Exception as e:
@@ -615,15 +753,40 @@ def _enhanced_crisis_detection(message: str) -> Tuple[str, float, List[str]]:
     return risk_level, normalized_score, found_keywords
 
 
+def get_crisis_response_and_resources(risk_level: str, country: str = 'generic') -> Dict[str, Any]:
+    """Get geography-specific crisis response and resources"""
+    if risk_level == 'crisis':
+        # Get country-specific crisis resources
+        country_resources = CRISIS_RESOURCES_BY_COUNTRY.get(country, CRISIS_RESOURCES_BY_COUNTRY['generic'])
+        return {
+            'crisis_msg': country_resources['crisis_msg'],
+            'crisis_numbers': country_resources['crisis_numbers'],
+            'risk_level': risk_level
+        }
+    else:
+        # For non-crisis levels, return standard responses
+        responses = {
+            'high': "I'm worried about what you're experiencing. These feelings are serious and you deserve support. Please consider reaching out to a mental health professional or calling your local crisis helpline. You don't have to face this alone.",
+            'medium': "I can see you're going through a difficult time. It's important to take these feelings seriously. Consider talking to someone you trust or reaching out to a mental health professional. You're showing strength by sharing this.",
+            'low': "Thank you for sharing how you're feeling. It's normal to have difficult moments, and it's okay to not be okay. Consider reaching out to friends, family, or a mental health professional for support."
+        }
+        return {
+            'crisis_msg': responses.get(risk_level, responses['low']),
+            'crisis_numbers': [],
+            'risk_level': risk_level
+        }
+
 def _get_crisis_response(risk_level: str, risk_score: float) -> str:
-    """Get appropriate crisis response based on risk level"""
-    responses = {
-        'crisis': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call the National Suicide Prevention Lifeline at 988 or text HOME to 741741 to reach the Crisis Text Line. You're not alone, and help is available 24/7.",
-        'high': "I'm worried about what you're experiencing. These feelings are serious and you deserve support. Please consider reaching out to a mental health professional or calling 988 for immediate support. You don't have to face this alone.",
-        'medium': "I can see you're going through a difficult time. It's important to take these feelings seriously. Consider talking to someone you trust or reaching out to a mental health professional. You're showing strength by sharing this.",
-        'low': "Thank you for sharing how you're feeling. It's normal to have difficult moments, and it's okay to not be okay. Consider reaching out to friends, family, or a mental health professional for support."
-    }
-    return responses.get(risk_level, responses['low'])
+    """Get appropriate crisis response based on risk level (legacy function)"""
+    if risk_level == 'crisis':
+        return CRISIS_RESOURCES_BY_COUNTRY['generic']['crisis_msg']
+    else:
+        responses = {
+            'high': "I'm worried about what you're experiencing. These feelings are serious and you deserve support. Please consider reaching out to a mental health professional or calling your local crisis helpline. You don't have to face this alone.",
+            'medium': "I can see you're going through a difficult time. It's important to take these feelings seriously. Consider talking to someone you trust or reaching out to a mental health professional. You're showing strength by sharing this.",
+            'low': "Thank you for sharing how you're feeling. It's normal to have difficult moments, and it's okay to not be okay. Consider reaching out to friends, family, or a mental health professional for support."
+        }
+        return responses.get(risk_level, responses['low'])
 
 
 def _get_crisis_resources(risk_level: str) -> Dict[str, Any]:

@@ -62,7 +62,7 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> sendMessage(String content) async {
+  Future<void> sendMessage(String content, {String? country}) async {
     if (content.trim().isEmpty) return;
 
     _isLoading = true;
@@ -76,8 +76,8 @@ class ChatProvider extends ChangeNotifier {
       // Ensure session exists
       await _setupSession();
 
-      // Send message to backend first
-      final aiMessage = await _apiService.sendMessage(content);
+      // Send message to backend first with optional country parameter
+      final aiMessage = await _apiService.sendMessage(content, country: country);
 
       // Only add user message to UI after backend successfully processes it
       final userMessage = Message(content: content, isUser: true);

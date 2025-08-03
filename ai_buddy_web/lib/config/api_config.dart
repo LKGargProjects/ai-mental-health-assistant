@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
-  // Development - use production API for consistency
-  static const String localUrl = 'https://ai-mental-health-assistant-tddc.onrender.com';
+  // Development - use local backend for testing
+  static const String localUrl = 'http://localhost:5055';
 
   // Production (Render)
   static const String productionUrl =
@@ -15,8 +15,8 @@ class ApiConfig {
       return productionUrl;
     }
 
-    // For web, always use production URL for consistency
-    // This eliminates local container issues and follows our rules
+    // For web, use production URL for deployment
+    // This ensures consistent behavior across environments
     return productionUrl;
   }
 }

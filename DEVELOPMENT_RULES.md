@@ -101,6 +101,36 @@
 - ✅ **Test each component individually** (DB, Redis, App)
 - ✅ **Provide clear status information** to user with exact commands
 
+### **COMPREHENSIVE FEATURE PLANNING PROTOCOL**
+- ✅ **ALWAYS plan complete user experience** before implementing any feature
+- ✅ **Define ALL UI components** that should appear for each feature
+- ✅ **Map API responses to UI elements** explicitly
+- ✅ **List ALL expected visual elements** (buttons, widgets, messages)
+- ✅ **Plan complete user journey** from input to final state
+- ✅ **Consider ALL user interactions** (clicks, hovers, responses)
+- ✅ **Define success criteria** for both API and UI components
+- ✅ **Plan testing for ALL components** (API + UI + Integration)
+
+### **UI COMPONENT VALIDATION PROTOCOL**
+- ✅ **ALWAYS verify UI components display** after API fixes
+- ✅ **Check ALL expected widgets appear** for each feature
+- ✅ **Verify ALL buttons are functional** and accessible
+- ✅ **Test ALL visual states** (loading, success, error, empty)
+- ✅ **Validate ALL user interactions** work as expected
+- ✅ **Check ALL responsive behaviors** on different screen sizes
+- ✅ **Verify ALL accessibility features** (keyboard, screen readers)
+- ✅ **Test ALL edge cases** (empty data, network errors, timeouts)
+
+### **FEATURE COMPLETENESS CHECKLIST**
+- ✅ **API Level**: Endpoint works correctly
+- ✅ **Data Level**: Response structure is correct
+- ✅ **Logic Level**: Business logic functions properly
+- ✅ **UI Level**: All visual components display correctly
+- ✅ **Interaction Level**: All buttons/links work properly
+- ✅ **State Level**: All states (loading, success, error) handled
+- ✅ **Integration Level**: API + UI work together seamlessly
+- ✅ **User Experience Level**: Complete journey works end-to-end
+
 ### Crisis Detection & API Response Protocol
 - ✅ **ALWAYS verify API response structure** matches frontend expectations
 - ✅ **Check risk_level field** is properly included in API responses
@@ -129,6 +159,69 @@
 - ✅ **Verify crisis resources** are displayed based on risk level
 - ✅ **Test environment consistency** for same inputs
 - ✅ **Check API response format** is consistent across environments
+
+### **MANDATORY TESTING AFTER MAJOR CHANGES**
+- ✅ **EVERY major change MUST be followed by comprehensive testing**
+- ✅ **Automated tests MUST be run** for all API endpoints affected
+- ✅ **Manual testing MUST be requested** for UI changes
+- ✅ **Environment consistency MUST be verified** (local vs production)
+- ✅ **Cross-platform testing MUST be performed** (Web, iOS, Android)
+- ✅ **Performance testing MUST be included** for critical features
+- ✅ **Error handling MUST be tested** for edge cases
+- ✅ **Documentation MUST be updated** with test results
+
+### **CRISIS DETECTION CONSISTENCY RULE**
+- ✅ **CRISIS DETECTION MUST behave identically** across all environments
+- ✅ **Same input MUST produce same output** on local and production
+- ✅ **Crisis keywords MUST trigger appropriate responses** everywhere
+- ✅ **Risk level parsing MUST work correctly** in Flutter app
+- ✅ **Crisis resources MUST display consistently** across environments
+- ✅ **API response structure MUST be identical** between environments
+- ✅ **Environment differences MUST be documented** and resolved
+
+### **DEPLOYMENT VERIFICATION PROTOCOL**
+- ✅ **BEFORE deployment**: Run all automated tests locally
+- ✅ **AFTER deployment**: Verify production behavior matches local
+- ✅ **CRISIS DETECTION**: Must work identically in both environments
+- ✅ **API RESPONSES**: Must have same structure and content
+- ✅ **UI BEHAVIOR**: Must be consistent across environments
+- ✅ **PERFORMANCE**: Must be acceptable in production
+- ✅ **ERROR HANDLING**: Must work correctly in production
+
+### **CRISIS DETECTION COMPLETE FEATURE REQUIREMENTS**
+- ✅ **API Level**: Crisis keywords trigger appropriate risk levels
+- ✅ **Response Level**: API returns crisis intervention messages with geography-specific resources
+- ✅ **Geography Level**: Country-specific crisis helplines and messages
+- ✅ **UI Level**: Crisis resources widget displays with country-specific buttons
+- ✅ **Button Level**: All crisis buttons are functional and accessible
+- ✅ **Integration Level**: API response triggers correct UI components
+- ✅ **User Experience Level**: Complete crisis intervention flow works
+- ✅ **Accessibility Level**: Crisis resources accessible to all users
+- ✅ **Performance Level**: Crisis detection responds quickly
+- ✅ **Fallback Level**: Generic resources for unsupported countries
+- ✅ **IP Detection Level**: Automatic country detection from user's IP
+- ✅ **Override Level**: Manual country specification for testing
+- ✅ **Local Testing Level**: Frontend configured to call local backend, NOT production
+
+### **🚨 CRITICAL LOCAL TESTING RULE**
+- ✅ **ALWAYS verify API endpoint configuration** before local testing
+- ✅ **Frontend MUST call local backend** (`http://localhost:5055`) for local development
+- ✅ **NEVER use production API** for local testing
+- ✅ **Check `api_config.dart`** to ensure `baseUrl` points to local backend
+- ✅ **Test backend directly** with curl to verify responses
+- ✅ **Compare frontend and backend responses** to ensure consistency
+- ✅ **Rebuild Flutter app** after changing API configuration
+- ✅ **Use incognito mode** to avoid browser cache issues
+- ✅ **Check console logs** for API endpoint verification
+
+### **API Endpoint Configuration Checklist:**
+- [ ] `ai_buddy_web/lib/config/api_config.dart` uses `http://localhost:5055` for local development
+- [ ] Backend container is running and healthy
+- [ ] Frontend calls local backend (not production)
+- [ ] API responses match between curl and frontend
+- [ ] Crisis data fields are populated correctly
+- [ ] Geography-specific resources are returned
+- [ ] UI displays crisis widget with correct data
 
 ## 📝 How to Modify Rules
 
@@ -218,3 +311,16 @@ Cursor.ai, as an AI coding assistant, should adhere to the following rules and p
 
 **Last Updated:** Current session
 **Status:** Active 
+
+## 🎯 **CURSOR RULES - FOLLOW THESE ALWAYS**
+
+### **CRITICAL DEBUGGING RULES:**
+- ✅ **ALWAYS add debug logging** before troubleshooting any issue
+- ✅ **Test backend directly** with curl before blaming frontend
+- ✅ **Check API endpoint configuration** - ensure frontend calls local backend for local testing
+- ✅ **Verify Docker container rebuilds** after code changes
+- ✅ **Use incognito mode** to avoid browser cache issues
+- ✅ **Compare API responses** between curl and frontend
+- ✅ **Check console logs** for detailed debugging information
+- ✅ **Rebuild Flutter containers** when UI not updating
+- ✅ **Test in isolation** - backend first, then frontend, then integration 

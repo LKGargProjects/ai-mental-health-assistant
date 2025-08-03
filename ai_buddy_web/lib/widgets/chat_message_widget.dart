@@ -6,29 +6,30 @@ import 'crisis_resources.dart';
 class ChatMessageWidget extends StatelessWidget {
   final Message message;
 
-  const ChatMessageWidget({
-    super.key,
-    required this.message,
-  });
+  const ChatMessageWidget({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
       child: Column(
-        crossAxisAlignment:
-            message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: message.isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment:
-                message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: message.isUser
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             children: [
               if (!message.isUser) _buildAvatar(context),
               const SizedBox(width: 8),
               Flexible(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: message.getMessageColor(context),
                     borderRadius: BorderRadius.circular(20),
@@ -50,10 +51,15 @@ class ChatMessageWidget extends StatelessWidget {
               if (message.isUser) _buildAvatar(context),
             ],
           ),
-          if (message.riskLevel != RiskLevel.none && !message.isUser)
+          // Show crisis widget for high-risk messages
+          if (!message.isUser && message.riskLevel == RiskLevel.high)
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
-              child: CrisisResourcesWidget(riskLevel: message.riskLevel),
+              child: CrisisResourcesWidget(
+                riskLevel: message.riskLevel,
+                crisisMsg: message.crisisMsg,
+                crisisNumbers: message.crisisNumbers,
+              ),
             ),
         ],
       ),
@@ -71,4 +77,4 @@ class ChatMessageWidget extends StatelessWidget {
       ),
     );
   }
-} 
+}
