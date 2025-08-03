@@ -173,3 +173,176 @@
 3. **Validate Environment Variables**: Ensure consistency
 4. **Test with Debug Logging**: Trace data flow
 5. **Rebuild All Containers**: Force fresh deployment 
+
+## 🚨 **PRODUCTION DEBUGGING GUIDE**
+
+### **Common Production Issues & Solutions**
+
+#### **Issue 1: "Static Folder Exists: False" / "Index.html Exists: False"**
+**Symptoms:**
+- Production shows Render default page instead of Flutter app
+- Environment info shows static files missing
+- "The Flutter web app is not available" message
+
+**Root Cause:**
+- Static files not being built or copied during deployment
+- Wrong start command in render.yaml
+- Nginx not serving static files correctly
+
+**Solutions:**
+1. **Check static files locally:**
+   ```bash
+   ls -la static/
+   ls -la static/index.html static/main.dart.js
+   ```
+
+2. **Rebuild static files:**
+   ```bash
+   cd ai_buddy_web && flutter build web --release
+   cd .. && yes | rm -rf static/* && cp -r ai_buddy_web/build/web/* static/
+   ```
+
+3. **Verify render.yaml configuration:**
+   ```yaml
+   buildCommand: ./build.sh
+   startCommand: ./start.sh  # NOT python app.py
+   ```
+
+4. **Check Docker setup:**
+   - Local: Use `docker-compose up -d` (separate containers)
+   - Production: Use single container with nginx + Flask
+
+#### **Issue 2: Mixed Geography Crisis Resources**
+**Symptoms:**
+- AI responses include generic crisis resources (988, 111, 741741)
+- Crisis widget shows correct geography-specific resources
+- Inconsistent crisis resource display
+
+**Root Cause:**
+- AI provider not aware of crisis detection results
+- AI model trained to include crisis resources in responses
+
+**Solutions:**
+1. **Pass risk_level to AI provider:**
+   ```python
+   ai_response = get_gemini_response(message, session_id=session_id, risk_level=risk_level)
+   ```
+
+2. **Replace crisis AI responses:**
+   ```python
+   if risk_level == 'crisis':
+       cleaned_response = """Generic supportive message without crisis resources"""
+   ```
+
+3. **Update crisis detection keywords:**
+   ```python
+   crisis_keywords = ['take me from this earth', 'remove me from earth']
+   ```
+
+#### **Issue 3: Environment Detection Issues**
+**Symptoms:**
+- Frontend calls wrong API endpoint
+- Local development uses production API
+- Production uses local API
+
+**Root Cause:**
+- Manual API config changes between environments
+- No automatic environment detection
+
+**Solutions:**
+1. **Implement dynamic environment detection:**
+   ```dart
+   if (hostname == 'localhost' || hostname == '127.0.0.1') {
+     return localUrl;
+   } else {
+     return productionUrl;
+   }
+   ```
+
+2. **Use automatic environment detection:**
+   - No manual code changes needed
+   - Same codebase works in both environments
+
+#### **Issue 4: Docker Container Issues**
+**Symptoms:**
+- Port conflicts: "port is already allocated"
+- Backend inaccessible from host
+- Container rebuilds not reflecting changes
+
+**Solutions:**
+1. **Clean up containers:**
+   ```bash
+   docker-compose down --remove-orphans
+   docker-compose up -d
+   ```
+
+2. **Force rebuild:**
+   ```bash
+   docker-compose build --no-cache backend
+   docker-compose up -d backend
+   ```
+
+3. **Check container logs:**
+   ```bash
+   docker-compose logs backend
+   docker-compose logs flutter-web
+   ```
+
+#### **Issue 5: API Response Parsing Issues**
+**Symptoms:**
+- Crisis widget not displaying
+- Risk level not being detected
+- Missing crisis data fields
+
+**Root Cause:**
+- Frontend not parsing new API response fields
+- Backend not returning expected data structure
+
+**Solutions:**
+1. **Update frontend parsing:**
+   ```dart
+   crisisMsg = data['crisis_msg'] as String;
+   crisisNumbers = data['crisis_numbers'] as List<dynamic>;
+   ```
+
+2. **Verify backend response:**
+   ```bash
+   curl -X POST http://localhost:5055/api/chat \
+     -H "Content-Type: application/json" \
+     -d '{"message": "i want to die", "country": "in"}' | jq
+   ```
+
+### **Debugging Checklist**
+
+#### **Pre-Deployment:**
+- [ ] Static files built and copied to static/
+- [ ] render.yaml uses correct start command
+- [ ] All environment variables set in Render
+- [ ] Local testing works on port 8080
+- [ ] API responses include crisis data fields
+
+#### **Post-Deployment:**
+- [ ] Production URL loads Flutter app (not Render default page)
+- [ ] Crisis detection works with geography-specific resources
+- [ ] No mixed geography crisis resources
+- [ ] API endpoints respond correctly
+- [ ] Environment detection works automatically
+
+#### **Monitoring:**
+- [ ] Check Render deployment logs
+- [ ] Monitor API response times
+- [ ] Verify crisis detection accuracy
+- [ ] Test with real users in India
+
+### **Emergency Rollback Plan**
+
+If critical issues are found:
+1. **Immediate:** Revert to previous commit
+2. **Investigation:** Check logs and debug locally
+3. **Fix:** Address issues and redeploy
+4. **Test:** Verify fixes work in production
+
+---
+
+**Status:** ✅ Production deployment issues resolved
+**Next Step:** Monitor production deployment and test with MVP users 

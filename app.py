@@ -274,7 +274,7 @@ class Config:
 
 def create_app() -> Flask:
     """Application factory pattern for single codebase usage"""
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='static', static_url_path='')
     
     # Load configuration
     app.config.from_object(Config)
@@ -456,6 +456,15 @@ def _register_routes(app: Flask) -> None:
             return send_from_directory(app.static_folder, 'index.html')
         else:
             return _get_fallback_html(app)
+    
+    @app.route("/<path:filename>")
+    def serve_static(filename):
+        """Serve static files for Flutter web app"""
+        if os.path.exists(os.path.join(app.static_folder, filename)):
+            return send_from_directory(app.static_folder, filename)
+        else:
+            # Fallback to index.html for SPA routing
+            return send_from_directory(app.static_folder, 'index.html')
 
     @app.route("/api/health", methods=["GET"])
     def health():

@@ -76,8 +76,9 @@ COPY --from=python-builder /usr/local/lib/python3.11/site-packages /usr/local/li
 COPY --from=python-builder /usr/local/bin /usr/local/bin
 COPY --from=python-builder /app .
 
-# Copy Flutter web build
+# Copy Flutter web build to both locations
 COPY --from=flutter-builder /app/ai_buddy_web/build/web /var/www/html
+COPY --from=flutter-builder /app/ai_buddy_web/build/web /app/static
 
 # Copy static web files
 COPY web/ /var/www/html/static/
