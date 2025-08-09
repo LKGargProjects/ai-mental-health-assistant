@@ -7,9 +7,8 @@ import '../core/utils/image_constant.dart';
 import '../theme/theme_helper.dart';
 import '../theme/text_style_helper.dart';
 import '../widgets/dhiwise/custom_image_view.dart';
-import 'mood_tracker_screen.dart';
-import '../dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
-import '../dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
+import '../core/utils/size_utils.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class InteractiveChatScreen extends StatefulWidget {
   const InteractiveChatScreen({super.key});
@@ -232,20 +231,8 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
           ),
         ],
       ),
-      // Bottom Navigation
-      bottomNavigationBar: Container(
-        color: appTheme.whiteCustom,
-        padding: EdgeInsets.symmetric(vertical: 8.h),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(Icons.chat_bubble_outline, 'Talk', true),
-            _buildNavItem(Icons.mood, 'Mood', false),
-            _buildNavItem(Icons.emoji_events_outlined, 'Quest', false),
-            _buildNavItem(Icons.people_outline, 'Community', false),
-          ],
-        ),
-      ),
+      // Bottom Navigation (shared)
+      bottomNavigationBar: const AppBottomNav(current: AppTab.talk),
     );
   }
 
@@ -299,65 +286,6 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
               fit: BoxFit.cover,
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return GestureDetector(
-      onTap: () {
-        // Handle navigation
-        switch (label.toLowerCase()) {
-          case 'talk':
-            // Already on talk screen
-            break;
-          case 'mood':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MoodTrackerScreen(),
-              ),
-            );
-            break;
-          case 'quest':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DhiwiseSizer.Sizer(
-                  builder: (context, orientation, deviceType) => WellnessDashboardScreen(),
-                ),
-              ),
-            );
-            break;
-          case 'community':
-            // TODO: Navigate to community screen
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Community coming soon!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-            break;
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 28.0, // iOS standard tab bar icon size
-            color: isActive ? Colors.blue : Colors.grey,
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.0, // iOS standard tab bar label size
-              color: isActive ? Colors.blue : Colors.grey,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
         ],
       ),
     );

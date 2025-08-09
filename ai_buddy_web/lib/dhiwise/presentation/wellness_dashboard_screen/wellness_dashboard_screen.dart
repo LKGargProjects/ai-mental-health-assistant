@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
-import './widgets/bottom_nav_item_widget.dart';
 import './widgets/progress_card_widget.dart';
 import './widgets/recommendation_card_widget.dart';
+import '../../../widgets/app_bottom_nav.dart';
 
 class WellnessDashboardScreen extends StatelessWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -63,7 +63,7 @@ class WellnessDashboardScreen extends StatelessWidget {
                             fit: BoxFit.cover)),
                   ])),
             ]),
-            bottomNavigationBar: _buildBottomNavigation()));
+            bottomNavigationBar: const AppBottomNav(current: AppTab.quest)));
     });
   }
 
@@ -176,44 +176,6 @@ class WellnessDashboardScreen extends StatelessWidget {
               imagePath: ImageConstant.imgImage130x130,
               onTap: () {
                 // Handle social recommendation click
-              }),
-        ]));
-  }
-
-  Widget _buildBottomNavigation() {
-    return Container(
-        decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFF4F4EF)))),
-        padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-          BottomNavItemWidget(
-              iconPath: ImageConstant.imgVector0Gray600021,
-              label: 'Talk',
-              isActive: false,
-              onTap: () {
-                // Handle talk tab click
-              }),
-          BottomNavItemWidget(
-              iconPath: ImageConstant.imgVector0Gray60002,
-              label: 'Mood',
-              isActive: false,
-              onTap: () {
-                // Handle mood tab click
-              }),
-          BottomNavItemWidget(
-              iconPath: ImageConstant.imgVector0Gray900,
-              label: 'Quest',
-              isActive: true,
-              onTap: () {
-                // Handle quest tab click
-              }),
-          BottomNavItemWidget(
-              iconPath: ImageConstant.imgVector039x39,
-              label: 'Community',
-              isActive: false,
-              onTap: () {
-                // Handle community tab click
               }),
         ]));
   }
