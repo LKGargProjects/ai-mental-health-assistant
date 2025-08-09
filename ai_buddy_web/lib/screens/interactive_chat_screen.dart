@@ -185,11 +185,19 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                             controller: _messageController,
                             decoration: InputDecoration(
                               hintText: 'Type your message...',
+                              hintStyle: TextStyle(
+                                fontSize: 16.0, // iOS standard input text size
+                                color: Colors.grey[600],
+                              ),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16.h,
                                 vertical: 12.h,
                               ),
+                            ),
+                            style: TextStyle(
+                              fontSize: 16.0, // iOS standard input text size
+                              color: Colors.black87,
                             ),
                             onSubmitted: (_) => _sendMessage(),
                             textInputAction: TextInputAction.send,
@@ -272,8 +280,11 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
               ),
               child: Text(
                 message.content,
-                style: TextStyleHelper.instance.body14Medium.copyWith(
+                style: TextStyle(
+                  fontSize: 16.0, // iOS standard body text size
+                  fontWeight: FontWeight.w400,
                   color: appTheme.colorFF1F29,
+                  height: 1.4, // iOS standard line height
                 ),
               ),
             ),
@@ -333,16 +344,16 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
         children: [
           Icon(
             icon,
-            size: 24.h,
+            size: 28.0, // iOS standard tab bar icon size
             color: isActive ? Colors.blue : Colors.grey,
           ),
           SizedBox(height: 4.h),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12.h,
+              fontSize: 10.0, // iOS standard tab bar label size
               color: isActive ? Colors.blue : Colors.grey,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import '../widgets/mood_tracker.dart';
 import '../core/utils/size_utils.dart';
 import '../core/utils/image_constant.dart';
 import '../theme/theme_helper.dart';
+import '../theme/text_style_helper.dart';
 import '../widgets/dhiwise/custom_image_view.dart';
 
 class MoodTrackerScreen extends StatelessWidget {
@@ -48,11 +49,7 @@ class MoodTrackerScreen extends StatelessWidget {
                         child: Text(
                           'Mood Tracker',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 20.h,
-                            fontWeight: FontWeight.bold,
-                            color: appTheme.colorFF1F29,
-                          ),
+                          style: TextStyleHelper.instance.headline24Bold,
                         ),
                       ),
                       SizedBox(width: 48.h), // Balance the back button
@@ -69,7 +66,7 @@ class MoodTrackerScreen extends StatelessWidget {
               Expanded(
                 child: Container(
                   color: Colors.transparent,
-                  child: const MoodTrackerWidget(),
+                  child: const MoodTrackerWidget(), // Fixed - now without duplicate header
                 ),
               ),
             ],
@@ -129,16 +126,16 @@ class MoodTrackerScreen extends StatelessWidget {
         children: [
           Icon(
             icon,
-            size: 24.h,
+            size: 28.0, // iOS standard tab bar icon size
             color: isActive ? Colors.blue : Colors.grey,
           ),
           SizedBox(height: 4.h),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12.h,
+              fontSize: 10.0, // iOS standard tab bar label size
               color: isActive ? Colors.blue : Colors.grey,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
         ],

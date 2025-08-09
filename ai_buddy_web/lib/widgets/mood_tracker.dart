@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import '../models/mood_entry.dart';
 import '../providers/mood_provider.dart';
+import '../models/mood_entry.dart';
 
 class MoodTrackerWidget extends StatelessWidget {
   const MoodTrackerWidget({super.key});
@@ -20,31 +20,26 @@ class MoodTrackerWidget extends StatelessWidget {
           return Center(
             child: Text(
               moodProvider.error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontFamily: 'Inter', // Match chat screen font family
+              ),
             ),
           );
         }
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Mood Tracker'),
-            centerTitle: true,
-            backgroundColor: Colors.white,
-            elevation: 1,
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                _buildMoodInput(context, moodProvider),
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              _buildMoodInput(context, moodProvider),
+              const SizedBox(height: 16),
+              if (moodProvider.moodEntries.isNotEmpty) ...[
+                _buildMoodChart(context, moodProvider),
                 const SizedBox(height: 16),
-                if (moodProvider.moodEntries.isNotEmpty) ...[
-                  _buildMoodChart(context, moodProvider),
-                  const SizedBox(height: 16),
-                  _buildMoodStats(context, moodProvider),
-                ],
+                _buildMoodStats(context, moodProvider),
               ],
-            ),
+            ],
           ),
         );
       },
@@ -220,7 +215,9 @@ class MoodTrackerWidget extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            fontFamily: 'Inter', // Match chat screen font family
+          ),
         ),
         const SizedBox(height: 4),
         Text(
@@ -230,7 +227,9 @@ class MoodTrackerWidget extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontFamily: 'Inter', // Match chat screen font family
+          ),
         ),
       ],
     );
@@ -254,7 +253,14 @@ class MoodTrackerWidget extends StatelessWidget {
               style: const TextStyle(fontSize: 24),
             ),
             const SizedBox(width: 8),
-            Text('Feeling ${MoodEntry(moodLevel: moodLevel).moodDescription}'),
+            Text(
+              'Feeling ${MoodEntry(moodLevel: moodLevel).moodDescription}',
+              style: TextStyle(
+                fontFamily: 'Inter', // Match chat screen font family
+                fontSize: 18.0, // Keep existing size
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
         content: TextField(
