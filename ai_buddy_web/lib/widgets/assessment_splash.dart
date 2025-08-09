@@ -9,21 +9,30 @@ class AssessmentSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dialog with rounded corners and subtle shadow, centered, responsive width
+    // Dialog with rounded corners and subtle shadow, centered, responsive width/height
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final media = MediaQuery.of(context);
+          final screenH = media.size.height;
+          final viewInsetsBottom = media.viewInsets.bottom; // keyboard
+          // Keep dialog within 90% of viewport, minus keyboard insets
+          final maxDialogHeight = (screenH * 0.9) - viewInsetsBottom;
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 720,
+                maxHeight: maxDialogHeight.clamp(320.0, screenH),
+              ),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 16 + viewInsetsBottom),
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   // Header
                   Row(
                     children: [
@@ -56,10 +65,11 @@ class AssessmentSplash extends StatelessWidget {
                       fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Body: existing self assessment widget (API-integrated)
-                  Flexible(
+                  // Use Expanded so the body takes remaining space and scrolls within, avoiding overflow
+                  Expanded(
                     child: SelfAssessmentWidget(
                       onAssessmentSubmitted: () {
                         // Close on successful submit
@@ -71,8 +81,9 @@ class AssessmentSplash extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-        ),
+            ),
+          );
+        },
       ),
     );
   }

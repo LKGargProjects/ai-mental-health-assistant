@@ -373,7 +373,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
                                 'REMINDER',
@@ -390,24 +390,41 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                   });
                                 },
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  curve: Curves.easeInOut,
-                                  width: 52.h,
-                                  height: 28.h,
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  width: 56.h,
+                                  height: 30.h,
                                   padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
                                   decoration: BoxDecoration(
                                     color: _reminderOn ? Theme.of(context).colorScheme.primary : const Color(0xFFE6EAF0),
                                     borderRadius: BorderRadius.circular(20.h),
+                                    boxShadow: _reminderOn
+                                        ? [
+                                            BoxShadow(
+                                              color: Theme.of(context).colorScheme.primary.withOpacity(0.35),
+                                              blurRadius: 14,
+                                              spreadRadius: 1,
+                                              offset: const Offset(0, 3),
+                                            )
+                                          ]
+                                        : [],
                                   ),
-                                  child: Align(
+                                  child: AnimatedAlign(
+                                    duration: const Duration(milliseconds: 220),
+                                    curve: Curves.easeOutCubic,
                                     alignment: _reminderOn ? Alignment.centerRight : Alignment.centerLeft,
-                                    child: Container(
-                                      width: 20.h,
-                                      height: 20.h,
-                                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                                      child: _reminderOn
-                                          ? Icon(Icons.check, size: 16.h, color: Theme.of(context).colorScheme.primary)
-                                          : null,
+                                    child: AnimatedScale(
+                                      duration: const Duration(milliseconds: 160),
+                                      curve: Curves.easeOutBack,
+                                      scale: _reminderOn ? 1.0 : 0.96,
+                                      child: Container(
+                                        width: 22.h,
+                                        height: 22.h,
+                                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                        child: _reminderOn
+                                            ? Icon(Icons.check, size: 16.h, color: Theme.of(context).colorScheme.primary)
+                                            : null,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -463,14 +480,22 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                       }
                                     : null,
                                 style: OutlinedButton.styleFrom(
-                                  padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
+                                  padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 0),
+                                  minimumSize: Size(0, 30.h), // match toggle height
                                   side: BorderSide(
                                     color: _reminderOn ? Theme.of(context).colorScheme.primary : const Color(0xFFB8C0CC),
                                   ),
                                   foregroundColor: _reminderOn ? Theme.of(context).colorScheme.primary : const Color(0xFFB8C0CC),
+                                  shape: const StadiumBorder(),
                                 ),
-                                icon: Icon(Icons.edit, size: 16.h),
-                                label: const Text('Change'),
+                                icon: Icon(Icons.edit, size: 18.h),
+                                label: Text(
+                                  'Change',
+                                  style: TextStyleHelper.instance.headline21Inter.copyWith(
+                                    fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                                    fontSize: 12.h,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -489,23 +514,10 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                         ],
                       ),
                     ),
-                    SizedBox(width: 24.h),
-                    Container(
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(19.h)),
-                      child: ColorFiltered(
-                        colorFilter: ColorFilter.matrix(_reminderOn ? _saturationMatrix(1.15) : _saturationMatrix(0.85)),
-                        child: CustomImageView(
-                          imagePath: ImageConstant.imgImage131x130,
-                          height: 130.h,
-                          width: 130.h,
-                          fit: BoxFit.cover,
-                          radius: BorderRadius.circular(19.h),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
+                    // Removed right-side image to give space for time + tomorrow label
+                    ],
+                  ),
+                );
             },
           ),
         ]));

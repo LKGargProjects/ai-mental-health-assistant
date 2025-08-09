@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'dart:convert';
-import '../config/api_config.dart';
 import '../services/api_service.dart';
 
 class SelfAssessmentWidget extends StatefulWidget {
@@ -150,60 +147,83 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            childAspectRatio: 1.2,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
+          style: const TextStyle(
+            fontSize: 14, 
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
           ),
-          itemCount: options.length,
-          itemBuilder: (context, index) {
-            final option = options[index];
-            final isSelected = selectedValue == option['value'];
-
-            return GestureDetector(
-              onTap: () => onChanged(option['value']),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.blue : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isSelected ? Colors.blue : Colors.grey[300]!,
-                    width: 2,
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (showIcons && option['icon'] != null)
-                      Text(
-                        option['icon'],
-                        style: const TextStyle(fontSize: 24),
-                      ),
-                    Text(
-                      option['label'],
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: isSelected ? Colors.white : Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+        ),
+        const SizedBox(height: 4),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            // More columns for better space utilization
+            int cols = w > 400 ? 6 : w > 350 ? 5 : 4;
+            
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                crossAxisSpacing: 4,
+                mainAxisSpacing: 4,
+                mainAxisExtent: showIcons ? 50 : 40, // Smaller height, especially for non-emoji items
               ),
+              itemCount: options.length,
+              itemBuilder: (context, index) {
+                final option = options[index];
+                final isSelected = selectedValue == option['value'];
+
+                return GestureDetector(
+                  onTap: () => onChanged(option['value']),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isSelected 
+                          ? Theme.of(context).primaryColor 
+                          : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: isSelected 
+                            ? Theme.of(context).primaryColor 
+                            : Colors.grey[300]!,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 2),
+                    child: Center(
+                      child: showIcons && option['icon'] != null
+                        ? Text(
+                            option['icon'],
+                            style: const TextStyle(fontSize: 22), // Keep emoji size
+                            textAlign: TextAlign.center,
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                            child: Text(
+                              option['label'],
+                              style: TextStyle(
+                                fontSize: 11, // Slightly larger text for better readability
+                                fontWeight: isSelected 
+                                    ? FontWeight.w600 
+                                    : FontWeight.normal,
+                                color: isSelected 
+                                    ? Colors.white 
+                                    : Colors.black87,
+                                height: 1.0,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
       ],
     );
   }
@@ -262,23 +282,34 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedCrisisLevel.isEmpty ? null : _selectedCrisisLevel,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Select crisis level (if applicable)',
-              ),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('None')),
-                ..._levelOptions.map(
-                  (option) => DropdownMenuItem(
-                    value: option['value'],
-                    child: Text(option['label']),
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: DropdownButtonFormField<String>(
+                isExpanded: true,
+                value: _selectedCrisisLevel.isEmpty ? null : _selectedCrisisLevel,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Select crisis level (if applicable)',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
-              ],
-              onChanged: (value) =>
-                  setState(() => _selectedCrisisLevel = value ?? ''),
+                items: [
+                  const DropdownMenuItem(
+                    value: null, 
+                    child: Text('None', overflow: TextOverflow.ellipsis),
+                  ),
+                  ..._levelOptions.map(
+                    (option) => DropdownMenuItem(
+                      value: option['value'],
+                      child: Text(
+                        option['label'],
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) =>
+                    setState(() => _selectedCrisisLevel = value ?? ''),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -288,25 +319,34 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedAnxietyLevel.isEmpty
-                  ? null
-                  : _selectedAnxietyLevel,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Select anxiety level (if applicable)',
-              ),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('None')),
-                ..._levelOptions.map(
-                  (option) => DropdownMenuItem(
-                    value: option['value'],
-                    child: Text(option['label']),
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: DropdownButtonFormField<String>(
+                isExpanded: true,
+                value: _selectedAnxietyLevel.isEmpty ? null : _selectedAnxietyLevel,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Select anxiety level (if applicable)',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
-              ],
-              onChanged: (value) =>
-                  setState(() => _selectedAnxietyLevel = value ?? ''),
+                items: [
+                  const DropdownMenuItem(
+                    value: null, 
+                    child: Text('None', overflow: TextOverflow.ellipsis),
+                  ),
+                  ..._levelOptions.map(
+                    (option) => DropdownMenuItem(
+                      value: option['value'],
+                      child: Text(
+                        option['label'],
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) =>
+                    setState(() => _selectedAnxietyLevel = value ?? ''),
+              ),
             ),
             const SizedBox(height: 16),
 
