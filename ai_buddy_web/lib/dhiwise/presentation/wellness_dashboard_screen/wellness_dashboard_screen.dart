@@ -16,17 +16,17 @@ class WellnessDashboardScreen extends StatelessWidget {
       return SafeArea(
           child: Scaffold(
             body: Stack(children: [
-              // Background Image
+              // Background Image (use full viewport like chat/mood)
               CustomImageView(
                   imagePath: ImageConstant.imgBackground1440x6351,
-                  height: SizeUtils.height,
-                  width: SizeUtils.width,
+                  height: MediaQuery.of(context).size.height,
+                  width: MediaQuery.of(context).size.width,
                   fit: BoxFit.cover),
 
-              // Content
+              // Content (full viewport sizing)
               Container(
-                  height: SizeUtils.height,
-                  width: SizeUtils.width,
+                  height: MediaQuery.of(context).size.height,
+                  width: MediaQuery.of(context).size.width,
                   child: Stack(children: [
                     // Side Background
                     Positioned(
@@ -59,7 +59,7 @@ class WellnessDashboardScreen extends StatelessWidget {
                         child: CustomImageView(
                             imagePath: ImageConstant.imgBackground13x635,
                             height: 13.h,
-                            width: 635.h,
+                            width: MediaQuery.of(context).size.width,
                             fit: BoxFit.cover)),
                   ])),
             ]),
