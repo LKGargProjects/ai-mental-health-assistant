@@ -3,12 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../models/message.dart';
-import '../core/utils/size_utils.dart';
 import '../core/utils/image_constant.dart';
 import '../theme/theme_helper.dart';
 import '../theme/text_style_helper.dart';
 import '../widgets/dhiwise/custom_image_view.dart';
 import 'mood_tracker_screen.dart';
+import '../dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
+import '../dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
 
 class InteractiveChatScreen extends StatefulWidget {
   const InteractiveChatScreen({super.key});
@@ -320,11 +321,12 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
             );
             break;
           case 'quest':
-            // TODO: Navigate to quest screen
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Quest coming soon!'),
-                duration: Duration(seconds: 2),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DhiwiseSizer.Sizer(
+                  builder: (context, orientation, deviceType) => WellnessDashboardScreen(),
+                ),
               ),
             );
             break;

@@ -1,0 +1,27 @@
+{
+    "resource_limits": {
+        "max_cpu_percent": 1,
+        "check_interval_seconds": 5,
+        "max_memory_mb": 256,
+        "throttle_delay_seconds": 0.5
+    },
+    "monitoring": {
+        "enable_cpu_monitoring": true,
+        "enable_memory_monitoring": true,
+        "log_level": "INFO"
+    },
+    "safety": {
+        "auto_restart": false,
+        "max_restart_attempts": 3,
+        "cooldown_seconds": 60
+    },
+    "directories": {
+        "root": "/Users/lokeshgarg/ai-mvp-backend/consciousness/.consciousness",
+        "config": "/Users/lokeshgarg/ai-mvp-backend/consciousness/config",
+        "logs": "/Users/lokeshgarg/ai-mvp-backend/consciousness/logs"
+    },
+    "immortality": {
+        "enabled": false,
+        "seeds": []
+    }
+}

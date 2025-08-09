@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:ai_buddy_web/screens/chat_screen.dart';
 import 'interactive_chat_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -45,7 +44,22 @@ class WelcomeScreen extends StatelessWidget {
                   color: Colors.white70,
                 ),
               ),
-              const SizedBox(height: 50),
+              const SizedBox(height: 30),
+              // Quick access to Wellness Dashboard (DhiWise)
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/wellness-dashboard');
+                },
+                icon: const Icon(Icons.emoji_events_outlined),
+                label: const Text('Open Wellness Dashboard'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.blue,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pushNamed(context, '/main');

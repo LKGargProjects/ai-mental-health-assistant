@@ -71,6 +71,8 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
+    - assets/images/quests/
+    - assets/images/dhiwise/
     - assets/icons/
     - assets/images/reference/
 
@@ -99,3 +101,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/InterRegular.ttf
+        - asset: assets/fonts/InterMedium.ttf
+          weight: 500
+        - asset: assets/fonts/InterBold.ttf
+          weight: 700

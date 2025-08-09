@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quest Screen Preview</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .app-bar {
+            background-color: #667EEA;
+            color: white;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .app-bar h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 500;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+        .quest-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .quest-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .icon-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+        .quest-info {
+            flex: 1;
+        }
+        .quest-title {
+            font-weight: 600;
+            margin: 0 0 4px 0;
+            color: #1F2937;
+        }
+        .quest-desc {
+            margin: 0;
+            color: #6B7280;
+            font-size: 14px;
+        }
+        .progress-bar {
+            height: 8px;
+            background: #E5E7EB;
+            border-radius: 4px;
+            margin: 12px 0 8px 0;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            border-radius: 4px;
+            width: 30%;
+        }
+        .progress-text {
+            text-align: right;
+            color: #6B7280;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .action-button {
+            background: #667EEA;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            float: right;
+            font-size: 14px;
+        }
+        .blue { background-color: #EFF6FF; color: #2563EB; }
+        .green { background-color: #ECFDF5; color: #059669; }
+        .orange { background-color: #FFFBEB; color: #D97706; }
+        .blue .progress { background-color: #2563EB; }
+        .green .progress { background-color: #059669; }
+        .orange .progress { background-color: #D97706; }
+    </style>
+</head>
+<body>
+    <div class="app-bar">
+        <h1>Quest Screen Preview</h1>
+    </div>
+    
+    <div class="container">
+        <!-- Quest 1 -->
+        <div class="quest-card">
+            <div class="quest-header">
+                <div class="icon-circle blue">
+                    <span class="material-icons">check_circle</span>
+                </div>
+                <div class="quest-info">
+                    <h3 class="quest-title">Daily Check-in</h3>
+                    <p class="quest-desc">Complete your daily mood check-in</p>
+                </div>
+                <button class="action-button">Continue</button>
+            </div>
+            <div class="progress-bar">
+                <div class="progress" style="width: 30%;"></div>
+            </div>
+            <div class="progress-text">30% complete</div>
+        </div>
+
+        <!-- Quest 2 -->
+        <div class="quest-card">
+            <div class="quest-header">
+                <div class="icon-circle green">
+                    <span class="material-icons">self_improvement</span>
+                </div>
+                <div class="quest-info">
+                    <h3 class="quest-title">Meditation Challenge</h3>
+                    <p class="quest-desc">Meditate for 5 minutes</p>
+                </div>
+                <button class="action-button" style="background-color: #059669;">Continue</button>
+            </div>
+            <div class="progress-bar">
+                <div class="progress" style="width: 70%;"></div>
+            </div>
+            <div class="progress-text">70% complete</div>
+        </div>
+
+        <!-- Quest 3 -->
+        <div class="quest-card">
+            <div class="quest-header">
+                <div class="icon-circle orange">
+                    <span class="material-icons">book</span>
+                </div>
+                <div class="quest-info">
+                    <h3 class="quest-title">Gratitude Journal</h3>
+                    <p class="quest-desc">Write 3 things you're grateful for</p>
+                </div>
+                <button class="action-button" style="background-color: #D97706;">Start</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
