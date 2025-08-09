@@ -10,6 +10,7 @@ class RecommendationCardWidget extends StatelessWidget {
   final String subtitle;
   final String imagePath;
   final VoidCallback? onTap;
+  final bool completed;
 
   RecommendationCardWidget({
     Key? key,
@@ -18,6 +19,7 @@ class RecommendationCardWidget extends StatelessWidget {
     required this.subtitle,
     required this.imagePath,
     this.onTap,
+    this.completed = false,
   }) : super(key: key);
 
   @override
@@ -71,12 +73,39 @@ class RecommendationCardWidget extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(19.h),
               ),
-              child: CustomImageView(
-                imagePath: imagePath,
-                height: 130.h,
-                width: 130.h,
-                fit: BoxFit.cover,
-                radius: BorderRadius.circular(19.h),
+              child: Stack(
+                children: [
+                  CustomImageView(
+                    imagePath: imagePath,
+                    height: 130.h,
+                    width: 130.h,
+                    fit: BoxFit.cover,
+                    radius: BorderRadius.circular(19.h),
+                  ),
+                  if (completed)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.35),
+                          borderRadius: BorderRadius.circular(19.h),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Done',
+                            style: TextStyleHelper.instance.title19BoldInter
+                                .copyWith(
+                              fontFamily: CoreTextStyles
+                                  .TextStyleHelper
+                                  .instance
+                                  .headline24Bold
+                                  .fontFamily,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

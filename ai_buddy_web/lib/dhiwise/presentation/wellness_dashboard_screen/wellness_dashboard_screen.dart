@@ -8,8 +8,19 @@ import './widgets/recommendation_card_widget.dart';
 import '../../../widgets/app_bottom_nav.dart';
 import '../../../theme/text_style_helper.dart' as CoreTextStyles;
 
-class WellnessDashboardScreen extends StatelessWidget {
+class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
+
+  @override
+  State<WellnessDashboardScreen> createState() => _WellnessDashboardScreenState();
+}
+
+class _WellnessDashboardScreenState extends State<WellnessDashboardScreen> {
+  // UI-only state for TASK completion and progress
+  bool _task1Done = false; // Focus reset
+  bool _task2Done = false; // Study sprint
+  int _baseSteps = 2; // total tasks today
+  int _baseXp = 20; // base example XP shown initially
 
   @override
   Widget build(BuildContext context) {
@@ -152,19 +163,29 @@ class WellnessDashboardScreen extends StatelessWidget {
                   color: Color(0xFF444D5C))),
           SizedBox(height: 28.h),
           Row(children: [
-            Expanded(
-                child: ProgressCardWidget(
-                    imagePath: ImageConstant.imgImage65x52,
-                    value: '2',
-                    label: 'Steps Left',
-                    backgroundColor: Color(0xFFE0F2E9))),
-            SizedBox(width: 24.h),
-            Expanded(
-                child: ProgressCardWidget(
-                    imagePath: ImageConstant.imgImage63x65,
-                    value: '+20',
-                    label: 'XP Earned',
-                    backgroundColor: Color(0xFFE8E7F8))),
+            // Compute dynamic values from UI state
+            // Steps left cannot go below 0
+            // XP increases by +10 per completed task for demo purposes (UI-only)
+            Builder(builder: (_) {
+              final completed = (_task1Done ? 1 : 0) + (_task2Done ? 1 : 0);
+              final stepsLeft = (_baseSteps - completed).clamp(0, _baseSteps);
+              final xpEarned = _baseXp + (completed * 10);
+              return Row(children: [
+                Expanded(
+                    child: ProgressCardWidget(
+                        imagePath: ImageConstant.imgImage65x52,
+                        value: '$stepsLeft',
+                        label: 'Steps Left',
+                        backgroundColor: Color(0xFFE0F2E9))),
+                SizedBox(width: 24.h),
+                Expanded(
+                    child: ProgressCardWidget(
+                        imagePath: ImageConstant.imgImage63x65,
+                        value: '+$xpEarned',
+                        label: 'XP Earned',
+                        backgroundColor: Color(0xFFE8E7F8))),
+              ]);
+            }),
           ]),
           SizedBox(height: 12.h),
           Text('Estimated time: 2–3 min',
@@ -189,10 +210,15 @@ class WellnessDashboardScreen extends StatelessWidget {
           RecommendationCardWidget(
               category: 'TASK',
               title: 'Focus reset (2 min)',
-              subtitle: 'Quick breathing + desk tidy',
+              subtitle: (_task1Done && _task2Done)
+                  ? 'All steps complete 🎉'
+                  : 'Quick breathing + desk tidy',
               imagePath: ImageConstant.imgImage131x130,
+              completed: _task1Done,
               onTap: () {
-                // Toggle completion (UI-only for now)
+                setState(() {
+                  _task1Done = !_task1Done;
+                });
               }),
           SizedBox(height: 24.h),
           // Card 2 (TASK)
@@ -201,8 +227,11 @@ class WellnessDashboardScreen extends StatelessWidget {
               title: 'Study sprint (10 min)',
               subtitle: 'Timer + no‑phone rule',
               imagePath: ImageConstant.imgImage130x130,
+              completed: _task2Done,
               onTap: () {
-                // Toggle completion (UI-only for now)
+                setState(() {
+                  _task2Done = !_task2Done;
+                });
               }),
           SizedBox(height: 24.h),
           // Card 3 (RESOURCE)
