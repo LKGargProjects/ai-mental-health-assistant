@@ -21,6 +21,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen> {
   bool _task2Done = false; // Study sprint
   int _baseSteps = 2; // total tasks today
   int _baseXp = 20; // base example XP shown initially
+  bool _reminderOn = false; // UI-only reminder toggle
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +154,10 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen> {
   }
 
   Widget _buildProgressSection() {
+    // Compute dynamic values from UI state (UI-only)
+    final int completed = (_task1Done ? 1 : 0) + (_task2Done ? 1 : 0);
+    final int stepsLeft = (_baseSteps - completed).clamp(0, _baseSteps);
+    final int xpEarned = _baseXp + (completed * 10);
     return Padding(
         padding: EdgeInsets.symmetric(horizontal: 70.h).copyWith(bottom: 32.h),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -163,29 +168,19 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen> {
                   color: Color(0xFF444D5C))),
           SizedBox(height: 28.h),
           Row(children: [
-            // Compute dynamic values from UI state
-            // Steps left cannot go below 0
-            // XP increases by +10 per completed task for demo purposes (UI-only)
-            Builder(builder: (_) {
-              final completed = (_task1Done ? 1 : 0) + (_task2Done ? 1 : 0);
-              final stepsLeft = (_baseSteps - completed).clamp(0, _baseSteps);
-              final xpEarned = _baseXp + (completed * 10);
-              return Row(children: [
-                Expanded(
-                    child: ProgressCardWidget(
-                        imagePath: ImageConstant.imgImage65x52,
-                        value: '$stepsLeft',
-                        label: 'Steps Left',
-                        backgroundColor: Color(0xFFE0F2E9))),
-                SizedBox(width: 24.h),
-                Expanded(
-                    child: ProgressCardWidget(
-                        imagePath: ImageConstant.imgImage63x65,
-                        value: '+$xpEarned',
-                        label: 'XP Earned',
-                        backgroundColor: Color(0xFFE8E7F8))),
-              ]);
-            }),
+            Expanded(
+                child: ProgressCardWidget(
+                    imagePath: ImageConstant.imgImage65x52,
+                    value: '$stepsLeft',
+                    label: 'Steps Left',
+                    backgroundColor: Color(0xFFE0F2E9))),
+            SizedBox(width: 24.h),
+            Expanded(
+                child: ProgressCardWidget(
+                    imagePath: ImageConstant.imgImage63x65,
+                    value: '+$xpEarned',
+                    label: 'XP Earned',
+                    backgroundColor: Color(0xFFE8E7F8))),
           ]),
           SizedBox(height: 12.h),
           Text('Estimated time: 2–3 min',
@@ -258,10 +253,15 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen> {
           RecommendationCardWidget(
               category: 'REMINDER',
               title: 'Tonight, 7:00 PM',
-              subtitle: 'Nudge me to finish the quest',
+              subtitle: _reminderOn
+                  ? 'Reminder on for 7:00 PM'
+                  : 'Nudge me to finish the quest',
               imagePath: ImageConstant.imgImage131x130,
               onTap: () {
-                // Toggle reminder (UI-only for now)
+                // Toggle reminder (UI-only)
+                setState(() {
+                  _reminderOn = !_reminderOn;
+                });
               }),
         ]));
   }
