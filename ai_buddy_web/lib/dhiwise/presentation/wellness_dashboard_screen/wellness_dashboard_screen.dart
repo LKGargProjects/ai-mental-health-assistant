@@ -8,6 +8,7 @@ import './widgets/progress_card_widget.dart';
 import './widgets/recommendation_card_widget.dart';
 import '../../../widgets/app_bottom_nav.dart';
 import '../../../theme/text_style_helper.dart' as CoreTextStyles;
+import '../../../widgets/assessment_splash.dart';
 
 class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -226,7 +227,11 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   fontFamily: CoreTextStyles
                       .TextStyleHelper.instance.headline24Bold.fontFamily),
               onPressed: () {
-                // Handle check in click
+                showDialog(
+                  context: context,
+                  barrierDismissible: false, // keep user on quest screen; use X to close
+                  builder: (ctx) => const AssessmentSplash(),
+                );
               }),
         ]));
   }

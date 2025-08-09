@@ -65,6 +65,16 @@
 
 ## ⚖️ AGENT PROTOCOLS
 
+## 🔭 FUTURE ENHANCEMENTS (Reference)
+
+- **Journal for Struggles & Reflections**
+  - Allow users to log struggles/problems and ongoing reflections.
+  - Data can inform supportive nudges and optional human-in-the-loop assistance while preserving privacy by design.
+
+- **Pre‑Onboarding Personalization Assessment**
+  - Lightweight (e.g., 5-item) intake to capture primary struggles and preferences.
+  - Personalizes initial experience (content, tone, goals) and guides early recommendations.
+
 ### COLLABORATION RULES
 1. **Documentation First**: Major changes require documentation updates
 2. **Progressive Enhancement**: Build incrementally with quality
