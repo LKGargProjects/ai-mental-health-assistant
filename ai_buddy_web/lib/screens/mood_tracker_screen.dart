@@ -6,6 +6,7 @@ import '../core/utils/image_constant.dart';
 import '../theme/theme_helper.dart';
 import '../theme/text_style_helper.dart';
 import '../widgets/dhiwise/custom_image_view.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class MoodTrackerScreen extends StatelessWidget {
   const MoodTrackerScreen({super.key});
@@ -73,73 +74,8 @@ class MoodTrackerScreen extends StatelessWidget {
           ),
         ],
       ),
-      // Bottom Navigation
-      bottomNavigationBar: Container(
-        color: appTheme.whiteCustom,
-        padding: EdgeInsets.symmetric(vertical: 8.h),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(Icons.chat_bubble_outline, 'Talk', false, context),
-            _buildNavItem(Icons.mood, 'Mood', true, context),
-            _buildNavItem(Icons.emoji_events_outlined, 'Quest', false, context),
-            _buildNavItem(Icons.people_outline, 'Community', false, context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, bool isActive, BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        // Handle navigation
-        switch (label.toLowerCase()) {
-          case 'talk':
-            Navigator.of(context).pop(); // Go back to chat
-            break;
-          case 'mood':
-            // Already on mood screen
-            break;
-          case 'quest':
-            // TODO: Navigate to quest screen
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Quest coming soon!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-            break;
-          case 'community':
-            // TODO: Navigate to community screen
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Community coming soon!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-            break;
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 28.0, // iOS standard tab bar icon size
-            color: isActive ? Colors.blue : Colors.grey,
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.0, // iOS standard tab bar label size
-              color: isActive ? Colors.blue : Colors.grey,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
+      // Bottom Navigation (shared)
+      bottomNavigationBar: const AppBottomNav(current: AppTab.mood),
     );
   }
 }
