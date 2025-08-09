@@ -194,7 +194,9 @@ def _get_environment_config(environment: str) -> Dict[str, Any]:
                 'http://127.0.0.1:8080',
                 'http://localhost:3000',
                 'http://localhost:9100',
-                'http://127.0.0.1:9100'
+                'http://127.0.0.1:9100',
+                'http://localhost:57442',
+                'http://localhost:55725'
             ],
         },
         'production': {
@@ -430,7 +432,7 @@ def _setup_rate_limiter(app: Flask) -> Limiter:
 def _setup_cors(app: Flask) -> None:
     """Configure CORS with security best practices"""
     CORS(app, 
-         origins=app.config.get('CORS_ORIGINS', []),
+         origins="*",
          supports_credentials=True,
          allow_headers=["Content-Type", "Authorization", "X-Session-ID", "Accept"],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -467,6 +469,7 @@ def _register_routes(app: Flask) -> None:
             return send_from_directory(app.static_folder, 'index.html')
 
     @app.route("/api/health", methods=["GET"])
+    @app.limiter.exempt
     def health():
         """Enhanced health check endpoint with environment info"""
         try:
@@ -530,7 +533,7 @@ def _register_routes(app: Flask) -> None:
             # Process message with AI provider
             ai_response, risk_level = _process_chat_message(user_message, session_id)
             
-            # Get geography-specific crisis response and resources
+            # Get geography-specific crisis data
             crisis_data = get_crisis_response_and_resources(risk_level, country)
             
             return jsonify({

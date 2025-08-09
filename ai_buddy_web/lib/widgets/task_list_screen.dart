@@ -10,7 +10,9 @@ class TaskListScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Wellness Tasks'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 1,
       ),
       body: Consumer<TaskProvider>(
         builder: (context, taskProvider, child) {
@@ -27,7 +29,29 @@ class TaskListScreen extends StatelessWidget {
             );
           }
 
-          return const Center(child: Text('Task list coming soon...'));
+          // Placeholder tasks
+          final tasks = [
+            {'title': 'Practice deep breathing for 5 minutes', 'completed': true},
+            {'title': 'Go for a 15-minute walk', 'completed': false},
+            {'title': 'Write down 3 things you are grateful for', 'completed': false},
+            {'title': 'Disconnect from social media for 1 hour', 'completed': false},
+          ];
+
+          return ListView.builder(
+            itemCount: tasks.length,
+            itemBuilder: (context, index) {
+              final task = tasks[index];
+              return ListTile(
+                leading: Checkbox(
+                  value: task['completed'] as bool,
+                  onChanged: (value) {
+                    // Handle task completion
+                  },
+                ),
+                title: Text(task['title'] as String),
+              );
+            },
+          );
         },
       ),
     );

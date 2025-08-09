@@ -29,7 +29,7 @@ services:
     networks:
       - ai-buddy-network
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:${BACKEND_PORT:-5055}/api/health')\""]
+      test: ["CMD-SHELL", "curl -f http://localhost:${BACKEND_PORT:-5055}/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

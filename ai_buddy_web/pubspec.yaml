@@ -43,6 +43,8 @@ dependencies:
   flutter_markdown: ^0.6.20  # For rendering markdown in messages
   flutter_secure_storage: ^9.0.0  # For secure storage of session data
   animated_text_kit: ^4.2.2  # For typing animations
+  cached_network_image: ^3.3.1  # For DhiWise image caching
+  flutter_svg: ^2.0.10+1  # For DhiWise SVG support
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +72,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/images/reference/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -25,16 +25,27 @@ class MoodTrackerWidget extends StatelessWidget {
           );
         }
 
-        return Column(
-          children: [
-            _buildMoodInput(context, moodProvider),
-            const SizedBox(height: 16),
-            if (moodProvider.moodEntries.isNotEmpty) ...[
-              _buildMoodChart(context, moodProvider),
-              const SizedBox(height: 16),
-              _buildMoodStats(context, moodProvider),
-            ],
-          ],
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Mood Tracker'),
+            centerTitle: true,
+            backgroundColor: Colors.white,
+            elevation: 1,
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                _buildMoodInput(context, moodProvider),
+                const SizedBox(height: 16),
+                if (moodProvider.moodEntries.isNotEmpty) ...[
+                  _buildMoodChart(context, moodProvider),
+                  const SizedBox(height: 16),
+                  _buildMoodStats(context, moodProvider),
+                ],
+              ],
+            ),
+          ),
         );
       },
     );
@@ -42,14 +53,16 @@ class MoodTrackerWidget extends StatelessWidget {
 
   Widget _buildMoodInput(BuildContext context, MoodProvider moodProvider) {
     return Card(
+      elevation: 2.0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'How are you feeling?',
-              style: Theme.of(context).textTheme.titleMedium,
+              'How are you feeling today?',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
             Row(
@@ -61,7 +74,7 @@ class MoodTrackerWidget extends StatelessWidget {
                   onPressed: () => _showMoodDialog(context, moodProvider, moodLevel),
                   icon: Text(
                     entry.moodEmoji,
-                    style: const TextStyle(fontSize: 24),
+                    style: const TextStyle(fontSize: 32),
                   ),
                   tooltip: entry.moodDescription,
                 );
@@ -77,65 +90,72 @@ class MoodTrackerWidget extends StatelessWidget {
     final entries = moodProvider.moodEntries;
     if (entries.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: 200,
-      child: LineChart(
-        LineChartData(
-          gridData: const FlGridData(show: false),
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 1,
-                reservedSize: 40,
-                getTitlesWidget: (value, meta) {
-                  if (value < 1 || value > 5) return const Text('');
-                  return Text(MoodEntry(moodLevel: value.toInt()).moodEmoji);
-                },
+    return Card(
+      elevation: 2.0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SizedBox(
+          height: 200,
+          child: LineChart(
+            LineChartData(
+              gridData: const FlGridData(show: false),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: 1,
+                    reservedSize: 40,
+                    getTitlesWidget: (value, meta) {
+                      if (value < 1 || value > 5) return const Text('');
+                      return Text(MoodEntry(moodLevel: value.toInt()).moodEmoji);
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: 1,
+                    getTitlesWidget: (value, meta) {
+                      if (value >= entries.length) return const Text('');
+                      final date = entries[value.toInt()].timestamp;
+                      return Text(DateFormat('MM/dd').format(date));
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
               ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 1,
-                getTitlesWidget: (value, meta) {
-                  if (value >= entries.length) return const Text('');
-                  final date = entries[value.toInt()].timestamp;
-                  return Text(DateFormat('MM/dd').format(date));
-                },
-              ),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
+              borderData: FlBorderData(show: false),
+              minX: 0,
+              maxX: entries.length.toDouble() - 1,
+              minY: 1,
+              maxY: 5,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: entries.asMap().entries.map((entry) {
+                    return FlSpot(
+                      entry.key.toDouble(),
+                      entry.value.moodLevel.toDouble(),
+                    );
+                  }).toList(),
+                  isCurved: true,
+                  color: Theme.of(context).colorScheme.primary,
+                  barWidth: 3,
+                  isStrokeCapRound: true,
+                  dotData: const FlDotData(show: true),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  ),
+                ),
+              ],
             ),
           ),
-          borderData: FlBorderData(show: false),
-          minX: 0,
-          maxX: entries.length.toDouble() - 1,
-          minY: 1,
-          maxY: 5,
-          lineBarsData: [
-            LineChartBarData(
-              spots: entries.asMap().entries.map((entry) {
-                return FlSpot(
-                  entry.key.toDouble(),
-                  entry.value.moodLevel.toDouble(),
-                );
-              }).toList(),
-              isCurved: true,
-              color: Theme.of(context).colorScheme.primary,
-              barWidth: 3,
-              isStrokeCapRound: true,
-              dotData: const FlDotData(show: true),
-              belowBarData: BarAreaData(
-                show: true,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -149,14 +169,16 @@ class MoodTrackerWidget extends StatelessWidget {
     final latestMood = entries.last;
 
     return Card(
+      elevation: 2.0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Mood Stats',
-              style: Theme.of(context).textTheme.titleMedium,
+              'Mood Statistics',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Row(
@@ -164,19 +186,19 @@ class MoodTrackerWidget extends StatelessWidget {
               children: [
                 _buildStatItem(
                   context,
-                  'Current Mood',
+                  'Current',
                   latestMood.moodEmoji,
                   latestMood.moodDescription,
                 ),
                 _buildStatItem(
                   context,
-                  'Average Mood',
+                  'Average',
                   MoodEntry(moodLevel: averageMood.round()).moodEmoji,
                   averageMood.toStringAsFixed(1),
                 ),
                 _buildStatItem(
                   context,
-                  'Total Entries',
+                  'Entries',
                   '📊',
                   entries.length.toString(),
                 ),
@@ -203,7 +225,7 @@ class MoodTrackerWidget extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           emoji,
-          style: const TextStyle(fontSize: 24),
+          style: const TextStyle(fontSize: 32),
         ),
         const SizedBox(height: 4),
         Text(
@@ -224,6 +246,7 @@ class MoodTrackerWidget extends StatelessWidget {
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
         title: Row(
           children: [
             Text(

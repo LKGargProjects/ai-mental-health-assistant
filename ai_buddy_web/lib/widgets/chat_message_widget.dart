@@ -1,79 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import '../models/message.dart';
-import 'crisis_resources.dart';
 
 class ChatMessageWidget extends StatelessWidget {
-  final Message message;
+  const ChatMessageWidget({
+    super.key,
+    required this.text,
+    required this.isUser,
+  });
 
-  const ChatMessageWidget({super.key, required this.message});
+  final String text;
+  final bool isUser;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-      child: Column(
-        crossAxisAlignment: message.isUser
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 10.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: message.isUser
-                ? MainAxisAlignment.end
-                : MainAxisAlignment.start,
-            children: [
-              if (!message.isUser) _buildAvatar(context),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: message.getMessageColor(context),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: MarkdownBody(
-                    data: message.content,
-                    styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(color: message.getTextColor(context)),
-                      a: TextStyle(
-                        color: message.isUser
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (message.isUser) _buildAvatar(context),
-            ],
-          ),
-          // Show crisis widget for high-risk messages
-          if (!message.isUser && message.riskLevel == RiskLevel.high)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: CrisisResourcesWidget(
-                riskLevel: message.riskLevel,
-                crisisMsg: message.crisisMsg,
-                crisisNumbers: message.crisisNumbers,
-              ),
+          if (!isUser) ...[
+            const CircleAvatar(
+              // Placeholder for AI avatar
+              child: Icon(Icons.android),
             ),
+            const SizedBox(width: 8.0),
+          ],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: isUser ? Colors.blue[100] : Colors.grey[200],
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: Text(text),
+            ),
+          ),
+          if (isUser) ...[
+            const SizedBox(width: 8.0),
+            const CircleAvatar(
+              // Placeholder for user avatar
+              child: Icon(Icons.person),
+            ),
+          ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildAvatar(BuildContext context) {
-    return CircleAvatar(
-      backgroundColor: message.isUser
-          ? Theme.of(context).colorScheme.primary
-          : Theme.of(context).colorScheme.secondary,
-      child: Text(
-        message.isUser ? '👤' : '🤖',
-        style: const TextStyle(fontSize: 16),
       ),
     );
   }

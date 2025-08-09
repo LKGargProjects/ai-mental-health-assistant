@@ -4,7 +4,7 @@ set -e
 echo "=== Starting build process for single codebase deployment ==="
 echo "Environment: ${ENVIRONMENT:-local}"
 echo "Platform: ${PLATFORM:-unknown}"
-echo "Python version: $(python --version)"
+echo "Python version: $(/Users/lokeshgarg/ai-mvp-backend/venv/bin/python3 --version)"
 
 # Set build timestamp
 export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -12,7 +12,7 @@ echo "Build time: $BUILD_TIME"
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
-pip install -r requirements.txt
+/Users/lokeshgarg/ai-mvp-backend/venv/bin/pip3 install -r requirements.txt
 
 # Install Flutter with version management
 echo "Installing Flutter..."
@@ -22,9 +22,9 @@ FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/stabl
 # Check if Flutter is already installed
 if [ ! -d "flutter" ]; then
     echo "Downloading Flutter ${FLUTTER_VERSION}..."
-    wget -q "${FLUTTER_URL}"
-    tar xf "flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-    rm "flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+    curl -L -o flutter.tar.xz "${FLUTTER_URL}"
+    tar xf "flutter.tar.xz"
+    rm "flutter.tar.xz"
     echo "✅ Flutter downloaded successfully"
 else
     echo "✅ Flutter already installed"
@@ -59,7 +59,7 @@ flutter pub get
 
 # Build with error handling and validation
 echo "Building Flutter web app with release configuration..."
-if flutter build web --release --web-renderer canvaskit; then
+if flutter build web --release; then
     echo "✅ Flutter build completed successfully!"
     
     # Verify build output

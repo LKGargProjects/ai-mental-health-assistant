@@ -22,7 +22,9 @@ class MoodProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _moodEntries = await _apiService.getMoodHistory();
+      // For now, use local storage instead of backend
+      // TODO: Implement backend mood tracking later
+      _moodEntries = [];
       _error = null;
     } catch (e) {
       _error = 'Failed to load mood history';
@@ -39,15 +41,9 @@ class MoodProvider extends ChangeNotifier {
 
     try {
       final entry = MoodEntry(moodLevel: moodLevel, note: note);
-
-      // Convert MoodEntry to Map for API call
-      final data = {
-        'mood_level': moodLevel,
-        'note': note,
-        'timestamp': entry.timestamp.toIso8601String(),
-      };
-
-      await _apiService.addMoodEntry(data);
+      
+      // For now, store locally instead of backend
+      // TODO: Implement backend mood tracking later
       _moodEntries = [..._moodEntries, entry];
       _error = null;
     } catch (e) {

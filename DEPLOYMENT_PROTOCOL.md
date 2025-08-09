@@ -212,6 +212,44 @@
    - Local: Use `docker-compose up -d` (separate containers)
    - Production: Use single container with nginx + Flask
 
+#### **Issue 1b: "Blank Page with 404 Errors for flutter_bootstrap.js"**
+**Symptoms:**
+- Production URL shows blank white page
+- Console shows 404 errors for `flutter_bootstrap.js` and `manifest.json`
+- Flutter web app fails to load
+
+**Root Cause:**
+- Flask app not configured to serve static files
+- Static files not copied to correct location in container
+- Missing static folder configuration in Flask app
+
+**Solutions:**
+1. **Configure Flask static folder:**
+   ```python
+   app = Flask(__name__, static_folder='static', static_url_path='')
+   ```
+
+2. **Add static file serving route:**
+   ```python
+   @app.route("/<path:filename>")
+   def serve_static(filename):
+       if os.path.exists(os.path.join(app.static_folder, filename)):
+           return send_from_directory(app.static_folder, filename)
+       else:
+           return send_from_directory(app.static_folder, 'index.html')
+   ```
+
+3. **Update Dockerfile to copy files to both locations:**
+   ```dockerfile
+   COPY --from=flutter-builder /app/ai_buddy_web/build/web /var/www/html
+   COPY --from=flutter-builder /app/ai_buddy_web/build/web /app/static
+   ```
+
+4. **Test static file serving:**
+   ```bash
+   curl -s http://localhost:5055/flutter_bootstrap.js | head -5
+   ```
+
 #### **Issue 2: Mixed Geography Crisis Resources**
 **Symptoms:**
 - AI responses include generic crisis resources (988, 111, 741741)
