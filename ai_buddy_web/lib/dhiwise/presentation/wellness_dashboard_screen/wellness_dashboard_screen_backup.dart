@@ -108,7 +108,6 @@ class WellnessDashboardScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(28.h)),
         padding: EdgeInsets.symmetric(horizontal: 32.h, vertical: 44.h),
         child: Column(children: [
-          // Large prompt card title
           Text('Quick check-in',
               textAlign: TextAlign.center,
               style: TextStyleHelper.instance.headline28Inter.copyWith(
@@ -116,14 +115,13 @@ class WellnessDashboardScreen extends StatelessWidget {
                       .TextStyleHelper.instance.headline24Bold.fontFamily,
                   color: Color(0xFF555F6D))),
           SizedBox(height: 8.h),
-          // Prompt subtitle
           Text('Takes 2 minutes',
               textAlign: TextAlign.center,
               style: TextStyleHelper.instance.headline21Inter.copyWith(
                   fontFamily: CoreTextStyles
                       .TextStyleHelper.instance.headline24Bold.fontFamily,
                   color: Color(0xFF8C9CAA))),
-          SizedBox(height: 32.h),
+          SizedBox(height: 24.h),
           CustomButton(
               text: 'Start',
               backgroundColor: Colors.white,
@@ -155,23 +153,17 @@ class WellnessDashboardScreen extends StatelessWidget {
             Expanded(
                 child: ProgressCardWidget(
                     imagePath: ImageConstant.imgImage65x52,
-                    value: '2',
-                    label: 'Steps Left',
+                    value: '3 days',
+                    label: 'Streak',
                     backgroundColor: Color(0xFFE0F2E9))),
             SizedBox(width: 24.h),
             Expanded(
                 child: ProgressCardWidget(
                     imagePath: ImageConstant.imgImage63x65,
-                    value: '+20',
+                    value: '150',
                     label: 'XP Earned',
                     backgroundColor: Color(0xFFE8E7F8))),
           ]),
-          SizedBox(height: 12.h),
-          Text('Estimated time: 2–3 min',
-              style: TextStyleHelper.instance.headline21Inter.copyWith(
-                  fontFamily: CoreTextStyles
-                      .TextStyleHelper.instance.headline24Bold.fontFamily,
-                  color: Color(0xFF8C9CAA))),
         ]));
   }
 
@@ -185,54 +177,22 @@ class WellnessDashboardScreen extends StatelessWidget {
                       .TextStyleHelper.instance.headline24Bold.fontFamily,
                   color: Color(0xFF4A5261))),
           SizedBox(height: 28.h),
-          // Card 1 (TASK)
           RecommendationCardWidget(
-              category: 'TASK',
-              title: 'Focus reset (2 min)',
-              subtitle: 'Quick breathing + desk tidy',
+              category: 'MINDFULNESS',
+              title: 'Guided Meditation',
+              subtitle: '5 min',
               imagePath: ImageConstant.imgImage131x130,
               onTap: () {
-                // Toggle completion (UI-only for now)
+                // Handle mindfulness recommendation click
               }),
           SizedBox(height: 24.h),
-          // Card 2 (TASK)
           RecommendationCardWidget(
-              category: 'TASK',
-              title: 'Study sprint (10 min)',
-              subtitle: 'Timer + no‑phone rule',
+              category: 'SOCIAL',
+              title: 'Connect with Peers',
+              subtitle: 'Join a group chat',
               imagePath: ImageConstant.imgImage130x130,
               onTap: () {
-                // Toggle completion (UI-only for now)
-              }),
-          SizedBox(height: 24.h),
-          // Card 3 (RESOURCE)
-          RecommendationCardWidget(
-              category: 'RESOURCE',
-              title: 'Calm music',
-              subtitle: 'Lo‑fi playlist',
-              imagePath: ImageConstant.imgImage131x130,
-              onTap: () {
-                // Open resource (UI-only for now)
-              }),
-          SizedBox(height: 24.h),
-          // Card 4 (TIP)
-          RecommendationCardWidget(
-              category: 'TIP',
-              title: 'One tiny step',
-              subtitle: 'Pick the easiest task first',
-              imagePath: ImageConstant.imgImage130x130,
-              onTap: () {
-                // Show tip (UI-only for now)
-              }),
-          SizedBox(height: 24.h),
-          // Card 5 (REMINDER)
-          RecommendationCardWidget(
-              category: 'REMINDER',
-              title: 'Tonight, 7:00 PM',
-              subtitle: 'Nudge me to finish the quest',
-              imagePath: ImageConstant.imgImage131x130,
-              onTap: () {
-                // Toggle reminder (UI-only for now)
+                // Handle social recommendation click
               }),
         ]));
   }

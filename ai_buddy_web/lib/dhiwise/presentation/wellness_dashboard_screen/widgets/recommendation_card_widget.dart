@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
+import '../../../../theme/text_style_helper.dart' as CoreTextStyles;
 
 class RecommendationCardWidget extends StatelessWidget {
   final String category;
@@ -38,20 +39,29 @@ class RecommendationCardWidget extends StatelessWidget {
                 children: [
                   Text(
                     category,
-                    style: TextStyleHelper.instance.title19BoldInter
-                        .copyWith(color: Color(0xFF939FAF)),
+                    style: TextStyleHelper.instance.title19BoldInter.copyWith(
+                      fontFamily: CoreTextStyles
+                          .TextStyleHelper.instance.headline24Bold.fontFamily,
+                      color: Color(0xFF8E98A7),
+                    ),
                   ),
                   SizedBox(height: 8.h),
                   Text(
                     title,
-                    style: TextStyleHelper.instance.headline26BoldInter
-                        .copyWith(color: Color(0xFF4F5866)),
+                    style: TextStyleHelper.instance.headline26BoldInter.copyWith(
+                      fontFamily: CoreTextStyles
+                          .TextStyleHelper.instance.headline24Bold.fontFamily,
+                      color: Color(0xFF4C5664),
+                    ),
                   ),
                   SizedBox(height: 12.h),
                   Text(
                     subtitle,
-                    style: TextStyleHelper.instance.headline21Inter
-                        .copyWith(color: Color(0xFFA8B1BF)),
+                    style: TextStyleHelper.instance.headline21Inter.copyWith(
+                      fontFamily: CoreTextStyles
+                          .TextStyleHelper.instance.headline24Bold.fontFamily,
+                      color: Color(0xFFA8B1BF),
+                    ),
                   ),
                 ],
               ),

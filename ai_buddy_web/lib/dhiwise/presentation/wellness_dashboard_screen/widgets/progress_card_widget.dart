@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
+import '../../../../theme/text_style_helper.dart' as CoreTextStyles;
 
 class ProgressCardWidget extends StatelessWidget {
   final String imagePath;
@@ -36,14 +37,20 @@ class ProgressCardWidget extends StatelessWidget {
           SizedBox(height: 16.h),
           Text(
             value,
-            style: TextStyleHelper.instance.headline28BoldInter
-                .copyWith(color: Color(0xFF4E5965)),
+            style: TextStyleHelper.instance.headline28BoldInter.copyWith(
+              fontFamily: CoreTextStyles
+                  .TextStyleHelper.instance.headline24Bold.fontFamily,
+              color: Color(0xFF4E5965),
+            ),
           ),
           SizedBox(height: 4.h),
           Text(
             label,
-            style: TextStyleHelper.instance.headline22Inter
-                .copyWith(color: Color(0xFF8C9CAA)),
+            style: TextStyleHelper.instance.headline22Inter.copyWith(
+              fontFamily: CoreTextStyles
+                  .TextStyleHelper.instance.headline24Bold.fontFamily,
+              color: Color(0xFF8C9CAA),
+            ),
           ),
         ],
       ),
