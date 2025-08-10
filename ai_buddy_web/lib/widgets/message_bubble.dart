@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lokesh_s_application/models/message.dart';
+import 'package:ai_buddy_web/models/message.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -14,13 +14,13 @@ class MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: message.isUser ? Colors.blue : Colors.grey[300],
+          color: message.getMessageColor(context),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
-          message.text,
+          message.content,
           style: TextStyle(
-            color: message.isUser ? Colors.white : Colors.black,
+            color: message.getTextColor(context),
           ),
         ),
       ),

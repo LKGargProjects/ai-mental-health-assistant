@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../core/app_export.dart';
+import '../../dhiwise/core/utils/size_utils.dart';
+import './theme_helper.dart';
 
 /// A helper class for managing text styles in the application
 class TextStyleHelper {
