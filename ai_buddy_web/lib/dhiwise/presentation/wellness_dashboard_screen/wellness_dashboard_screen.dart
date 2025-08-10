@@ -67,7 +67,9 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
         final d = DateTime(base.year, base.month, base.day).add(Duration(days: i));
         final set1 = engine.selectToday(d, const {});
         final set2 = engine.selectToday(d, const {});
-        final same = listEquals(set1.map((e) => (e as dynamic).id).toList(), set2.map((e) => (e as dynamic).id).toList());
+        final ids1 = set1.map((e) => (e as dynamic).id as String).toList()..sort();
+        final ids2 = set2.map((e) => (e as dynamic).id as String).toList()..sort();
+        final same = listEquals(ids1, ids2);
         final hasTask = set1.any((q) => (q as dynamic).tag.toString().contains('task'));
         final hasTipRes = set1.any((q) => (q as dynamic).tag.toString().contains('tip') || (q as dynamic).tag.toString().contains('resource'));
         final hasCheckProg = set1.any((q) => (q as dynamic).tag.toString().contains('checkin') || (q as dynamic).tag.toString().contains('progress'));
