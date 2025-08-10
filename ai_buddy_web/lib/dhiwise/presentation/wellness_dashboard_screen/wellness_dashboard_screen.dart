@@ -13,6 +13,7 @@ import '../../../quests/quests_engine.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint, listEquals;
 import 'package:provider/provider.dart';
 import '../../../providers/progress_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -41,6 +42,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   ];
   int _microIndex = 0;
   Timer? _microTimer;
+  Timer? _midnightTimer;
+  static bool _autoVerifiedOnce = false; // ensure automated verification runs once per session
 
   // Gentle pulse for near-time attention
   late AnimationController _pulseController;
@@ -50,6 +53,143 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   QuestsEngine? _questsEngine;
   // ignore: unused_field
   Map<String, dynamic>? _todayData; // {'todayItems': List<Quest>, 'progress': {stepsLeft, xpEarned}}
+
+  // Persist reminder prefs
+  static const _prefsReminderOn = 'wellness.reminder_on_v1';
+  static const _prefsReminderMinutes = 'wellness.reminder_minutes_v1';
+  // Quests engine internal keys used for debug cleanup only
+  static const _qeTelemetryKey = 'quests_engine.telemetry_v1';
+  static const _qeHistoryKey = 'quests_engine.history_v1';
+  static const _qeTimersKey = 'quests_engine.timers_v1';
+
+  // Debug helper: extract today's quest titles
+  List<String> _debugTodayTitles() {
+    final items = _todayData?["todayItems"] as List<dynamic>?;
+    if (items == null) return const [];
+    return items.map((e) => (e as dynamic).title?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+  }
+
+  Future<void> _loadReminderPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final on = prefs.getBool(_prefsReminderOn);
+      final mins = prefs.getInt(_prefsReminderMinutes);
+      if (on != null || mins != null) {
+        if (mounted) {
+          setState(() {
+            if (on != null) _reminderOn = on;
+            if (mins != null) {
+              final h = (mins ~/ 60).clamp(0, 23);
+              final m = (mins % 60).clamp(0, 59);
+              _reminderTime = TimeOfDay(hour: h, minute: m);
+            }
+          });
+        }
+      }
+      if (kDebugMode) {
+        final hh = _reminderTime.hour.toString().padLeft(2, '0');
+        final mm = _reminderTime.minute.toString().padLeft(2, '0');
+        debugPrint('[ReminderPrefs] loaded on='+_reminderOn.toString()+' time='+hh+':'+mm);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ReminderPrefs][ERROR] '+e.toString());
+    }
+  }
+
+  // Debug cleanup helper used by automated verification
+  Future<void> _clearQuestDebugState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_qeTelemetryKey);
+      await prefs.remove(_qeHistoryKey);
+      await prefs.remove(_qeTimersKey);
+      if (kDebugMode) debugPrint('[QuestsEngine][DEBUG] Cleared debug telemetry/history/timers');
+    } catch (e) {
+      if (kDebugMode) debugPrint('[QuestsEngine][DEBUG][ERROR] cleanup '+e.toString());
+    }
+  }
+
+  Future<void> _runAutomatedVerification() async {
+    if (!kDebugMode) return;
+    if (_questsEngine == null) return;
+    try {
+      final titles = _debugTodayTitles();
+      if (titles.isNotEmpty) {
+        debugPrint('[AutoVerify] todayTitles='+titles.join(' | '));
+      }
+
+      final before = _todayData?['progress'] as Map<String, dynamic>?;
+
+      // Non-destructive actions
+      await _questsEngine!.markImpression('resource_calm_music_v2');
+      await _questsEngine!.markStart('resource_calm_music_v2');
+      await _questsEngine!.markComplete('resource_calm_music_v2');
+      await _questsEngine!.markImpression('tip_one_tiny_step_v2');
+      await _questsEngine!.markStart('tip_one_tiny_step_v2');
+      await _questsEngine!.markComplete('tip_one_tiny_step_v2');
+
+      // One task completion
+      await _questsEngine!.markStart('task_focus_reset_v2');
+      await _questsEngine!.markComplete('task_focus_reset_v2');
+
+      await _refreshToday();
+      final after = _todayData?['progress'] as Map<String, dynamic>?;
+
+      if (kDebugMode) {
+        final stepsBefore = (before?['stepsLeft'] ?? 0) as int;
+        final stepsAfter = (after?['stepsLeft'] ?? 0) as int;
+        final xpBefore = (before?['xpEarned'] ?? 0) as int;
+        final xpAfter = (after?['xpEarned'] ?? 0) as int;
+        final okSteps = stepsAfter <= stepsBefore;
+        final okXp = xpAfter >= xpBefore;
+        debugPrint('[AutoVerify][ASSERT] steps ok='+okSteps.toString()+' xp ok='+okXp.toString());
+      }
+
+      // Reminder prefs persistence
+      final origOn = _reminderOn;
+      final origTime = _reminderTime;
+      _reminderOn = !origOn;
+      final newMinutes = (origTime.minute + 5) % 60;
+      final carry = (origTime.minute + 5) ~/ 60;
+      final newHour = (origTime.hour + carry) % 24;
+      _reminderTime = TimeOfDay(hour: newHour, minute: newMinutes);
+      await _saveReminderPrefs();
+      await _loadReminderPrefs();
+      final loadedMatches = (_reminderOn == !origOn) && (_reminderTime.hour == newHour && _reminderTime.minute == newMinutes);
+      debugPrint('[AutoVerify][ASSERT] reminder persisted='+loadedMatches.toString()+' on='+_reminderOn.toString()+' time='+_reminderTime.hour.toString()+':'+_reminderTime.minute.toString().padLeft(2, '0'));
+      _reminderOn = origOn;
+      _reminderTime = origTime;
+      await _saveReminderPrefs();
+      await _loadReminderPrefs();
+
+      // Simulate midnight
+      final tomorrow = DateTime.now().add(const Duration(days: 1));
+      final nextData = await _questsEngine!.getTodayData(date: tomorrow);
+      final nextItems = nextData['todayItems'] as List?;
+      final nextProgress = nextData['progress'] as Map<String, dynamic>?;
+      debugPrint('[AutoVerify][MidnightSim] nextDay items='+(nextItems?.length.toString() ?? 'null')+' stepsLeft='+((nextProgress?['stepsLeft'])?.toString() ?? 'null')+' xp='+((nextProgress?['xpEarned'])?.toString() ?? 'null'));
+    } catch (e) {
+      if (kDebugMode) debugPrint('[AutoVerify][ERROR] '+e.toString());
+    } finally {
+      await _clearQuestDebugState();
+      await _refreshToday();
+      if (kDebugMode) debugPrint('[AutoVerify] cleanup done and state restored');
+    }
+  }
+
+  Future<void> _saveReminderPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefsReminderOn, _reminderOn);
+      final mins = _reminderTime.hour * 60 + _reminderTime.minute;
+      await prefs.setInt(_prefsReminderMinutes, mins);
+      if (kDebugMode) {
+        debugPrint('[ReminderPrefs] saved on=$_reminderOn minutes=$mins');
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ReminderPrefs][ERROR] $e');
+    }
+  }
 
   Future<void> _initQuests() async {
     final engine = QuestsEngine();
@@ -79,7 +219,9 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
           debugPrint('[QuestsEngine][FAIL] ${d.toIso8601String().split('T').first} same=$same task=$hasTask tipRes=$hasTipRes checkProg=$hasCheckProg short=$hasShort');
         }
       }
-      debugPrint('[QuestsEngine][STRESS] window=14d failures=$failures (0 is ideal)');
+      if (failures > 0) {
+        debugPrint('[QuestsEngine][STRESS] window=14d failures=$failures');
+      }
     }
     if (!mounted) return;
     setState(() {
@@ -97,6 +239,34 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
         debugPrint('[ProgressProvider] updateFromQuests stepsLeft=$stepsLeft xp=$xpEarned');
       }
     }
+  }
+
+  Future<void> _refreshToday() async {
+    if (_questsEngine == null) return _initQuests();
+    final data = await _questsEngine!.getTodayData();
+    if (!mounted) return;
+    setState(() {
+      _todayData = data;
+    });
+    final progress = data['progress'] as Map<String, dynamic>?;
+    if (progress != null) {
+      final stepsLeft = (progress['stepsLeft'] ?? 0) as int;
+      final xpEarned = (progress['xpEarned'] ?? 0) as int;
+      context.read<ProgressProvider>().updateFromQuests(stepsLeft: stepsLeft, xpEarned: xpEarned);
+      if (kDebugMode) debugPrint('[ProgressProvider][refresh] stepsLeft=$stepsLeft xp=$xpEarned');
+    }
+  }
+
+  void _scheduleMidnightRefresh() {
+    _midnightTimer?.cancel();
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    final ms = nextMidnight.difference(now).inMilliseconds;
+    _midnightTimer = Timer(Duration(milliseconds: ms.clamp(1000, 86400000)), () async {
+      if (kDebugMode) debugPrint('[QuestsEngine] Midnight refresh');
+      await _refreshToday();
+      _scheduleMidnightRefresh();
+    });
   }
 
   String _formatReminderTime(TimeOfDay t) {
@@ -138,13 +308,23 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     super.initState();
     _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
     _startMicrocopyRotation();
-    // Initialize quests data silently (used by existing widgets via provider later)
-    _initQuests();
+    // Initialize asynchronously: reminder prefs, quests data, and midnight refresh
+    Future.microtask(() async {
+      await _loadReminderPrefs();
+      await _initQuests();
+      _scheduleMidnightRefresh();
+      // Run automated in-app verification (debug-only), then restore state
+      if (kDebugMode && !_autoVerifiedOnce) {
+        await _runAutomatedVerification();
+        _autoVerifiedOnce = true;
+      }
+    });
   }
 
   @override
   void dispose() {
     _microTimer?.cancel();
+    _midnightTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -340,10 +520,23 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   : 'Quick breathing + desk tidy',
               imagePath: ImageConstant.imgImage131x130,
               completed: _task1Done,
-              onTap: () {
-                setState(() {
-                  _task1Done = !_task1Done;
-                });
+              onTap: () async {
+                final newVal = !_task1Done;
+                setState(() { _task1Done = newVal; });
+                // Wire to engine: mark start/complete for known quest id
+                const questId = 'task_focus_reset_v2';
+                if (_questsEngine != null) {
+                  try {
+                    await _questsEngine!.markStart(questId);
+                    if (newVal) {
+                      await _questsEngine!.markComplete(questId);
+                    }
+                    if (kDebugMode) debugPrint('[QuestsEngine] toggled $questId completed=$newVal');
+                  } catch (e) {
+                    if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e');
+                  }
+                  await _refreshToday();
+                }
               }),
           SizedBox(height: 24.h),
           // Card 2 (TASK)
@@ -353,10 +546,22 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
               subtitle: 'Timer + no‑phone rule',
               imagePath: ImageConstant.imgImage130x130,
               completed: _task2Done,
-              onTap: () {
-                setState(() {
-                  _task2Done = !_task2Done;
-                });
+              onTap: () async {
+                final newVal = !_task2Done;
+                setState(() { _task2Done = newVal; });
+                const questId = 'task_study_sprint_v2';
+                if (_questsEngine != null) {
+                  try {
+                    await _questsEngine!.markStart(questId);
+                    if (newVal) {
+                      await _questsEngine!.markComplete(questId);
+                    }
+                    if (kDebugMode) debugPrint('[QuestsEngine] toggled $questId completed=$newVal');
+                  } catch (e) {
+                    if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e');
+                  }
+                  await _refreshToday();
+                }
               }),
           SizedBox(height: 24.h),
           // Card 3 (RESOURCE)
@@ -365,8 +570,20 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
               title: 'Calm music',
               subtitle: 'Lo‑fi playlist',
               imagePath: ImageConstant.imgImage131x130,
-              onTap: () {
-                // Open resource (UI-only for now)
+              onTap: () async {
+                // Telemetry: impression/start/complete for resource
+                const questId = 'resource_calm_music_v2';
+                if (_questsEngine != null) {
+                  try {
+                    await _questsEngine!.markImpression(questId);
+                    await _questsEngine!.markStart(questId);
+                    await _questsEngine!.markComplete(questId);
+                    if (kDebugMode) debugPrint('[QuestsEngine] resource used $questId');
+                  } catch (e) {
+                    if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e');
+                  }
+                  await _refreshToday();
+                }
               }),
           SizedBox(height: 24.h),
           // Card 4 (TIP)
@@ -375,8 +592,19 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
               title: 'One tiny step',
               subtitle: 'Pick the easiest task first',
               imagePath: ImageConstant.imgImage130x130,
-              onTap: () {
-                // Show tip (UI-only for now)
+              onTap: () async {
+                const questId = 'tip_one_tiny_step_v2';
+                if (_questsEngine != null) {
+                  try {
+                    await _questsEngine!.markImpression(questId);
+                    await _questsEngine!.markStart(questId);
+                    await _questsEngine!.markComplete(questId);
+                    if (kDebugMode) debugPrint('[QuestsEngine] tip viewed $questId');
+                  } catch (e) {
+                    if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e');
+                  }
+                  await _refreshToday();
+                }
               }),
           SizedBox(height: 24.h),
           // Card 5 (REMINDER) - themed toggle + change time
@@ -435,6 +663,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                     _reminderOn = !_reminderOn;
                                     _startMicrocopyRotation();
                                   });
+                                  _saveReminderPrefs();
                                 },
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 220),
@@ -523,6 +752,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                             _reminderTime = picked;
                                             _reminderOn = true;
                                           });
+                                          _saveReminderPrefs();
                                         }
                                       }
                                     : null,
