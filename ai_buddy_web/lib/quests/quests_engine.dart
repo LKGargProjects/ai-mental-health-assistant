@@ -14,6 +14,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Tags allowed for quests
 enum QuestTag { task, tip, resource, reminder, checkin, progress }
 
+// Debug logging verbosity (debug builds only). Set true during active debugging.
+const bool _debugVerbose = true;
+
 QuestTag _tagFromString(String s) {
   switch (s.toUpperCase()) {
     case 'TASK':
@@ -155,6 +158,7 @@ class QuestsEngine {
       try {
         final List list = jsonDecode(cached) as List;
         _catalog = list.map((e) => Quest.fromJson(e as Map<String, dynamic>)).toList();
+        if (kDebugMode && _debugVerbose) debugPrint('[QuestsEngine] Catalog loaded from cache: ${_catalog.length} items');
       } catch (_) {}
     }
 
@@ -163,7 +167,9 @@ class QuestsEngine {
       try {
         // kIsWeb-friendly simple fetch using HttpClient not available; skip for Week 0.
         // We keep remote off by default. Documented in WEEK0.md.
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode && _debugVerbose) debugPrint('[QuestsEngine][WARN] Remote catalog load failed: ' + e.toString());
+      }
     }
 
     // Fallback to embedded if empty
@@ -171,12 +177,16 @@ class QuestsEngine {
       final List list = jsonDecode(_embeddedFallbackJson) as List;
       _catalog = list.map((e) => Quest.fromJson(e as Map<String, dynamic>)).toList();
       await prefs.setString(_prefsCatalogKey, jsonEncode(_catalog.map((e) => e.toJson()).toList()));
+      if (kDebugMode && _debugVerbose) debugPrint('[QuestsEngine] Catalog loaded from embedded: ${_catalog.length} items');
     }
 
     // Load telemetry/history/timers
     _telemetry = _readJsonMap(prefs.getString(_prefsTelemetryKey));
     _history = _readJsonMap(prefs.getString(_prefsHistoryKey));
     _timers = _readJsonMap(prefs.getString(_prefsTimersKey));
+    if (kDebugMode && _debugVerbose) {
+      debugPrint('[QuestsEngine] Telemetry keys=${_telemetry.length} historyDays=${_history.length} timers=${_timers.length}');
+    }
   }
 
   Map<String, dynamic> _readJsonMap(String? s) {
@@ -273,6 +283,10 @@ class QuestsEngine {
     };
     _persistHistory();
 
+    if (kDebugMode) {
+      final ids = picked.map((e) => e.id).toList();
+      debugPrint('[QuestsEngine] selectToday ${_dateKey(date)} => ${ids.join(', ')}');
+    }
     return picked;
   }
 
@@ -302,6 +316,7 @@ class QuestsEngine {
     // Prevent double-award on the same day
     if (_isIsoSameDay(lastIso, now)) {
       // Already completed today; do not increment counters again
+      if (kDebugMode) debugPrint('[QuestsEngine] markComplete noop (already today) questId=' + questId);
       return;
     }
     _telemetry[questId]['completes'] = (_telemetry[questId]['completes'] ?? 0) + 1;
@@ -310,6 +325,7 @@ class QuestsEngine {
       _telemetry[questId]['elapsed_ms'] = (_telemetry[questId]['elapsed_ms'] ?? 0) + elapsedMs;
     }
     await _persistTelemetry();
+    if (kDebugMode) debugPrint('[QuestsEngine] markComplete questId=' + questId + ' completes=' + (_telemetry[questId]['completes']).toString());
   }
 
   /// Undo today's completion, used by UI 'Undo' actions.
@@ -327,6 +343,9 @@ class QuestsEngine {
         _telemetry[questId]['completes'] = c - 1;
       }
       await _persistTelemetry();
+      if (kDebugMode) debugPrint('[QuestsEngine] undoComplete questId=' + questId + ' completes=' + (_telemetry[questId]['completes']).toString());
+    } else {
+      if (kDebugMode) debugPrint('[QuestsEngine] undoComplete noop (not completed today) questId=' + questId);
     }
   }
 
@@ -389,6 +408,7 @@ class QuestsEngine {
       }
     }
 
+    if (kDebugMode) debugPrint('[QuestsEngine] progress stepsLeft=' + stepsLeft.toString() + ' xp=' + xpEarned.toString());
     return TodayProgressSummary(stepsLeft: stepsLeft, xpEarned: xpEarned);
   }
 

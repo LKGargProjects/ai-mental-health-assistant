@@ -11,13 +11,28 @@ import '../../../widgets/app_bottom_nav.dart';
 import '../../../theme/text_style_helper.dart' as CoreTextStyles;
 import '../../../widgets/assessment_splash.dart';
 import '../../../quests/quests_engine.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:provider/provider.dart';
 import '../../../providers/progress_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // DEBUG ONLY: toggle to reset quest state on each app launch
 const bool _debugResetQuestsOnLaunch = false;
+// DEBUG ONLY: toggle verbose XP chip position logs
+const bool _debugXpLogs = false;
+// DEBUG ONLY: run selector determinism/variety checks on init
+const bool _debugSelectorTest = false;
+// DEBUG ONLY: auto-run reminder microinteraction self-test after init
+// Turned off after verification to avoid noise
+const bool _debugAutoTestReminder = false;
+
+// Animation tuning constants (microinteractions)
+const Duration kRippleDuration = Duration(milliseconds: 380);
+const double kRippleEndRadius = 84.0;
+const Curve kRippleCurve = Curves.easeOutCubic;
+
+const Duration kRingDuration = Duration(milliseconds: 520);
+const Curve kRingCurve = Curves.easeOutCubic;
 
 class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -114,6 +129,55 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
 
   // Optional microinteraction flags (must be explicitly enabled)
   bool _enableSoftXpPop = true; // enabled per user approval
+  // Reminder microinteraction anchors
+  final GlobalKey _reminderToggleKey = GlobalKey();
+  final GlobalKey _reminderTimeKey = GlobalKey();
+
+  // Timer pill overlay state
+  OverlayEntry? _timerPillEntry;
+  Timer? _timerPillTicker;
+  DateTime? _timerPillEndAt;
+  String? _timerPillQuestId;
+
+  // Compute global center of a widget by key
+  Offset? _globalCenterOf(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx == null) return null;
+    final box = ctx.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return null;
+    final topLeft = box.localToGlobal(Offset.zero);
+    final center = topLeft + Offset(box.size.width / 2, box.size.height / 2);
+    return center;
+  }
+
+  // Look up duration_min for a quest in today's selection
+  int? _durationFor(String? questId) {
+    if (questId == null) return null;
+    // Datasets may provide 'todayItems' (preferred) which may be List<Quest> or List<Map>
+    final raw = (_todayData?['todayItems'] as List?) ?? const [];
+    for (final e in raw) {
+      try {
+        if (e is Quest && e.id == questId) {
+          return e.durationMin;
+        } else if (e is Map<String, dynamic> && e['quest_id'] == questId) {
+          final d = e['duration_min'];
+          if (d == null) return null;
+          return (d as num).toInt();
+        }
+      } catch (_) {}
+    }
+    // Legacy 'today' support (List<Map>)
+    final todayAlt = (_todayData?['today'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    for (final m in todayAlt) {
+      if (m['quest_id'] == questId) {
+        final d = m['duration_min'];
+        if (d == null) return null;
+        try { return (d as num).toInt(); } catch (_) { return null; }
+      }
+    }
+    // No hardcoded fallbacks: single source of truth is engine/JSON
+    return null;
+  }
 
   // Keys to compute positions for XP chip animation
   final GlobalKey _task1CardKey = GlobalKey();
@@ -177,18 +241,16 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
           });
         }
       }
-      if (kDebugMode) {
-        final hh = _reminderTime.hour.toString().padLeft(2, '0');
-        final mm = _reminderTime.minute.toString().padLeft(2, '0');
-        debugPrint('[ReminderPrefs] loaded on='+_reminderOn.toString()+' time='+hh+':'+mm);
-      }
     } catch (e) {
-      if (kDebugMode) debugPrint('[ReminderPrefs][ERROR] '+e.toString());
+      // swallow
     }
   }
 
   // Subtle check ripple behind a card center
   void _showCheckRipple(GlobalKey sourceKey) {
+    // Respect reduce-motion: skip decorative animation
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) return;
     final startGlobal = _globalCenterOf(sourceKey);
     final overlayState = Overlay.of(context, rootOverlay: true);
     if (startGlobal == null) return;
@@ -196,9 +258,10 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     if (overlayBox == null || !overlayBox.attached) return;
     final start = overlayBox.globalToLocal(startGlobal);
     final size = overlayBox.size;
-    final controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
-    final fade = CurvedAnimation(parent: controller, curve: Curves.easeOutCubic);
-    final radius = Tween<double>(begin: 0, end: 80).animate(CurvedAnimation(parent: controller, curve: Curves.easeOut));
+    final controller = AnimationController(vsync: this, duration: kRippleDuration);
+    final fade = CurvedAnimation(parent: controller, curve: kRippleCurve);
+    final radius = Tween<double>(begin: 0, end: kRippleEndRadius)
+        .animate(CurvedAnimation(parent: controller, curve: Curves.easeOut));
 
     late OverlayEntry entry;
     entry = OverlayEntry(builder: (_) {
@@ -226,59 +289,14 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     controller.forward();
   }
 
-  // Short timer ring microinteraction centered on a card
-  void _showTimerRing(GlobalKey sourceKey) {
-    final startGlobal = _globalCenterOf(sourceKey);
-    final overlayState = Overlay.of(context, rootOverlay: true);
-    if (startGlobal == null) return;
-    final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
-    if (overlayBox == null || !overlayBox.attached) return;
-    final start = overlayBox.globalToLocal(startGlobal);
-    final size = overlayBox.size;
-
-    final controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    final anim = CurvedAnimation(parent: controller, curve: Curves.easeOutQuad);
-
-    late OverlayEntry entry;
-    entry = OverlayEntry(builder: (_) {
-      return Positioned.fill(
-        child: IgnorePointer(
-          ignoring: true,
-          child: CustomPaint(
-            painter: _RingPainter(
-              center: Offset(
-                start.dx.clamp(0.0, size.width),
-                start.dy.clamp(0.0, size.height),
-              ),
-              progress: anim.value, // 0..1
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
-      );
-    });
-    overlayState.insert(entry);
-    controller.addListener(() { entry.markNeedsBuild(); });
-    controller.forward().whenComplete(() {
-      entry.remove();
-      controller.dispose();
-    });
-  }
-
   Future<void> _saveReminderPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_prefsReminderOn, _reminderOn);
       final mins = _reminderTime.hour * 60 + _reminderTime.minute;
       await prefs.setInt(_prefsReminderMinutes, mins);
-      if (kDebugMode) {
-        debugPrint('[ReminderPrefs] saved on='+_reminderOn.toString()+' minutes='+mins.toString());
-      }
     } catch (e) {
-      if (kDebugMode) debugPrint('[ReminderPrefs][ERROR] '+e.toString());
+      // swallow
     }
   }
 
@@ -309,8 +327,12 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
 
   Future<void> _initQuests() async {
     final engine = QuestsEngine();
+    if (kDebugMode && _debugSelectorTest) {
+      // Lightweight selector assertions (determinism and variety)
+      // ignore: invalid_use_of_visible_for_testing_member
+      assert(() { engine.debugRunSelectorChecks(); return true; }());
+    }
     final data = await engine.getTodayData();
-    // Removed temporary debug stress tests and prints post-verification
     if (!mounted) return;
     setState(() {
       _questsEngine = engine;
@@ -321,6 +343,15 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       _task1Done = _qTask1Id != null ? (comp[_qTask1Id] ?? false) : false;
       _task2Done = _qTask2Id != null ? (comp[_qTask2Id] ?? false) : false;
     });
+    if (kDebugMode) {
+      try {
+        final items = (data['todayItems'] as List?) ?? const [];
+        final ids = items.map((e) => e is Quest ? e.id : (e is Map ? e['quest_id'] : '?')).toList();
+        final comp = (data['completedToday'] as Map?)?.cast<String, bool>() ?? const {};
+        final prog = (data['progress'] as Map?)?.cast<String, dynamic>() ?? const {};
+        debugPrint('[Quests][INIT] todayItems=${ids.join(', ')} comp=${comp.toString()} progress=${prog.toString()}');
+      } catch (_) {}
+    }
 
     // Push progress summary to existing ProgressProvider (no widget changes)
     final progress = data['progress'] as Map<String, dynamic>?;
@@ -328,9 +359,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       final stepsLeft = (progress['stepsLeft'] ?? 0) as int;
       final xpEarned = (progress['xpEarned'] ?? 0) as int;
       context.read<ProgressProvider>().updateFromQuests(stepsLeft: stepsLeft, xpEarned: xpEarned);
-      if (kDebugMode) {
-        debugPrint('[ProgressProvider] updateFromQuests stepsLeft=$stepsLeft xp=$xpEarned');
-      }
     }
   }
 
@@ -351,7 +379,13 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       final stepsLeft = (progress['stepsLeft'] ?? 0) as int;
       final xpEarned = (progress['xpEarned'] ?? 0) as int;
       context.read<ProgressProvider>().updateFromQuests(stepsLeft: stepsLeft, xpEarned: xpEarned);
-      if (kDebugMode) debugPrint('[ProgressProvider][refresh] stepsLeft=$stepsLeft xp=$xpEarned');
+    }
+    if (kDebugMode) {
+      try {
+        final comp = (data['completedToday'] as Map?)?.cast<String, bool>() ?? const {};
+        final prog = (data['progress'] as Map?)?.cast<String, dynamic>() ?? const {};
+        debugPrint('[Quests][REFRESH] comp=${comp.toString()} progress=${prog.toString()}');
+      } catch (_) {}
     }
   }
 
@@ -448,10 +482,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       );
     }
     _qTipId = idOf(tipPick);
-
-    if (kDebugMode) {
-      debugPrint('[QuestsEngine][displayIDs] task1=${_qTask1Id ?? 'fallback'} task2=${_qTask2Id ?? 'fallback'} res=${_qResId ?? 'fallback'} tip=${_qTipId ?? 'fallback'}');
-    }
   }
 
   void _scheduleMidnightRefresh() {
@@ -460,10 +490,18 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     final nextMidnight = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
     final ms = nextMidnight.difference(now).inMilliseconds;
     _midnightTimer = Timer(Duration(milliseconds: ms.clamp(1000, 86400000)), () async {
-      if (kDebugMode) debugPrint('[QuestsEngine] Midnight refresh');
       await _refreshToday();
       _scheduleMidnightRefresh();
     });
+  }
+
+  @override
+  void dispose() {
+    _removeTimerPill();
+    _microTimer?.cancel();
+    _midnightTimer?.cancel();
+    _pulseController.dispose();
+    super.dispose();
   }
 
   String _formatReminderTime(TimeOfDay t) {
@@ -500,6 +538,45 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     }
   }
 
+  // DEBUG ONLY: programmatically exercise reminder microinteractions once
+  Future<void> _debugRunReminderSelfTestOnce() async {
+    if (!kDebugMode || !_debugAutoTestReminder) return;
+    // Only run once per day to avoid annoyance on hot restarts
+    const key = 'debug.reminder_test_run_today_v1';
+    final first = await _isFirstUseToday(key);
+    if (!first) return;
+    await _markUsedToday(key);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    if (kDebugMode) debugPrint('[Reminder][selftest] start');
+    // 1) Toggle ripple: flip OFF then ON with ripple
+    setState(() { _reminderOn = !_reminderOn; });
+    if (kDebugMode) debugPrint('[Reminder][selftest] toggle -> ${_reminderOn ? 'ON' : 'OFF'}');
+    HapticFeedback.lightImpact();
+    SystemSound.play(SystemSoundType.click);
+    _showCheckRipple(_reminderToggleKey);
+    await Future<void>.delayed(const Duration(milliseconds: 420));
+    if (!mounted) return;
+    setState(() { _reminderOn = true; });
+    if (kDebugMode) debugPrint('[Reminder][selftest] toggle -> ON');
+    HapticFeedback.lightImpact();
+    SystemSound.play(SystemSoundType.click);
+    _showCheckRipple(_reminderToggleKey);
+    await _saveReminderPrefs();
+    // 2) Time change ring: move time by +1 min and show ring
+    final nextMinute = (TimeOfDay(
+      hour: _reminderTime.hour,
+      minute: (_reminderTime.minute + 1) % 60,
+    ));
+    setState(() { _reminderTime = nextMinute; });
+    if (kDebugMode) debugPrint('[Reminder][selftest] time -> ${_reminderTime.format(context)}');
+    HapticFeedback.selectionClick();
+    SystemSound.play(SystemSoundType.click);
+    _showTimerRing(_reminderTimeKey);
+    await _saveReminderPrefs();
+    if (kDebugMode) debugPrint('[Reminder][selftest] done');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -511,30 +588,257 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       // DEBUG ONLY: reset quests state on each launch to test persistence/awards
       if (kDebugMode && _debugResetQuestsOnLaunch) {
         await QuestsEngine.debugResetAll();
-        debugPrint('[QuestsEngine][debug] reset all local quest state on launch');
       }
       await _initQuests();
       _scheduleMidnightRefresh();
+      // DEBUG ONLY: run reminder microinteraction self-test once per day,
+      // after first frame so keys are mounted
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _debugRunReminderSelfTestOnce();
+      });
     });
   }
 
-  @override
-  void dispose() {
-    _microTimer?.cancel();
-    _midnightTimer?.cancel();
-    _pulseController.dispose();
-    super.dispose();
+  // Start a floating timer pill anchored near the given card.
+  void _startTimerPill({required GlobalKey cardKey, required String questId, required Duration total}) {
+    _removeTimerPill();
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    final centerGlobal = _globalCenterOf(cardKey);
+    if (overlayBox == null || !overlayBox.attached || centerGlobal == null) return;
+    final centerLocal = overlayBox.globalToLocal(centerGlobal);
+    _timerPillQuestId = questId;
+    _timerPillEndAt = DateTime.now().add(total);
+    final controller = reduceMotion
+        ? null
+        : (AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true));
+    final scaleAnim = controller == null
+        ? const AlwaysStoppedAnimation<double>(1.0)
+        : Tween<double>(begin: 0.98, end: 1.02).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
+
+    String _fmt(Duration d) {
+      final s = d.inSeconds.clamp(0, 24 * 3600);
+      final mm = (s ~/ 60).toString().padLeft(2, '0');
+      final ss = (s % 60).toString().padLeft(2, '0');
+      return '$mm:$ss';
+    }
+
+    _timerPillEntry = OverlayEntry(builder: (_) {
+      final now = DateTime.now();
+      final remaining = _timerPillEndAt != null ? _timerPillEndAt!.difference(now) : Duration.zero;
+      final txt = _fmt(remaining);
+      // Position slightly to the right of the card center
+      final left = (centerLocal.dx + 64).clamp(8.0, (overlayBox.size.width - 140).toDouble());
+      final top = (centerLocal.dy - 16).clamp(8.0, (overlayBox.size.height - 40).toDouble());
+      return Positioned(
+        left: left,
+        top: top,
+        child: IgnorePointer(
+          ignoring: true,
+          child: AnimatedBuilder(
+            animation: scaleAnim,
+            builder: (context, child) => Transform.scale(scale: scaleAnim.value, child: child),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: ShapeDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                shape: const StadiumBorder(),
+                shadows: [
+                  BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Text(
+                txt,
+                style: TextStyleHelper.instance.titleMediumInter.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+    overlay.insert(_timerPillEntry!);
+    _timerPillTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_timerPillEndAt == null) return;
+      if (DateTime.now().isAfter(_timerPillEndAt!)) {
+        _removeTimerPill(forQuestId: questId);
+      } else {
+        _timerPillEntry?.markNeedsBuild();
+      }
+    });
+    controller?.addStatusListener((_) {});
   }
 
-  // Compute global center of a widget by key
-  Offset? _globalCenterOf(GlobalKey key) {
-    final ctx = key.currentContext;
-    if (ctx == null) return null;
-    final box = ctx.findRenderObject() as RenderBox?;
-    if (box == null || !box.attached) return null;
-    final topLeft = box.localToGlobal(Offset.zero);
-    final center = topLeft + Offset(box.size.width / 2, box.size.height / 2);
-    return center;
+  void _removeTimerPill({String? forQuestId}) {
+    if (forQuestId != null && _timerPillQuestId != null && _timerPillQuestId != forQuestId) return;
+    _timerPillTicker?.cancel();
+    _timerPillTicker = null;
+    _timerPillEndAt = null;
+    _timerPillQuestId = null;
+    _timerPillEntry?.remove();
+    _timerPillEntry = null;
+  }
+
+  Future<void> _openTimerSheet({
+    required String questId,
+    required GlobalKey cardKey,
+    required String title,
+    required int durationMin,
+  }) async {
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyleHelper.instance.headline21Inter),
+              const SizedBox(height: 8),
+              Text('Estimated ${durationMin} min', style: TextStyleHelper.instance.titleMediumInter.copyWith(color: const Color(0xFF6B7280))),
+              const SizedBox(height: 16),
+              Row(children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    try {
+                      await _questsEngine?.startTimer(questId);
+                    } catch (_) {}
+                    HapticFeedback.lightImpact();
+                    SystemSound.play(SystemSoundType.click);
+                    _showTimerRing(cardKey);
+                    _startTimerPill(cardKey: cardKey, questId: questId, total: Duration(minutes: durationMin));
+                    Future.delayed(Duration(minutes: durationMin), () async {
+                      if (!mounted) return;
+                      try {
+                        await _questsEngine?.autoCompleteTimer(questId, durationMin);
+                        await _questsEngine?.markComplete(questId);
+                        if (_enableSoftXpPop) _showXpChipPop(cardKey, amount: 10);
+                      } catch (_) {}
+                      _removeTimerPill(forQuestId: questId);
+                      await _refreshToday();
+                      // Offer Undo after auto-complete
+                      if (mounted) {
+                        final messenger = ScaffoldMessenger.of(context);
+                        messenger.hideCurrentSnackBar();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            duration: const Duration(seconds: 5),
+                            content: Text('$title marked complete'),
+                            action: SnackBarAction(
+                              label: 'Undo',
+                              onPressed: () async {
+                                try { await _questsEngine?.uncompleteToday(questId); } catch (_) {}
+                                await _refreshToday();
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Timer started for $durationMin min')),
+                      );
+                    }
+                  },
+                  child: Text('Start ${durationMin} min'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: () async {
+                    // Close the bottom sheet first so SnackBar is visible
+                    Navigator.of(ctx).pop();
+                    try {
+                      await _questsEngine?.markStart(questId);
+                      await _questsEngine?.markComplete(questId);
+                      if (_enableSoftXpPop) _showXpChipPop(cardKey, amount: 10);
+                      _showCheckRipple(cardKey);
+                    } catch (_) {}
+                    await _refreshToday();
+                    if (mounted) {
+                      final messenger = ScaffoldMessenger.of(context);
+                      messenger.hideCurrentSnackBar();
+                      messenger.showSnackBar(
+                        SnackBar(
+                          duration: const Duration(seconds: 5),
+                          content: Text('$title marked complete'),
+                          action: SnackBarAction(
+                            label: 'Undo',
+                            onPressed: () async {
+                              try { await _questsEngine?.uncompleteToday(questId); } catch (_) {}
+                              await _refreshToday();
+                            },
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Complete now'),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ]),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Short timer ring microinteraction centered on a card
+  void _showTimerRing(GlobalKey sourceKey) {
+    // Respect reduce-motion: skip decorative animation
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) return;
+    final startGlobal = _globalCenterOf(sourceKey);
+    final overlayState = Overlay.of(context, rootOverlay: true);
+    if (startGlobal == null) return;
+    final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
+    if (overlayBox == null || !overlayBox.attached) return;
+    final start = overlayBox.globalToLocal(startGlobal);
+    final size = overlayBox.size;
+
+    final controller = AnimationController(
+      vsync: this,
+      duration: kRingDuration,
+    );
+    final anim = CurvedAnimation(parent: controller, curve: kRingCurve);
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(builder: (_) {
+      return Positioned.fill(
+        child: IgnorePointer(
+          ignoring: true,
+          child: CustomPaint(
+            painter: _RingPainter(
+              center: Offset(
+                start.dx.clamp(0.0, size.width),
+                start.dy.clamp(0.0, size.height),
+              ),
+              progress: anim.value, // 0..1
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+      );
+    });
+    overlayState.insert(entry);
+    controller.addListener(() { entry.markNeedsBuild(); });
+    controller.forward().whenComplete(() {
+      entry.remove();
+      controller.dispose();
+    });
   }
 
   // Optional +XP chip pop animation from a source card to XP card
@@ -559,17 +863,31 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       // simple upward pop if XP card is not visible
       end = start.translate(0, -80);
     }
-    if (kDebugMode) {
-      debugPrint('[XPChip] start=$start end=$end size=$size');
+    if (kDebugMode && _debugXpLogs) {
+      // optional position logs removed
     }
 
-    final controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 360));
+    // Respect reduce-motion: show a lightweight toast instead of animated chip
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('+$amount XP'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 900),
+        ),
+      );
+      return;
+    }
+
+    // Animation polish: snappier ease + minor timing tweak
+    final controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
     final position = Tween<Offset>(begin: start, end: end)
         .chain(CurveTween(curve: Curves.easeOutCubic))
         .animate(controller);
-    final fade = CurvedAnimation(parent: controller, curve: const Interval(0.0, 0.9, curve: Curves.easeOut));
-    final scale = Tween<double>(begin: 0.92, end: 1.0)
-        .chain(CurveTween(curve: Curves.easeOutBack))
+    final fade = CurvedAnimation(parent: controller, curve: const Interval(0.0, 0.8, curve: Curves.easeOut));
+    final scale = Tween<double>(begin: 0.92, end: 1.06)
+        .chain(CurveTween(curve: Curves.fastOutSlowIn))
         .animate(controller);
 
     late OverlayEntry entry;
@@ -598,19 +916,26 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   border: Border.all(color: Colors.white, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: primary.withOpacity(0.30),
-                      blurRadius: 12,
+                      color: primary.withOpacity(0.22),
+                      blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Text(
-                  '+$amount XP',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.star_rounded, color: Colors.white, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      '+$amount XP',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -622,7 +947,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     overlayState.insert(entry);
     controller.addListener(() => entry.markNeedsBuild());
     controller.forward().whenComplete(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 120));
+      // Slightly faster fade-out tail (-80ms)
+      await Future<void>.delayed(const Duration(milliseconds: 40));
       entry.remove();
       controller.dispose();
     });
@@ -824,11 +1150,15 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                 )),
           ]),
           SizedBox(height: 12.h),
-          Text('Estimated time: 2–3 min',
+          // Compute duration locally for the header estimate to avoid scope issues
+          Builder(builder: (context) {
+            final int? _localTask1Dur = _durationFor(_qTask1Id);
+            return Text(_localTask1Dur != null ? 'Estimated time: ${_localTask1Dur} min' : 'Estimated time',
               style: TextStyleHelper.instance.headline21Inter.copyWith(
                   fontFamily: CoreTextStyles
                       .TextStyleHelper.instance.headline24Bold.fontFamily,
-                  color: Color(0xFF8C9CAA))),
+                  color: Color(0xFF8C9CAA)));
+          }),
         ]));
   }
 
@@ -837,6 +1167,9 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     final comp = (_todayData?['completedToday'] as Map?)?.cast<String, bool>() ?? const {};
     final bool resDone = _qResId != null ? (comp[_qResId!] ?? false) : false;
     final bool tipDone = _qTipId != null ? (comp[_qTipId!] ?? false) : false;
+    // Pull durations for tasks from today's selection for accurate display
+    final int? _task1Dur = _durationFor(_qTask1Id);
+    final int? _task2Dur = _durationFor(_qTask2Id);
     return Padding(
         padding: EdgeInsets.symmetric(horizontal: 69.h).copyWith(bottom: 32.h),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -849,7 +1182,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
           RecommendationCardWidget(
               containerKey: _task1CardKey,
               category: 'TASK',
-              title: 'Focus reset (2 min)',
+              title: _task1Dur != null ? 'Focus reset (${_task1Dur} min)' : 'Focus reset',
               subtitle: (_task1Done && _task2Done)
                   ? 'All steps complete 🎉'
                   : 'Quick breathing + desk tidy',
@@ -859,28 +1192,42 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
               onTap: () async {
                 // One-and-done: ignore taps once completed (use Undo to revert)
                 if (_task1Done) return;
+                // Ensure engine is ready
+                if (_questsEngine == null) {
+                  await _initQuests();
+                }
+                // Must have a selected quest from today's items; do not fall back to a non-today ID
+                final questId = _qTask1Id;
+                if (questId == null) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Focus task not available today')),);
+                  }
+                  return;
+                }
+                final dur = _durationFor(questId);
+                if (dur != null && dur > 0) {
+                  await _openTimerSheet(questId: questId, cardKey: _task1CardKey, title: 'Focus reset', durationMin: dur);
+                  return;
+                }
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Focus duration missing')),);
+                }
                 final newVal = true;
                 setState(() { _task1Done = newVal; });
                 if (newVal && !_task1Popped) {
-                  // First time completion feedback
                   HapticFeedback.lightImpact();
                   SystemSound.play(SystemSoundType.click);
                   if (_enableSoftXpPop) _showXpChipPop(_task1CardKey, amount: 10);
                   _task1Popped = true;
                   _showCheckRipple(_task1CardKey);
                 }
-                // Wire to engine: prefer selected ID; fall back to known quest id
-                final questId = _qTask1Id ?? 'task_focus_reset_v2';
                 if (_questsEngine != null) {
                   try {
                     await _questsEngine!.markStart(questId);
-                    if (newVal) {
-                      await _questsEngine!.markComplete(questId);
-                    }
-                    if (kDebugMode) debugPrint('[QuestsEngine] toggled $questId completed=$newVal');
-                  } catch (e) {
-                    if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e');
-                  }
+                    if (newVal) { await _questsEngine!.markComplete(questId); }
+                  } catch (e) { if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e'); }
                   await _refreshToday();
                 }
                 // Short undo window via SnackBar
@@ -916,13 +1263,34 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
           RecommendationCardWidget(
               containerKey: _task2CardKey,
               category: 'TASK',
-              title: 'Study sprint (10 min)',
+              title: _task2Dur != null ? 'Study sprint (${_task2Dur} min)' : 'Study sprint',
               subtitle: 'Timer + no‑phone rule',
               imagePath: 'assets/images/quests/task_study.svg',
               doneImagePath: 'assets/images/quests/task_study_done.svg',
               completed: _task2Done,
               onTap: () async {
                 if (_task2Done) return; // one-and-done; use Undo to revert
+                // Ensure engine is ready
+                if (_questsEngine == null) {
+                  await _initQuests();
+                }
+                final questId = _qTask2Id;
+                if (questId == null) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Study sprint not available today')),);
+                  }
+                  return;
+                }
+                final dur = _durationFor(questId);
+                if (dur != null && dur > 0) {
+                  await _openTimerSheet(questId: questId, cardKey: _task2CardKey, title: 'Study sprint', durationMin: dur);
+                  return;
+                }
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Study sprint duration missing')),);
+                }
                 final newVal = true;
                 setState(() { _task2Done = newVal; });
                 if (newVal && !_task2Popped) {
@@ -934,7 +1302,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   // Teaser: show a short timer ring microinteraction
                   _showTimerRing(_task2CardKey);
                 }
-                final questId = _qTask2Id ?? 'task_study_sprint_v2';
                 if (_questsEngine != null) {
                   try {
                     await _questsEngine!.markStart(questId);
@@ -1052,6 +1419,9 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
           Builder(
             builder: (context) {
               final near = _isReminderNear();
+              if (kDebugMode) {
+                debugPrint('[Reminder][near] now=$near on=$_reminderOn time=${_reminderTime.format(context)}');
+              }
               if (near && !_pulseController.isAnimating) {
                 _pulseController.repeat(reverse: true);
               } else if (!near && _pulseController.isAnimating) {
@@ -1105,42 +1475,52 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                     _startMicrocopyRotation();
                                   });
                                   _saveReminderPrefs();
+                                  if (kDebugMode) {
+                                    debugPrint('[Reminder][toggle] on=$_reminderOn');
+                                  }
+                                  // Microinteraction: subtle ripple on toggle change
+                                  HapticFeedback.lightImpact();
+                                  SystemSound.play(SystemSoundType.click);
+                                  _showCheckRipple(_reminderToggleKey);
                                 },
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 220),
-                                  curve: Curves.easeOutCubic,
-                                  width: 56.h,
-                                  height: 30.h,
-                                  padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
-                                  decoration: BoxDecoration(
-                                    color: _reminderOn ? Theme.of(context).colorScheme.primary : const Color(0xFFE6EAF0),
-                                    borderRadius: BorderRadius.circular(20.h),
-                                    boxShadow: _reminderOn
-                                        ? [
-                                            BoxShadow(
-                                              color: Theme.of(context).colorScheme.primary.withOpacity(0.35),
-                                              blurRadius: 14,
-                                              spreadRadius: 1,
-                                              offset: const Offset(0, 3),
-                                            )
-                                          ]
-                                        : [],
-                                  ),
-                                  child: AnimatedAlign(
+                                child: Container(
+                                  key: _reminderToggleKey,
+                                  child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 220),
                                     curve: Curves.easeOutCubic,
-                                    alignment: _reminderOn ? Alignment.centerRight : Alignment.centerLeft,
-                                    child: AnimatedScale(
-                                      duration: const Duration(milliseconds: 160),
-                                      curve: Curves.easeOutBack,
-                                      scale: _reminderOn ? 1.0 : 0.96,
-                                      child: Container(
-                                        width: 22.h,
-                                        height: 22.h,
-                                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                                        child: _reminderOn
-                                            ? Icon(Icons.check, size: 16.h, color: Theme.of(context).colorScheme.primary)
-                                            : null,
+                                    width: 56.h,
+                                    height: 30.h,
+                                    padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
+                                    decoration: BoxDecoration(
+                                      color: _reminderOn ? Theme.of(context).colorScheme.primary : const Color(0xFFE6EAF0),
+                                      borderRadius: BorderRadius.circular(20.h),
+                                      boxShadow: _reminderOn
+                                          ? [
+                                              BoxShadow(
+                                                color: Theme.of(context).colorScheme.primary.withOpacity(0.35),
+                                                blurRadius: 14,
+                                                spreadRadius: 1,
+                                                offset: const Offset(0, 3),
+                                              )
+                                            ]
+                                          : [],
+                                    ),
+                                    child: AnimatedAlign(
+                                      duration: const Duration(milliseconds: 220),
+                                      curve: Curves.easeOutCubic,
+                                      alignment: _reminderOn ? Alignment.centerRight : Alignment.centerLeft,
+                                      child: AnimatedScale(
+                                        duration: const Duration(milliseconds: 160),
+                                        curve: Curves.easeOutBack,
+                                        scale: _reminderOn ? 1.0 : 0.96,
+                                        child: Container(
+                                          width: 22.h,
+                                          height: 22.h,
+                                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                          child: _reminderOn
+                                              ? Icon(Icons.check, size: 16.h, color: Theme.of(context).colorScheme.primary)
+                                              : null,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -1179,6 +1559,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                               ),
                               SizedBox(width: 8.h),
                               OutlinedButton.icon(
+                                key: _reminderTimeKey,
                                 onPressed: _reminderOn
                                     ? () async {
                                         final picked = await showTimePicker(
@@ -1194,6 +1575,13 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                             _reminderOn = true;
                                           });
                                           _saveReminderPrefs();
+                                          if (kDebugMode) {
+                                            debugPrint('[Reminder][timeChanged] to=${_reminderTime.format(context)}');
+                                          }
+                                          // Microinteraction: confirmation ring + haptics
+                                          HapticFeedback.selectionClick();
+                                          SystemSound.play(SystemSoundType.click);
+                                          _showTimerRing(_reminderTimeKey);
                                         }
                                       }
                                     : null,

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemMouseCursors;
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/app_export.dart';
-import '../../../widgets/custom_image_view.dart';
 import '../../../../theme/text_style_helper.dart' as CoreTextStyles;
 
-class RecommendationCardWidget extends StatelessWidget {
+class RecommendationCardWidget extends StatefulWidget {
   final String category;
   final String title;
   final String subtitle;
@@ -14,7 +15,7 @@ class RecommendationCardWidget extends StatelessWidget {
   final bool completed;
   final Key? containerKey;
 
-  RecommendationCardWidget({
+  const RecommendationCardWidget({
     Key? key,
     required this.category,
     required this.title,
@@ -27,74 +28,173 @@ class RecommendationCardWidget extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<RecommendationCardWidget> createState() => _RecommendationCardWidgetState();
+}
+
+class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
+  bool _pressed = false;
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        key: containerKey,
-        decoration: BoxDecoration(
-          color: Color(0xFFFEFEFE),
-          border: Border.all(color: Color(0xFFF4F5F7)),
-          borderRadius: BorderRadius.circular(29.h),
-        ),
-        padding: EdgeInsets.all(28.h),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    category,
-                    style: TextStyleHelper.instance.title19BoldInter.copyWith(
-                      fontFamily: CoreTextStyles
-                          .TextStyleHelper.instance.headline24Bold.fontFamily,
-                      color: Color(0xFF8E98A7),
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    title,
-                    style: TextStyleHelper.instance.headline26BoldInter.copyWith(
-                      fontFamily: CoreTextStyles
-                          .TextStyleHelper.instance.headline24Bold.fontFamily,
-                      color: Color(0xFF4C5664),
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                  Text(
-                    subtitle,
-                    style: TextStyleHelper.instance.headline21Inter.copyWith(
-                      fontFamily: CoreTextStyles
-                          .TextStyleHelper.instance.headline24Bold.fontFamily,
-                      color: Color(0xFFA8B1BF),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: 24.h),
-            Container(
+    final radius = BorderRadius.circular(29.h);
+    final theme = Theme.of(context);
+    // Decide tint color heuristically by category/path and completion state
+    final cat = widget.category.toLowerCase();
+    final path = (widget.completed && widget.doneImagePath != null) ? widget.doneImagePath! : widget.imagePath;
+    final p = path.toLowerCase();
+    bool isAssess = cat.contains('assess');
+    bool isMusic = p.contains('music');
+    // Policy:
+    // - Only Assess keeps overall tint (tertiary) for the whole SVG.
+    // - For Task/Resource/Tip, do NOT tint the whole SVG (keep original colors).
+    // - For completed tasks, overlay a green check badge instead of tinting the SVG.
+    Color? tint = isAssess ? theme.colorScheme.tertiary : null;
+    // Ensure music icon is clearly visible on Android by forcing a neutral stroke color
+    final Color? iconColor = isMusic ? const Color(0xFF4A5261) : tint;
+    return Material(
+      color: const Color(0xFFFEFEFE),
+      borderRadius: radius,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        cursor: SystemMouseCursors.click,
+        child: InkWell(
+          onTap: widget.onTap,
+          onHighlightChanged: (v) => setState(() => _pressed = v),
+          borderRadius: radius,
+          splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.10),
+          highlightColor: Colors.transparent,
+          child: AnimatedScale(
+            scale: _pressed ? 0.985 : (_hover ? 1.005 : 1.0),
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOut,
+              key: widget.containerKey,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(19.h),
+                border: Border.all(color: const Color(0xFFF4F5F7)),
+                borderRadius: radius,
+                boxShadow: (_hover || _pressed)
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ]
+                    : null,
               ),
-              child: Stack(
+              padding: EdgeInsets.all(28.h),
+              child: Row(
                 children: [
-                  CustomImageView(
-                    imagePath: (completed && doneImagePath != null)
-                        ? doneImagePath
-                        : imagePath,
-                    height: 104.h,
-                    width: 104.h,
-                    fit: BoxFit.cover,
-                    radius: BorderRadius.circular(19.h),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.category,
+                          style: TextStyleHelper.instance.title19BoldInter.copyWith(
+                            fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                            color: const Color(0xFF8E98A7),
+                          ),
+                        ),
+                        SizedBox(height: 8.h),
+                        Text(
+                          widget.title,
+                          style: TextStyleHelper.instance.headline26BoldInter.copyWith(
+                            fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                            color: const Color(0xFF4C5664),
+                          ),
+                        ),
+                        SizedBox(height: 12.h),
+                        Text(
+                          widget.subtitle,
+                          style: TextStyleHelper.instance.headline21Inter.copyWith(
+                            fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                            color: const Color(0xFFA8B1BF),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 24.h),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isMusic ? const Color(0xFFF7F9FC) : null,
+                      borderRadius: BorderRadius.circular(19.h),
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.all(isMusic ? 10.h : 0),
+                          child: _IconRenderable(
+                            path: path,
+                            width: 104.h,
+                            height: 104.h,
+                            fit: isMusic ? BoxFit.contain : BoxFit.cover,
+                            color: iconColor,
+                            borderRadius: BorderRadius.circular(19.h),
+                          ),
+                        ),
+                        // No overlay tick; built-in green tick in SVG is used for completed tasks
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
+  }
+}
+
+// Renders either an SVG (with optional tint) or falls back to Image.asset
+class _IconRenderable extends StatelessWidget {
+  final String path;
+  final double width;
+  final double height;
+  final BoxFit fit;
+  final Color? color;
+  final BorderRadius? borderRadius;
+
+  const _IconRenderable({
+    Key? key,
+    required this.path,
+    required this.width,
+    required this.height,
+    this.fit = BoxFit.contain,
+    this.color,
+    this.borderRadius,
+  }) : super(key: key);
+
+  bool get _isSvg => path.toLowerCase().endsWith('.svg');
+
+  @override
+  Widget build(BuildContext context) {
+    final child = _isSvg
+        ? SvgPicture.asset(
+            path,
+            width: width,
+            height: height,
+            fit: fit,
+            colorFilter: color != null ? ColorFilter.mode(color!, BlendMode.srcIn) : null,
+          )
+        : Image.asset(
+            path,
+            width: width,
+            height: height,
+            fit: fit,
+            color: color,
+            colorBlendMode: color != null ? BlendMode.srcIn : null,
+          );
+    if (borderRadius != null) {
+      return ClipRRect(borderRadius: borderRadius ?? BorderRadius.zero, child: child);
+    }
+    return child;
   }
 }
