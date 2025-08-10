@@ -9,6 +9,7 @@ import './widgets/recommendation_card_widget.dart';
 import '../../../widgets/app_bottom_nav.dart';
 import '../../../theme/text_style_helper.dart' as CoreTextStyles;
 import '../../../widgets/assessment_splash.dart';
+import '../../../quests/quests_engine.dart';
 
 class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -40,6 +41,22 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
 
   // Gentle pulse for near-time attention
   late AnimationController _pulseController;
+
+  // Week 0 QuestsEngine (minimal glue, no UI changes)
+  // ignore: unused_field
+  QuestsEngine? _questsEngine;
+  // ignore: unused_field
+  Map<String, dynamic>? _todayData; // {'todayItems': List<Quest>, 'progress': {stepsLeft, xpEarned}}
+
+  Future<void> _initQuests() async {
+    final engine = QuestsEngine();
+    final data = await engine.getTodayData();
+    if (!mounted) return;
+    setState(() {
+      _questsEngine = engine;
+      _todayData = data;
+    });
+  }
 
   String _formatReminderTime(TimeOfDay t) {
     final hour12 = (t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod).toString();
@@ -80,6 +97,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     super.initState();
     _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
     _startMicrocopyRotation();
+    // Initialize quests data silently (used by existing widgets via provider later)
+    _initQuests();
   }
 
   @override

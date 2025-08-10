@@ -36,7 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   dio: ^5.4.1  # For API calls
   provider: ^6.1.2  # For state management
-  shared_preferences: ^2.2.2  # For local storage
+  shared_preferences: ^2.5.3  # For local storage
   intl: ^0.19.0  # For date formatting
   fl_chart: ^0.66.2  # For mood tracking charts
   url_launcher: ^6.2.5  # For opening crisis resource links
