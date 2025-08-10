@@ -10,6 +10,7 @@ import '../../../widgets/app_bottom_nav.dart';
 import '../../../theme/text_style_helper.dart' as CoreTextStyles;
 import '../../../widgets/assessment_splash.dart';
 import '../../../quests/quests_engine.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint, listEquals;
 
 class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -51,6 +52,31 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   Future<void> _initQuests() async {
     final engine = QuestsEngine();
     final data = await engine.getTodayData();
+    if (kDebugMode) {
+      // Log a brief summary for today
+      final items = data['todayItems'] as List?;
+      final progress = data['progress'] as Map<String, dynamic>?;
+      debugPrint('[QuestsEngine] todayItems=${items?.length} stepsLeft=${progress?['stepsLeft']} xp=${progress?['xpEarned']}');
+
+      // Stress test determinism & constraints across a 14-day window (non-destructive to UI)
+      final base = DateTime.now();
+      int failures = 0;
+      for (int i = -3; i < 11; i++) {
+        final d = DateTime(base.year, base.month, base.day).add(Duration(days: i));
+        final set1 = engine.selectToday(d, const {});
+        final set2 = engine.selectToday(d, const {});
+        final same = listEquals(set1.map((e) => (e as dynamic).id).toList(), set2.map((e) => (e as dynamic).id).toList());
+        final hasTask = set1.any((q) => (q as dynamic).tag.toString().contains('task'));
+        final hasTipRes = set1.any((q) => (q as dynamic).tag.toString().contains('tip') || (q as dynamic).tag.toString().contains('resource'));
+        final hasCheckProg = set1.any((q) => (q as dynamic).tag.toString().contains('checkin') || (q as dynamic).tag.toString().contains('progress'));
+        final hasShort = set1.any((q) => ((q as dynamic).durationMin ?? 999) <= 3);
+        if (!(same && hasTask && hasTipRes && hasCheckProg && hasShort)) {
+          failures++;
+          debugPrint('[QuestsEngine][FAIL] ${d.toIso8601String().split('T').first} same=$same task=$hasTask tipRes=$hasTipRes checkProg=$hasCheckProg short=$hasShort');
+        }
+      }
+      debugPrint('[QuestsEngine][STRESS] window=14d failures=$failures (0 is ideal)');
+    }
     if (!mounted) return;
     setState(() {
       _questsEngine = engine;

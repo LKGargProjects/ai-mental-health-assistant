@@ -189,6 +189,8 @@ class QuestsEngine {
     final last7 = _lastNDaysKeys(date, 7);
     final Map<String, int> taskUse = {};
     for (final d in last7) {
+      // IMPORTANT: exclude today's key so repeated calls on the same date remain deterministic
+      if (d == todayKey) continue;
       final used = (_history[d]?['tasks'] as List?)?.cast<String>() ?? const [];
       for (final id in used) {
         taskUse[id] = (taskUse[id] ?? 0) + 1;
