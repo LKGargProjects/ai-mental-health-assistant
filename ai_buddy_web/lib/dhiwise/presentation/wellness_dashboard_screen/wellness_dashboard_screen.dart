@@ -10,7 +10,7 @@ import '../../../widgets/app_bottom_nav.dart';
 import '../../../theme/text_style_helper.dart' as CoreTextStyles;
 import '../../../widgets/assessment_splash.dart';
 import '../../../quests/quests_engine.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint, listEquals;
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:provider/provider.dart';
 import '../../../providers/progress_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,7 +44,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   int _microIndex = 0;
   Timer? _microTimer;
   Timer? _midnightTimer;
-  static bool _autoVerifiedOnce = false; // ensure automated verification runs once per session
 
   // Gentle pulse for near-time attention
   late AnimationController _pulseController;
@@ -110,73 +109,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     }
   }
 
-  Future<void> _runAutomatedVerification() async {
-    if (!kDebugMode) return;
-    if (_questsEngine == null) return;
-    try {
-      final titles = _debugTodayTitles();
-      if (titles.isNotEmpty) {
-        debugPrint('[AutoVerify] todayTitles='+titles.join(' | '));
-      }
-
-      final before = _todayData?['progress'] as Map<String, dynamic>?;
-
-      // Non-destructive actions
-      await _questsEngine!.markImpression('resource_calm_music_v2');
-      await _questsEngine!.markStart('resource_calm_music_v2');
-      await _questsEngine!.markComplete('resource_calm_music_v2');
-      await _questsEngine!.markImpression('tip_one_tiny_step_v2');
-      await _questsEngine!.markStart('tip_one_tiny_step_v2');
-      await _questsEngine!.markComplete('tip_one_tiny_step_v2');
-
-      // One task completion
-      await _questsEngine!.markStart('task_focus_reset_v2');
-      await _questsEngine!.markComplete('task_focus_reset_v2');
-
-      await _refreshToday();
-      final after = _todayData?['progress'] as Map<String, dynamic>?;
-
-      if (kDebugMode) {
-        final stepsBefore = (before?['stepsLeft'] ?? 0) as int;
-        final stepsAfter = (after?['stepsLeft'] ?? 0) as int;
-        final xpBefore = (before?['xpEarned'] ?? 0) as int;
-        final xpAfter = (after?['xpEarned'] ?? 0) as int;
-        final okSteps = stepsAfter <= stepsBefore;
-        final okXp = xpAfter >= xpBefore;
-        debugPrint('[AutoVerify][ASSERT] steps ok='+okSteps.toString()+' xp ok='+okXp.toString());
-      }
-
-      // Reminder prefs persistence
-      final origOn = _reminderOn;
-      final origTime = _reminderTime;
-      _reminderOn = !origOn;
-      final newMinutes = (origTime.minute + 5) % 60;
-      final carry = (origTime.minute + 5) ~/ 60;
-      final newHour = (origTime.hour + carry) % 24;
-      _reminderTime = TimeOfDay(hour: newHour, minute: newMinutes);
-      await _saveReminderPrefs();
-      await _loadReminderPrefs();
-      final loadedMatches = (_reminderOn == !origOn) && (_reminderTime.hour == newHour && _reminderTime.minute == newMinutes);
-      debugPrint('[AutoVerify][ASSERT] reminder persisted='+loadedMatches.toString()+' on='+_reminderOn.toString()+' time='+_reminderTime.hour.toString()+':'+_reminderTime.minute.toString().padLeft(2, '0'));
-      _reminderOn = origOn;
-      _reminderTime = origTime;
-      await _saveReminderPrefs();
-      await _loadReminderPrefs();
-
-      // Simulate midnight
-      final tomorrow = DateTime.now().add(const Duration(days: 1));
-      final nextData = await _questsEngine!.getTodayData(date: tomorrow);
-      final nextItems = nextData['todayItems'] as List?;
-      final nextProgress = nextData['progress'] as Map<String, dynamic>?;
-      debugPrint('[AutoVerify][MidnightSim] nextDay items='+(nextItems?.length.toString() ?? 'null')+' stepsLeft='+((nextProgress?['stepsLeft'])?.toString() ?? 'null')+' xp='+((nextProgress?['xpEarned'])?.toString() ?? 'null'));
-    } catch (e) {
-      if (kDebugMode) debugPrint('[AutoVerify][ERROR] '+e.toString());
-    } finally {
-      await _clearQuestDebugState();
-      await _refreshToday();
-      if (kDebugMode) debugPrint('[AutoVerify] cleanup done and state restored');
-    }
-  }
 
   Future<void> _saveReminderPrefs() async {
     try {
@@ -195,35 +127,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   Future<void> _initQuests() async {
     final engine = QuestsEngine();
     final data = await engine.getTodayData();
-    if (kDebugMode) {
-      // Log a brief summary for today
-      final items = data['todayItems'] as List?;
-      final progress = data['progress'] as Map<String, dynamic>?;
-      debugPrint('[QuestsEngine] todayItems=${items?.length} stepsLeft=${progress?['stepsLeft']} xp=${progress?['xpEarned']}');
-
-      // Stress test determinism & constraints across a 14-day window (non-destructive to UI)
-      final base = DateTime.now();
-      int failures = 0;
-      for (int i = -3; i < 11; i++) {
-        final d = DateTime(base.year, base.month, base.day).add(Duration(days: i));
-        final set1 = engine.selectToday(d, const {});
-        final set2 = engine.selectToday(d, const {});
-        final ids1 = set1.map((e) => (e as dynamic).id as String).toList()..sort();
-        final ids2 = set2.map((e) => (e as dynamic).id as String).toList()..sort();
-        final same = listEquals(ids1, ids2);
-        final hasTask = set1.any((q) => (q as dynamic).tag.toString().contains('task'));
-        final hasTipRes = set1.any((q) => (q as dynamic).tag.toString().contains('tip') || (q as dynamic).tag.toString().contains('resource'));
-        final hasCheckProg = set1.any((q) => (q as dynamic).tag.toString().contains('checkin') || (q as dynamic).tag.toString().contains('progress'));
-        final hasShort = set1.any((q) => ((q as dynamic).durationMin ?? 999) <= 3);
-        if (!(same && hasTask && hasTipRes && hasCheckProg && hasShort)) {
-          failures++;
-          debugPrint('[QuestsEngine][FAIL] ${d.toIso8601String().split('T').first} same=$same task=$hasTask tipRes=$hasTipRes checkProg=$hasCheckProg short=$hasShort');
-        }
-      }
-      if (failures > 0) {
-        debugPrint('[QuestsEngine][STRESS] window=14d failures=$failures');
-      }
-    }
+    // Removed temporary debug stress tests and prints post-verification
     if (!mounted) return;
     setState(() {
       _questsEngine = engine;
@@ -314,11 +218,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       await _loadReminderPrefs();
       await _initQuests();
       _scheduleMidnightRefresh();
-      // Run automated in-app verification (debug-only), then restore state
-      if (kDebugMode && !_autoVerifiedOnce) {
-        await _runAutomatedVerification();
-        _autoVerifiedOnce = true;
-      }
     });
   }
 
