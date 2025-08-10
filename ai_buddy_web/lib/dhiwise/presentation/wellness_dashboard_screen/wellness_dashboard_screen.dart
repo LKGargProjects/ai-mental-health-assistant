@@ -75,19 +75,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     }
   }
 
-  List<double> _saturationMatrix(double s) {
-    // Standard saturation matrix
-    final double a = 0.213*(1-s) + s;
-    final double b = 0.715*(1-s);
-    final double c = 0.072*(1-s);
-    return <double>[
-      a, b, c, 0, 0,
-      0.213*(1-s), 0.715*(1-s)+s, 0.072*(1-s), 0, 0,
-      0.213*(1-s), 0.715*(1-s), 0.072*(1-s)+s, 0, 0,
-      0, 0, 0, 1, 0,
-    ];
-  }
-
   @override
   void initState() {
     super.initState();
