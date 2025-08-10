@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart' show kDebugMode, debugPrint, listEquals
 import 'package:provider/provider.dart';
 import '../../../providers/progress_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../quests/debug_quest_min_tests.dart';
 
 class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -788,6 +789,25 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                               ),
                             ),
                           ),
+                          // Debug-only: minimal quest tests trigger
+                          if (kDebugMode) ...[
+                            SizedBox(height: 12.h),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () async {
+                                  final ctx = context;
+                                  final summary = await runMinQuestTests();
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(content: Text(summary)),
+                                  );
+                                },
+                                icon: const Icon(Icons.bug_report, size: 18),
+                                label: const Text('Run Quest Min Tests'),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
