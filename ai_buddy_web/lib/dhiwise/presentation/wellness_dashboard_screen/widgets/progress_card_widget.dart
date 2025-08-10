@@ -9,6 +9,7 @@ class ProgressCardWidget extends StatelessWidget {
   final String value;
   final String label;
   final Color backgroundColor;
+  final Widget? valueWidget;
 
   ProgressCardWidget({
     Key? key,
@@ -16,6 +17,7 @@ class ProgressCardWidget extends StatelessWidget {
     required this.value,
     required this.label,
     required this.backgroundColor,
+    this.valueWidget,
   }) : super(key: key);
 
   @override
@@ -35,7 +37,7 @@ class ProgressCardWidget extends StatelessWidget {
             fit: BoxFit.contain,
           ),
           SizedBox(height: 16.h),
-          Text(
+          valueWidget ?? Text(
             value,
             style: TextStyleHelper.instance.headline28BoldInter.copyWith(
               fontFamily: CoreTextStyles

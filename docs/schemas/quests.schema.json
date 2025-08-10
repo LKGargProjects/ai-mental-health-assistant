@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/quests.schema.json",
+  "title": "Quests Catalog",
+  "description": "Schema for ai_buddy_web/assets/quests/quests.json",
+  "type": ["array", "object"],
+  "oneOf": [
+    {
+      "type": "array",
+      "items": { "$ref": "#/definitions/quest" }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/quest" }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": true
+    }
+  ],
+  "definitions": {
+    "quest": {
+      "type": "object",
+      "required": [
+        "quest_id",
+        "tag",
+        "title",
+        "duration_min",
+        "timer_suggested",
+        "active"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "quest_id": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "enum": ["TASK", "TIP", "RESOURCE", "CHECK-IN", "PROGRESS"] },
+        "title": { "type": "string", "minLength": 1 },
+        "subtitle": { "type": ["string", "null"] },
+        "duration_min": { "type": "integer", "minimum": 0, "maximum": 180 },
+        "url": { "type": ["string", "null"], "format": "uri", "nullable": true },
+        "checklist": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "timer_suggested": { "type": "boolean" },
+        "active": { "type": "boolean" }
+      }
+    }
+  }
+}

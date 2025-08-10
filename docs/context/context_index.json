@@ -1,0 +1,32 @@
+[
+  {
+    "path": "docs/ARCHITECTURE.md",
+    "summary": "# Architecture (TL;DR)",
+    "last_modified": "2025-08-10T15:02:44.061137",
+    "size": 710
+  },
+  {
+    "path": "docs/ADRS.md",
+    "summary": "# Architecture Decision Records (Index)",
+    "last_modified": "2025-08-10T15:03:04.957457",
+    "size": 660
+  },
+  {
+    "path": "docs/TESTING.md",
+    "summary": "# Testing Overview",
+    "last_modified": "2025-08-10T15:03:15.764642",
+    "size": 745
+  },
+  {
+    "path": "docs/frontend/QUESTS_ENGINE.md",
+    "summary": "# Quests Engine",
+    "last_modified": "2025-08-10T15:03:36.184771",
+    "size": 299
+  },
+  {
+    "path": "docs/schemas/quests.schema.json",
+    "summary": "{",
+    "last_modified": "2025-08-10T15:00:29.368977",
+    "size": 1519
+  }
+]

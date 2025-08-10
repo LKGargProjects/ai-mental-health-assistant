@@ -121,6 +121,29 @@ class QuestsEngine {
 
   QuestsEngine();
 
+  /// DEBUG ONLY: wipe local quest persistence to test fresh state.
+  /// Clears telemetry, history, and timers but keeps cached catalog.
+  /// Safe to call on startup during debug sessions.
+  static Future<void> debugResetAll() async {
+    if (!kDebugMode) return; // never run in release/profile
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsTelemetryKey);
+    await prefs.remove(_prefsHistoryKey);
+    await prefs.remove(_prefsTimersKey);
+  }
+
+  // --- Helpers ---
+  String _todayKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  bool _isIsoSameDay(String? iso, DateTime now) {
+    if (iso == null || iso.isEmpty) return false;
+    try {
+      final dt = DateTime.parse(iso);
+      return _todayKey(dt) == _todayKey(now);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Load catalog: prefer remote if set; else use embedded fallback.
   /// Cache the parsed catalog to prefs for quick startup.
   Future<void> loadCatalog() async {
@@ -274,12 +297,37 @@ class QuestsEngine {
 
   Future<void> markComplete(String questId, {int? elapsedMs}) async {
     _ensureQuestStats(questId);
+    final now = DateTime.now();
+    final lastIso = (_telemetry[questId]['last_completed_at'] as String?);
+    // Prevent double-award on the same day
+    if (_isIsoSameDay(lastIso, now)) {
+      // Already completed today; do not increment counters again
+      return;
+    }
     _telemetry[questId]['completes'] = (_telemetry[questId]['completes'] ?? 0) + 1;
-    _telemetry[questId]['last_completed_at'] = DateTime.now().toIso8601String();
+    _telemetry[questId]['last_completed_at'] = now.toIso8601String();
     if (elapsedMs != null) {
       _telemetry[questId]['elapsed_ms'] = (_telemetry[questId]['elapsed_ms'] ?? 0) + elapsedMs;
     }
     await _persistTelemetry();
+  }
+
+  /// Undo today's completion, used by UI 'Undo' actions.
+  /// If the quest was marked complete today, clears the marker and
+  /// decrements the 'completes' counter once (not below zero).
+  Future<void> uncompleteToday(String questId) async {
+    _ensureQuestStats(questId);
+    final now = DateTime.now();
+    final lastIso = (_telemetry[questId]['last_completed_at'] as String?);
+    if (_isIsoSameDay(lastIso, now)) {
+      // Clear today's completion marker
+      (_telemetry[questId] as Map<String, dynamic>).remove('last_completed_at');
+      final c = _telemetry[questId]['completes'];
+      if (c is int && c > 0) {
+        _telemetry[questId]['completes'] = c - 1;
+      }
+      await _persistTelemetry();
+    }
   }
 
   Future<void> rateUsefulness(String questId, int rating1to5) async {
@@ -317,38 +365,48 @@ class QuestsEngine {
   }
 
   // Progress
+  // Unified XP awards
+  static const int xpTask = 10;
+  static const int xpOther = 5;
+
   TodayProgressSummary computeProgress(List<Quest> today) {
-    int tasksToday = today.where((q) => q.tag == QuestTag.task).length;
-    int tasksDone = 0;
-    int xp = 0;
+    final now = DateTime.now();
+    int stepsLeft = 0; // remaining TASKs only
+    int xpEarned = 0;
 
     for (final q in today) {
-      final stats = _telemetry[q.id] as Map<String, dynamic>?;
-      final completedCount = (stats?['completes'] ?? 0) as int;
-      if (q.tag == QuestTag.task) {
-        if (completedCount > 0) tasksDone += 1;
-        xp += 10 * completedCount;
-      } else if (q.tag == QuestTag.checkin) {
-        xp += 5 * completedCount;
-      } else if (q.tag == QuestTag.tip || q.tag == QuestTag.resource) {
-        xp += 3 * completedCount;
-      } else if (q.tag == QuestTag.progress) {
-        xp += 5 * completedCount;
+      final lastIso = (_telemetry[q.id] as Map<String, dynamic>?)?['last_completed_at'] as String?;
+      final doneToday = _isIsoSameDay(lastIso, now);
+
+      // StepsLeft: count only TASKs not yet completed today
+      if (q.tag == QuestTag.task && !doneToday) {
+        stepsLeft += 1;
+      }
+
+      // XP: award per completed item today
+      if (doneToday) {
+        xpEarned += (q.tag == QuestTag.task) ? xpTask : xpOther;
       }
     }
 
-    return TodayProgressSummary(stepsLeft: max(0, tasksToday - tasksDone), xpEarned: xp);
+    return TodayProgressSummary(stepsLeft: stepsLeft, xpEarned: xpEarned);
   }
 
-  // Adapter (call from UI layer with no widget changes)
   Future<Map<String, dynamic>> getTodayData({DateTime? date, Map<String, dynamic> userState = const {}}) async {
     await loadCatalog();
     final d = date ?? DateTime.now();
     final todayItems = selectToday(d, userState);
     final progress = computeProgress(todayItems);
+    // Expose completed state per item for UI
+    final now = DateTime.now();
+    final Map<String, bool> completedToday = {
+      for (final q in todayItems)
+        q.id: _isIsoSameDay((_telemetry[q.id] as Map<String, dynamic>?)?['last_completed_at'] as String?, now)
+    };
     return {
       'todayItems': todayItems,
       'progress': {'stepsLeft': progress.stepsLeft, 'xpEarned': progress.xpEarned},
+      'completedToday': completedToday,
     };
   }
 

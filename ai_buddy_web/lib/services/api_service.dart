@@ -46,7 +46,9 @@ class ApiService {
           requestBody: true,
           responseBody: true,
           error: true,
-          logPrint: (obj) => print('API: $obj'),
+          logPrint: (obj) {
+            if (kDebugMode) debugPrint('API: $obj');
+          },
         ),
       );
     }
@@ -72,10 +74,9 @@ class ApiService {
   /// Log error details for debugging
   void _logError(DioException error) {
     if (!kDebugMode) return;
-
-    print('API Error: ${error.type} - ${error.message}');
-    print('Status: ${error.response?.statusCode}');
-    print('URL: ${error.requestOptions.uri}');
+    debugPrint('API Error: ${error.type} - ${error.message}');
+    debugPrint('Status: ${error.response?.statusCode}');
+    debugPrint('URL: ${error.requestOptions.uri}');
   }
 
   /// Get or create session ID
@@ -88,7 +89,7 @@ class ApiService {
         _sessionId = await _createNewSession();
       }
     } catch (e) {
-      print('Session error: $e');
+      if (kDebugMode) debugPrint('Session error: $e');
       _sessionId = await _createNewSession();
     }
 
@@ -103,7 +104,7 @@ class ApiService {
       await _storage.write(key: _sessionKey, value: sessionId);
       return sessionId;
     } catch (e) {
-      print('Failed to create session: $e');
+      if (kDebugMode) debugPrint('Failed to create session: $e');
       // Generate fallback session ID
       return DateTime.now().millisecondsSinceEpoch.toString();
     }
@@ -128,11 +129,11 @@ class ApiService {
       };
       if (country != null) {
         requestData['country'] = country;
-        print('🔍 DEBUG: Adding country parameter: $country');
+        if (kDebugMode) debugPrint('🔍 DEBUG: Adding country parameter: $country');
       } else {
-        print('🔍 DEBUG: No country parameter provided');
+        if (kDebugMode) debugPrint('🔍 DEBUG: No country parameter provided');
       }
-      print('🔍 DEBUG: Request data: $requestData');
+      if (kDebugMode) debugPrint('🔍 DEBUG: Request data: $requestData');
 
       final response = await _dio.post(
         '/api/chat',
@@ -358,7 +359,7 @@ class ApiService {
       await _storage.delete(key: _sessionKey);
       _sessionId = null;
     } catch (e) {
-      print('Failed to clear session: $e');
+      if (kDebugMode) debugPrint('Failed to clear session: $e');
     }
   }
 

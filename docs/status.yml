@@ -1,0 +1,6 @@
+version: 0.1
+frontend:
+  app: ai_buddy_web
+backend:
+  app: flask
+last_updated: 2025-08-10T15:09:04.796982

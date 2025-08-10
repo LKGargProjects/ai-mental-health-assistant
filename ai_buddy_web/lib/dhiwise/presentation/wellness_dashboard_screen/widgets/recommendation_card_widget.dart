@@ -9,8 +9,10 @@ class RecommendationCardWidget extends StatelessWidget {
   final String title;
   final String subtitle;
   final String imagePath;
+  final String? doneImagePath;
   final VoidCallback? onTap;
   final bool completed;
+  final Key? containerKey;
 
   RecommendationCardWidget({
     Key? key,
@@ -18,8 +20,10 @@ class RecommendationCardWidget extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.imagePath,
+    this.doneImagePath,
     this.onTap,
     this.completed = false,
+    this.containerKey,
   }) : super(key: key);
 
   @override
@@ -27,6 +31,7 @@ class RecommendationCardWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        key: containerKey,
         decoration: BoxDecoration(
           color: Color(0xFFFEFEFE),
           border: Border.all(color: Color(0xFFF4F5F7)),
@@ -76,35 +81,14 @@ class RecommendationCardWidget extends StatelessWidget {
               child: Stack(
                 children: [
                   CustomImageView(
-                    imagePath: imagePath,
-                    height: 130.h,
-                    width: 130.h,
+                    imagePath: (completed && doneImagePath != null)
+                        ? doneImagePath
+                        : imagePath,
+                    height: 104.h,
+                    width: 104.h,
                     fit: BoxFit.cover,
                     radius: BorderRadius.circular(19.h),
                   ),
-                  if (completed)
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.35),
-                          borderRadius: BorderRadius.circular(19.h),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Done',
-                            style: TextStyleHelper.instance.title19BoldInter
-                                .copyWith(
-                              fontFamily: CoreTextStyles
-                                  .TextStyleHelper
-                                  .instance
-                                  .headline24Bold
-                                  .fontFamily,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
