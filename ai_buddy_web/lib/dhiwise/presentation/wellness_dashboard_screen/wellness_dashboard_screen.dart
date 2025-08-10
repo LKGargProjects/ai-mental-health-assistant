@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 
 import '../../core/app_export.dart';
@@ -14,7 +15,9 @@ import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:provider/provider.dart';
 import '../../../providers/progress_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../quests/debug_quest_min_tests.dart';
+
+// DEBUG ONLY: toggle to reset quest state on each app launch
+const bool _debugResetQuestsOnLaunch = false;
 
 class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -23,8 +26,84 @@ class WellnessDashboardScreen extends StatefulWidget {
   State<WellnessDashboardScreen> createState() => _WellnessDashboardScreenState();
 }
 
+// Painter for progress ring
+class _RingPainter extends CustomPainter {
+  final Offset center;
+  final double progress; // 0..1
+  final Color color;
+
+  _RingPainter({required this.center, required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final radius = 46.0;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final bg = Paint()
+      ..color = color.withOpacity(0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round;
+    final fg = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round;
+
+    // background circle
+    canvas.drawArc(rect, 0, 2 * 3.1415926535, false, bg);
+    // progress arc from top (-pi/2)
+    final sweep = (2 * 3.1415926535) * progress.clamp(0.0, 1.0);
+    canvas.drawArc(rect, -3.1415926535 / 2, sweep, false, fg);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter oldDelegate) {
+    return oldDelegate.center != center ||
+        oldDelegate.progress != progress ||
+        oldDelegate.color != color;
+  }
+}
+
+// Painter for subtle expanding ripple
+class _RipplePainter extends CustomPainter {
+  final Offset center;
+  final double radius;
+  final double opacity; // 0..1
+  final Color color;
+
+  _RipplePainter({
+    required this.center,
+    required this.radius,
+    required this.opacity,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final effectiveOpacity = opacity.clamp(0.0, 1.0);
+    final fill = Paint()
+      ..color = color.withOpacity(0.10 * (1.0 - effectiveOpacity))
+      ..style = PaintingStyle.fill;
+    final stroke = Paint()
+      ..color = color.withOpacity(0.35 * (1.0 - effectiveOpacity))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    canvas.drawCircle(center, radius, fill);
+    canvas.drawCircle(center, radius, stroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RipplePainter oldDelegate) {
+    return oldDelegate.center != center ||
+        oldDelegate.radius != radius ||
+        oldDelegate.opacity != opacity ||
+        oldDelegate.color != color;
+  }
+}
+
 class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   // UI-only state for TASK completion and progress
   bool _task1Done = false; // Focus reset
   bool _task2Done = false; // Study sprint
@@ -32,6 +111,20 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   int _baseXp = 20; // base example XP shown initially
   bool _reminderOn = true; // UI-only reminder toggle (default ON)
   TimeOfDay _reminderTime = const TimeOfDay(hour: 19, minute: 0);
+
+  // Optional microinteraction flags (must be explicitly enabled)
+  bool _enableSoftXpPop = true; // enabled per user approval
+
+  // Keys to compute positions for XP chip animation
+  final GlobalKey _task1CardKey = GlobalKey();
+  final GlobalKey _task2CardKey = GlobalKey();
+  final GlobalKey _resCardKey = GlobalKey();
+  final GlobalKey _tipCardKey = GlobalKey();
+  final GlobalKey _xpCardKey = GlobalKey();
+
+  // Guard to ensure chip pop occurs only once per task per session
+  bool _task1Popped = false;
+  bool _task2Popped = false;
 
   // Habit formation microcopy (rotates while active)
   final List<String> _microcopy = const [
@@ -53,21 +146,19 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   QuestsEngine? _questsEngine;
   // ignore: unused_field
   Map<String, dynamic>? _todayData; // {'todayItems': List<Quest>, 'progress': {stepsLeft, xpEarned}}
+  // IDs for the 4 displayed cards (derived from todayItems; UI copy remains static)
+  String? _qTask1Id; // preferred: Focus reset variant
+  String? _qTask2Id; // preferred: Study sprint variant
+  String? _qResId;   // a RESOURCE item
+  String? _qTipId;   // a TIP item
 
   // Persist reminder prefs
   static const _prefsReminderOn = 'wellness.reminder_on_v1';
   static const _prefsReminderMinutes = 'wellness.reminder_minutes_v1';
-  // Quests engine internal keys used for debug cleanup only
-  static const _qeTelemetryKey = 'quests_engine.telemetry_v1';
-  static const _qeHistoryKey = 'quests_engine.history_v1';
-  static const _qeTimersKey = 'quests_engine.timers_v1';
-
-  // Debug helper: extract today's quest titles
-  List<String> _debugTodayTitles() {
-    final items = _todayData?["todayItems"] as List<dynamic>?;
-    if (items == null) return const [];
-    return items.map((e) => (e as dynamic).title?.toString() ?? '').where((s) => s.isNotEmpty).toList();
-  }
+  // Daily first-use keys
+  static const _prefsTipPopDate = 'xp_pop_tip_date_v1';
+  static const _prefsResPopDate = 'xp_pop_res_date_v1';
+  // Removed unused debug-only helpers and constants post-verification
 
   Future<void> _loadReminderPrefs() async {
     try {
@@ -96,19 +187,86 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     }
   }
 
-  // Debug cleanup helper used by automated verification
-  Future<void> _clearQuestDebugState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_qeTelemetryKey);
-      await prefs.remove(_qeHistoryKey);
-      await prefs.remove(_qeTimersKey);
-      if (kDebugMode) debugPrint('[QuestsEngine][DEBUG] Cleared debug telemetry/history/timers');
-    } catch (e) {
-      if (kDebugMode) debugPrint('[QuestsEngine][DEBUG][ERROR] cleanup '+e.toString());
-    }
+  // Subtle check ripple behind a card center
+  void _showCheckRipple(GlobalKey sourceKey) {
+    final startGlobal = _globalCenterOf(sourceKey);
+    final overlayState = Overlay.of(context, rootOverlay: true);
+    if (startGlobal == null) return;
+    final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
+    if (overlayBox == null || !overlayBox.attached) return;
+    final start = overlayBox.globalToLocal(startGlobal);
+    final size = overlayBox.size;
+    final controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+    final fade = CurvedAnimation(parent: controller, curve: Curves.easeOutCubic);
+    final radius = Tween<double>(begin: 0, end: 80).animate(CurvedAnimation(parent: controller, curve: Curves.easeOut));
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(builder: (_) {
+      final r = radius.value;
+      return Positioned.fill(
+        child: IgnorePointer(
+          ignoring: true,
+          child: CustomPaint(
+            painter: _RipplePainter(
+              center: Offset(
+                start.dx.clamp(0.0, size.width),
+                start.dy.clamp(0.0, size.height),
+              ),
+              radius: r,
+              opacity: (1.0 - fade.value).clamp(0.0, 1.0),
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+      );
+    });
+    overlayState.insert(entry);
+    controller.addListener(() { entry.markNeedsBuild(); });
+    controller.addStatusListener((s) { if (s == AnimationStatus.completed) { entry.remove(); controller.dispose(); } });
+    controller.forward();
   }
 
+  // Short timer ring microinteraction centered on a card
+  void _showTimerRing(GlobalKey sourceKey) {
+    final startGlobal = _globalCenterOf(sourceKey);
+    final overlayState = Overlay.of(context, rootOverlay: true);
+    if (startGlobal == null) return;
+    final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
+    if (overlayBox == null || !overlayBox.attached) return;
+    final start = overlayBox.globalToLocal(startGlobal);
+    final size = overlayBox.size;
+
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    final anim = CurvedAnimation(parent: controller, curve: Curves.easeOutQuad);
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(builder: (_) {
+      return Positioned.fill(
+        child: IgnorePointer(
+          ignoring: true,
+          child: CustomPaint(
+            painter: _RingPainter(
+              center: Offset(
+                start.dx.clamp(0.0, size.width),
+                start.dy.clamp(0.0, size.height),
+              ),
+              progress: anim.value, // 0..1
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+      );
+    });
+    overlayState.insert(entry);
+    controller.addListener(() { entry.markNeedsBuild(); });
+    controller.forward().whenComplete(() {
+      entry.remove();
+      controller.dispose();
+    });
+  }
 
   Future<void> _saveReminderPrefs() async {
     try {
@@ -117,11 +275,36 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       final mins = _reminderTime.hour * 60 + _reminderTime.minute;
       await prefs.setInt(_prefsReminderMinutes, mins);
       if (kDebugMode) {
-        debugPrint('[ReminderPrefs] saved on=$_reminderOn minutes=$mins');
+        debugPrint('[ReminderPrefs] saved on='+_reminderOn.toString()+' minutes='+mins.toString());
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[ReminderPrefs][ERROR] $e');
+      if (kDebugMode) debugPrint('[ReminderPrefs][ERROR] '+e.toString());
     }
+  }
+
+  // --- Daily first-use (Tip/Resource) helpers ---
+  String _todayStr() {
+    final now = DateTime.now();
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$mm-$dd';
+  }
+
+  Future<bool> _isFirstUseToday(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final last = prefs.getString(key);
+      return last != _todayStr();
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> _markUsedToday(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, _todayStr());
+    } catch (_) {}
   }
 
   Future<void> _initQuests() async {
@@ -132,6 +315,11 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     setState(() {
       _questsEngine = engine;
       _todayData = data;
+      _computeDisplayedQuestIds();
+      // Sync local completion flags from engine's persisted map
+      final comp = (data['completedToday'] as Map?)?.cast<String, bool>() ?? const {};
+      _task1Done = _qTask1Id != null ? (comp[_qTask1Id] ?? false) : false;
+      _task2Done = _qTask2Id != null ? (comp[_qTask2Id] ?? false) : false;
     });
 
     // Push progress summary to existing ProgressProvider (no widget changes)
@@ -152,6 +340,11 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     if (!mounted) return;
     setState(() {
       _todayData = data;
+      _computeDisplayedQuestIds();
+      // Sync local completion flags from engine's persisted map
+      final comp = (data['completedToday'] as Map?)?.cast<String, bool>() ?? const {};
+      _task1Done = _qTask1Id != null ? (comp[_qTask1Id] ?? false) : false;
+      _task2Done = _qTask2Id != null ? (comp[_qTask2Id] ?? false) : false;
     });
     final progress = data['progress'] as Map<String, dynamic>?;
     if (progress != null) {
@@ -159,6 +352,105 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       final xpEarned = (progress['xpEarned'] ?? 0) as int;
       context.read<ProgressProvider>().updateFromQuests(stepsLeft: stepsLeft, xpEarned: xpEarned);
       if (kDebugMode) debugPrint('[ProgressProvider][refresh] stepsLeft=$stepsLeft xp=$xpEarned');
+    }
+  }
+
+  // Choose IDs from today's items to back the 4 static cards.
+  void _computeDisplayedQuestIds() {
+    final items = (_todayData?['todayItems'] as List?)?.cast<dynamic>() ?? const [];
+    // Helper to extract fields safely from either Quest or Map
+    String? idOf(dynamic j) {
+      if (j is Quest) return j.id;
+      if (j is Map<String, dynamic>) return j['quest_id'] as String?;
+      return null;
+    }
+    bool isTag(dynamic j, QuestTag tag) {
+      if (j is Quest) return j.tag == tag;
+      if (j is Map<String, dynamic>) {
+        final t = (j['tag'] ?? '').toString().toUpperCase();
+        switch (tag) {
+          case QuestTag.task:
+            return t == 'TASK';
+          case QuestTag.tip:
+            return t == 'TIP';
+          case QuestTag.resource:
+            return t == 'RESOURCE';
+          case QuestTag.reminder:
+            return t == 'REMINDER';
+          case QuestTag.checkin:
+            return t == 'CHECK-IN' || t == 'CHECKIN';
+          case QuestTag.progress:
+            return t == 'PROGRESS';
+        }
+      }
+      return false;
+    }
+    String titleOf(dynamic j) {
+      if (j is Quest) return j.title;
+      if (j is Map<String, dynamic>) return (j['title']?.toString() ?? '');
+      return '';
+    }
+
+    // Pick two TASKs: prefer ones resembling current UI labels
+    final tasks = items.where((e) => isTag(e, QuestTag.task)).toList();
+    dynamic focusCandidate = tasks.firstWhere(
+      (e) => titleOf(e).toLowerCase().contains('focus'),
+      orElse: () => tasks.isNotEmpty ? tasks.first : null,
+    );
+    dynamic sprintCandidate = tasks.firstWhere(
+      (e) => titleOf(e).toLowerCase().contains('study'),
+      orElse: () => tasks.length > 1 ? tasks[1] : (tasks.isNotEmpty ? tasks.first : null),
+    );
+    _qTask1Id = idOf(focusCandidate);
+    // Ensure task2 is different from task1 when possible
+    final t2 = (idOf(sprintCandidate) != null && idOf(sprintCandidate) != _qTask1Id)
+        ? sprintCandidate
+        : (tasks.firstWhere(
+              (e) => idOf(e) != null && idOf(e) != _qTask1Id,
+              orElse: () => null,
+            ));
+    _qTask2Id = idOf(t2);
+
+    // Pools for non-task cards
+    final resources = items.where((e) => isTag(e, QuestTag.resource)).toList();
+    final tips = items.where((e) => isTag(e, QuestTag.tip)).toList();
+    final checks = items.where((e) => isTag(e, QuestTag.checkin) || isTag(e, QuestTag.progress)).toList();
+
+    // Pick one RESOURCE (preferred), else TIP, else CHECK/PROGRESS
+    dynamic resPick;
+    if (resources.isNotEmpty) {
+      resPick = resources.first;
+    } else if (tips.isNotEmpty) {
+      resPick = tips.first;
+    } else if (checks.isNotEmpty) {
+      resPick = checks.first;
+    }
+    _qResId = idOf(resPick);
+
+    // Pick one TIP distinct from resource (if possible); else CHECK/PROGRESS distinct; else null
+    dynamic tipPick;
+    if (tips.isNotEmpty) {
+      tipPick = tips.firstWhere(
+        (e) => idOf(e) != null && idOf(e) != _qResId,
+        orElse: () => tips.first,
+      );
+      // If only one TIP and it's same as res, try checks
+      if (idOf(tipPick) == _qResId && checks.isNotEmpty) {
+        tipPick = checks.firstWhere(
+          (e) => idOf(e) != null && idOf(e) != _qResId,
+          orElse: () => checks.first,
+        );
+      }
+    } else if (checks.isNotEmpty) {
+      tipPick = checks.firstWhere(
+        (e) => idOf(e) != null && idOf(e) != _qResId,
+        orElse: () => checks.first,
+      );
+    }
+    _qTipId = idOf(tipPick);
+
+    if (kDebugMode) {
+      debugPrint('[QuestsEngine][displayIDs] task1=${_qTask1Id ?? 'fallback'} task2=${_qTask2Id ?? 'fallback'} res=${_qResId ?? 'fallback'} tip=${_qTipId ?? 'fallback'}');
     }
   }
 
@@ -216,6 +508,11 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     // Initialize asynchronously: reminder prefs, quests data, and midnight refresh
     Future.microtask(() async {
       await _loadReminderPrefs();
+      // DEBUG ONLY: reset quests state on each launch to test persistence/awards
+      if (kDebugMode && _debugResetQuestsOnLaunch) {
+        await QuestsEngine.debugResetAll();
+        debugPrint('[QuestsEngine][debug] reset all local quest state on launch');
+      }
       await _initQuests();
       _scheduleMidnightRefresh();
     });
@@ -227,6 +524,108 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     _midnightTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  // Compute global center of a widget by key
+  Offset? _globalCenterOf(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx == null) return null;
+    final box = ctx.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return null;
+    final topLeft = box.localToGlobal(Offset.zero);
+    final center = topLeft + Offset(box.size.width / 2, box.size.height / 2);
+    return center;
+  }
+
+  // Optional +XP chip pop animation from a source card to XP card
+  void _showXpChipPop(GlobalKey sourceKey, {required int amount}) {
+    final startGlobal = _globalCenterOf(sourceKey);
+    final endGlobal = _globalCenterOf(_xpCardKey);
+    if (startGlobal == null || endGlobal == null) return;
+
+    final overlayState = Navigator.of(context).overlay ?? Overlay.of(context, rootOverlay: true);
+
+    final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
+    if (overlayBox == null || !overlayBox.attached) return;
+
+    // Convert to overlay-local coordinates
+    Offset start = overlayBox.globalToLocal(startGlobal);
+    Offset end = overlayBox.globalToLocal(endGlobal);
+
+    // Clamp and fallback for small screens or offscreen targets
+    final size = overlayBox.size;
+    bool endOff = end.dx.isNaN || end.dy.isNaN || end.dx < 0 || end.dy < 0 || end.dx > size.width || end.dy > size.height;
+    if (endOff) {
+      // simple upward pop if XP card is not visible
+      end = start.translate(0, -80);
+    }
+    if (kDebugMode) {
+      debugPrint('[XPChip] start=$start end=$end size=$size');
+    }
+
+    final controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 360));
+    final position = Tween<Offset>(begin: start, end: end)
+        .chain(CurveTween(curve: Curves.easeOutCubic))
+        .animate(controller);
+    final fade = CurvedAnimation(parent: controller, curve: const Interval(0.0, 0.9, curve: Curves.easeOut));
+    final scale = Tween<double>(begin: 0.92, end: 1.0)
+        .chain(CurveTween(curve: Curves.easeOutBack))
+        .animate(controller);
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(builder: (ctx) {
+      final pos = position.value;
+      final primary = Theme.of(context).colorScheme.primary;
+      double left = pos.dx - 26;
+      double top = pos.dy - 14;
+      // Bound the chip within overlay to avoid rendering offscreen
+      left = left.clamp(4.0, size.width - 52.0);
+      top = top.clamp(4.0, size.height - 32.0);
+      return Positioned(
+        left: left,
+        top: top,
+        child: IgnorePointer(
+          ignoring: true,
+          child: Opacity(
+            opacity: fade.value.clamp(0.0, 1.0),
+            child: Transform.scale(
+              scale: scale.value,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: primary,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primary.withOpacity(0.30),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  '+$amount XP',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+
+    overlayState.insert(entry);
+    controller.addListener(() => entry.markNeedsBuild());
+    controller.forward().whenComplete(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      entry.remove();
+      controller.dispose();
+    });
   }
 
   @override
@@ -364,17 +763,22 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   }
 
   Widget _buildProgressSection() {
-    // Compute dynamic values from UI state (UI-only)
-    final int completed = (_task1Done ? 1 : 0) + (_task2Done ? 1 : 0);
-    final int stepsLeft = (_baseSteps - completed).clamp(0, _baseSteps);
-    final int xpEarned = _baseXp + (completed * 10);
+    // Prefer engine-backed values via ProgressProvider once today data is loaded; fallback to UI-only
+    final pp = context.watch<ProgressProvider>();
+    final bool hasEngineData = _todayData != null;
+    final int completedLocal = (_task1Done ? 1 : 0) + (_task2Done ? 1 : 0);
+    final int stepsLeft = hasEngineData
+        ? pp.stepsLeft
+        : (_baseSteps - completedLocal).clamp(0, _baseSteps);
+    final int xpEarned = hasEngineData
+        ? pp.xpEarned
+        : (_baseXp + (completedLocal * 10));
     return Padding(
         padding: EdgeInsets.symmetric(horizontal: 70.h).copyWith(bottom: 32.h),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Your Progress',
               style: TextStyleHelper.instance.display31BoldInter.copyWith(
-                  fontFamily: CoreTextStyles
-                      .TextStyleHelper.instance.headline24Bold.fontFamily,
+                  fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
                   color: Color(0xFF444D5C))),
           SizedBox(height: 28.h),
           Row(children: [
@@ -383,14 +787,41 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                     imagePath: ImageConstant.imgImage65x52,
                     value: '$stepsLeft',
                     label: 'Steps Left',
-                    backgroundColor: Color(0xFFE0F2E9))),
+                    backgroundColor: Color(0xFFE0F2E9),
+                    valueWidget: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                      child: Text(
+                        '$stepsLeft',
+                        key: ValueKey<int>(stepsLeft),
+                        style: TextStyleHelper.instance.headline28BoldInter.copyWith(
+                          fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                          color: const Color(0xFF4E5965),
+                        ),
+                      ),
+                    ))),
             SizedBox(width: 24.h),
             Expanded(
-                child: ProgressCardWidget(
-                    imagePath: ImageConstant.imgImage63x65,
-                    value: '+$xpEarned',
-                    label: 'XP Earned',
-                    backgroundColor: Color(0xFFE8E7F8))),
+                child: Container(
+                  key: _xpCardKey,
+                  child: ProgressCardWidget(
+                      imagePath: ImageConstant.imgImage63x65,
+                      value: '+$xpEarned',
+                      label: 'XP Earned',
+                      backgroundColor: Color(0xFFE8E7F8),
+                      valueWidget: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                        child: Text(
+                          '+$xpEarned',
+                          key: ValueKey<int>(xpEarned),
+                          style: TextStyleHelper.instance.headline28BoldInter.copyWith(
+                            fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                            color: const Color(0xFF4E5965),
+                          ),
+                        ),
+                      )),
+                )),
           ]),
           SizedBox(height: 12.h),
           Text('Estimated time: 2–3 min',
@@ -402,29 +833,44 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   }
 
   Widget _buildRecommendationsSection() {
+    // Determine daily completion state for RESOURCE and TIP to show subtle status
+    final comp = (_todayData?['completedToday'] as Map?)?.cast<String, bool>() ?? const {};
+    final bool resDone = _qResId != null ? (comp[_qResId!] ?? false) : false;
+    final bool tipDone = _qTipId != null ? (comp[_qTipId!] ?? false) : false;
     return Padding(
         padding: EdgeInsets.symmetric(horizontal: 69.h).copyWith(bottom: 32.h),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Today\'s Recommendations',
               style: TextStyleHelper.instance.display32BoldInter.copyWith(
-                  fontFamily: CoreTextStyles
-                      .TextStyleHelper.instance.headline24Bold.fontFamily,
+                  fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
                   color: Color(0xFF4A5261))),
           SizedBox(height: 28.h),
           // Card 1 (TASK)
           RecommendationCardWidget(
+              containerKey: _task1CardKey,
               category: 'TASK',
               title: 'Focus reset (2 min)',
               subtitle: (_task1Done && _task2Done)
                   ? 'All steps complete 🎉'
                   : 'Quick breathing + desk tidy',
-              imagePath: ImageConstant.imgImage131x130,
+              imagePath: 'assets/images/quests/task_focus.svg',
+              doneImagePath: 'assets/images/quests/task_focus_done.svg',
               completed: _task1Done,
               onTap: () async {
-                final newVal = !_task1Done;
+                // One-and-done: ignore taps once completed (use Undo to revert)
+                if (_task1Done) return;
+                final newVal = true;
                 setState(() { _task1Done = newVal; });
-                // Wire to engine: mark start/complete for known quest id
-                const questId = 'task_focus_reset_v2';
+                if (newVal && !_task1Popped) {
+                  // First time completion feedback
+                  HapticFeedback.lightImpact();
+                  SystemSound.play(SystemSoundType.click);
+                  if (_enableSoftXpPop) _showXpChipPop(_task1CardKey, amount: 10);
+                  _task1Popped = true;
+                  _showCheckRipple(_task1CardKey);
+                }
+                // Wire to engine: prefer selected ID; fall back to known quest id
+                final questId = _qTask1Id ?? 'task_focus_reset_v2';
                 if (_questsEngine != null) {
                   try {
                     await _questsEngine!.markStart(questId);
@@ -436,20 +882,59 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                     if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e');
                   }
                   await _refreshToday();
+                }
+                // Short undo window via SnackBar
+                if (mounted) {
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.hideCurrentSnackBar();
+                  messenger.showSnackBar(
+                    SnackBar(
+                      duration: const Duration(seconds: 5),
+                      content: const Text('Focus reset marked complete'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () async {
+                          setState(() {
+                            _task1Done = false;
+                            _task1Popped = false; // allow chip on re-complete
+                          });
+                          final questId = _qTask1Id ?? 'task_focus_reset_v2';
+                          if (_questsEngine != null) {
+                            try {
+                              await _questsEngine!.uncompleteToday(questId);
+                            } catch (_) {}
+                          }
+                          await _refreshToday();
+                        },
+                      ),
+                    ),
+                  );
                 }
               }),
           SizedBox(height: 24.h),
           // Card 2 (TASK)
           RecommendationCardWidget(
+              containerKey: _task2CardKey,
               category: 'TASK',
               title: 'Study sprint (10 min)',
               subtitle: 'Timer + no‑phone rule',
-              imagePath: ImageConstant.imgImage130x130,
+              imagePath: 'assets/images/quests/task_study.svg',
+              doneImagePath: 'assets/images/quests/task_study_done.svg',
               completed: _task2Done,
               onTap: () async {
-                final newVal = !_task2Done;
+                if (_task2Done) return; // one-and-done; use Undo to revert
+                final newVal = true;
                 setState(() { _task2Done = newVal; });
-                const questId = 'task_study_sprint_v2';
+                if (newVal && !_task2Popped) {
+                  HapticFeedback.lightImpact();
+                  SystemSound.play(SystemSoundType.click);
+                  if (_enableSoftXpPop) _showXpChipPop(_task2CardKey, amount: 10);
+                  _task2Popped = true;
+                  _showCheckRipple(_task2CardKey);
+                  // Teaser: show a short timer ring microinteraction
+                  _showTimerRing(_task2CardKey);
+                }
+                final questId = _qTask2Id ?? 'task_study_sprint_v2';
                 if (_questsEngine != null) {
                   try {
                     await _questsEngine!.markStart(questId);
@@ -462,17 +947,58 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   }
                   await _refreshToday();
                 }
+                if (mounted) {
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.hideCurrentSnackBar();
+                  messenger.showSnackBar(
+                    SnackBar(
+                      duration: const Duration(seconds: 5),
+                      content: const Text('Study sprint marked complete'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () async {
+                          setState(() {
+                            _task2Done = false;
+                            _task2Popped = false;
+                          });
+                          final questId = _qTask2Id ?? 'task_study_sprint_v2';
+                          if (_questsEngine != null) {
+                            try {
+                              await _questsEngine!.uncompleteToday(questId);
+                            } catch (_) {}
+                          }
+                          await _refreshToday();
+                        },
+                      ),
+                    ),
+                  );
+                }
               }),
           SizedBox(height: 24.h),
           // Card 3 (RESOURCE)
           RecommendationCardWidget(
+              containerKey: _resCardKey,
               category: 'RESOURCE',
               title: 'Calm music',
               subtitle: 'Lo‑fi playlist',
-              imagePath: ImageConstant.imgImage131x130,
+              imagePath: 'assets/images/quests/resource_music.svg',
+              completed: resDone,
               onTap: () async {
+                HapticFeedback.lightImpact();
+                SystemSound.play(SystemSoundType.click);
+                if (_enableSoftXpPop && await _isFirstUseToday(_prefsResPopDate)) {
+                  _showXpChipPop(_resCardKey, amount: 5);
+                  await _markUsedToday(_prefsResPopDate);
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(duration: Duration(milliseconds: 1200), content: Text('XP already counted for today')),
+                    );
+                  }
+                }
                 // Telemetry: impression/start/complete for resource
-                const questId = 'resource_calm_music_v2';
+                final questId = _qResId ?? 'resource_calm_music_v2';
                 if (_questsEngine != null) {
                   try {
                     await _questsEngine!.markImpression(questId);
@@ -488,12 +1014,27 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
           SizedBox(height: 24.h),
           // Card 4 (TIP)
           RecommendationCardWidget(
+              containerKey: _tipCardKey,
               category: 'TIP',
               title: 'One tiny step',
               subtitle: 'Pick the easiest task first',
-              imagePath: ImageConstant.imgImage130x130,
+              imagePath: 'assets/images/quests/tip_generic.svg',
+              completed: tipDone,
               onTap: () async {
-                const questId = 'tip_one_tiny_step_v2';
+                HapticFeedback.lightImpact();
+                SystemSound.play(SystemSoundType.click);
+                if (_enableSoftXpPop && await _isFirstUseToday(_prefsTipPopDate)) {
+                  _showXpChipPop(_tipCardKey, amount: 5);
+                  await _markUsedToday(_prefsTipPopDate);
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(duration: Duration(milliseconds: 1200), content: Text('XP already counted for today')),
+                    );
+                  }
+                }
+                final questId = _qTipId ?? 'tip_one_tiny_step_v2';
                 if (_questsEngine != null) {
                   try {
                     await _questsEngine!.markImpression(questId);
@@ -688,25 +1229,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                               ),
                             ),
                           ),
-                          // Debug-only: minimal quest tests trigger
-                          if (kDebugMode) ...[
-                            SizedBox(height: 12.h),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: () async {
-                                  final ctx = context;
-                                  final summary = await runMinQuestTests();
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(content: Text(summary)),
-                                  );
-                                },
-                                icon: const Icon(Icons.bug_report, size: 18),
-                                label: const Text('Run Quest Min Tests'),
-                              ),
-                            ),
-                          ],
+                          
                         ],
                       ),
                     ),
