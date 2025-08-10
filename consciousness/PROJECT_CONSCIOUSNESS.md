@@ -65,6 +65,42 @@
 
 ## ⚖️ AGENT PROTOCOLS
 
+### Automation Example: In‑App Debug Testing Workflow (Week 0 Quests)
+
+This is a concrete example of how Cascade automates in‑app verification without user intervention. Steps vary case‑by‑case, but follow this pattern:
+
+1. Identify minimal, reversible debug hooks
+   - Add a temporary `debugPrint` where needed (e.g., `WellnessDashboardScreen._initQuests()` right after quests are computed) to log:
+     - Count summary: `todayItems`, `stepsLeft`, `xpEarned`
+     - One‑off verification data (e.g., titles) only when necessary
+   - Guard behavior with `kDebugMode` and keep UI unaffected.
+
+2. Run and observe deterministically
+   - Launch or hot‑restart the app (`flutter run -d chrome` or device in use).
+   - Navigate to the relevant screen (Wellness/Quest dashboard).
+   - Read logs to verify outputs, e.g.:
+     - `[QuestsEngine] todayItems=5 stepsLeft=2 xp=0`
+     - `[QuestsEngine][STRESS] window=14d failures=0 (0 is ideal)`
+     - `[ProgressProvider] updateFromQuests stepsLeft=2 xp=0`
+     - (Temporary) `[QuestsEngine] titles: [Focus reset, Phone away, …]`
+
+3. Validate constraints and determinism
+   - Keep a built‑in stress check in debug (non‑destructive):
+     - Determinism check compares sorted quest ID lists (order‑insensitive) to avoid false negatives.
+     - Variety constraints: ensure required types are present (e.g., TASK, TIP/RESOURCE, CHECK‑IN/PROGRESS, SHORT).
+
+4. Clean up immediately after verification
+   - Remove temporary prints to keep codebase clean.
+   - Keep only stable, debug‑mode stress checks.
+   - Commit with descriptive messages, e.g.:
+     - `fix(quests): deterministic selection across repeated calls`
+     - `feat(progress): wire QuestsEngine progress into ProgressProvider`
+     - `chore(debug): remove temporary quest titles log; test: order‑insensitive determinism`
+
+5. Persist learnings and preferences
+   - Save preference: Cascade may autonomously add temporary debug prints, restart, read logs, verify, and remove prints without prompting.
+   - Update plan only for major learning/state changes; avoid turning this document into a logbook.
+
 ## 🔭 FUTURE ENHANCEMENTS (Reference)
 
 - **Journal for Struggles & Reflections**
@@ -137,5 +173,13 @@ This document should be updated when:
 
 ---
 
-> **Last Updated**: 2025-08-09
-> **Version**: 2.2 (Reality Check Update)
+## ✅ Milestone Update (2025-08-10)
+- Implemented debug-only, in-app automated verification for Week 0 Quests in `WellnessDashboardScreen`.
+- Minimal harness `lib/quests/debug_quest_min_tests.dart` verifies:
+  - Deterministic progress updates
+  - Reminder setting persistence (SharedPreferences)
+  - Midnight refresh simulation (same-day determinism, next-day size)
+- Auto-run and stress logs removed; only manual `kDebugMode` button remains. Production-safe by default.
+
+> **Last Updated**: 2025-08-10
+> **Version**: 2.3 (Quests Verification)
