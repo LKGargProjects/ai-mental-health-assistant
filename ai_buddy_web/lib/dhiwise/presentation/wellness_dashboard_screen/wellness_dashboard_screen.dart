@@ -11,6 +11,8 @@ import '../../../theme/text_style_helper.dart' as CoreTextStyles;
 import '../../../widgets/assessment_splash.dart';
 import '../../../quests/quests_engine.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint, listEquals;
+import 'package:provider/provider.dart';
+import '../../../providers/progress_provider.dart';
 
 class WellnessDashboardScreen extends StatefulWidget {
   WellnessDashboardScreen({Key? key}) : super(key: key);
@@ -82,6 +84,17 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       _questsEngine = engine;
       _todayData = data;
     });
+
+    // Push progress summary to existing ProgressProvider (no widget changes)
+    final progress = data['progress'] as Map<String, dynamic>?;
+    if (progress != null && mounted) {
+      final stepsLeft = (progress['stepsLeft'] ?? 0) as int;
+      final xpEarned = (progress['xpEarned'] ?? 0) as int;
+      context.read<ProgressProvider>().updateFromQuests(stepsLeft: stepsLeft, xpEarned: xpEarned);
+      if (kDebugMode) {
+        debugPrint('[ProgressProvider] updateFromQuests stepsLeft=$stepsLeft xp=$xpEarned');
+      }
+    }
   }
 
   String _formatReminderTime(TimeOfDay t) {
