@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <!-- V6: classic headphones, thin (1.6), 24x24, no fill -->
+  <g transform="translate(0.1,-0.2)">
+    <!-- headband -->
+    <path d="M5 12 A7 7 0 0 1 19 12"/>
+    <!-- stems -->
+    <path d="M5 12v4"/>
+    <path d="M19 12v4"/>
+    <!-- cups -->
+    <rect x="2.8" y="15.5" width="3.4" height="4.0" rx="1.1"/>
+    <rect x="17.8" y="15.5" width="3.4" height="4.0" rx="1.1"/>
+  </g>
+</svg>

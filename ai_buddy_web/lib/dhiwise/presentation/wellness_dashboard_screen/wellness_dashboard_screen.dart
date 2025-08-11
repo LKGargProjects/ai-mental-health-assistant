@@ -1215,6 +1215,49 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                     const SnackBar(content: Text('Focus duration missing')),);
                 }
                 return;
+                final newVal = true;
+                setState(() { _task1Done = newVal; });
+                if (newVal && !_task1Popped) {
+                  HapticFeedback.lightImpact();
+                  SystemSound.play(SystemSoundType.click);
+                  if (_enableSoftXpPop) _showXpChipPop(_task1CardKey, amount: 10);
+                  _task1Popped = true;
+                  _showCheckRipple(_task1CardKey);
+                }
+                if (_questsEngine != null) {
+                  try {
+                    await _questsEngine!.markStart(questId);
+                    if (newVal) { await _questsEngine!.markComplete(questId); }
+                  } catch (e) { if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e'); }
+                  await _refreshToday();
+                }
+                // Short undo window via SnackBar
+                if (mounted) {
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.hideCurrentSnackBar();
+                  messenger.showSnackBar(
+                    SnackBar(
+                      duration: const Duration(seconds: 5),
+                      content: const Text('Focus reset marked complete'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () async {
+                          setState(() {
+                            _task1Done = false;
+                            _task1Popped = false; // allow chip on re-complete
+                          });
+                          final questId = _qTask1Id ?? 'task_focus_reset_v2';
+                          if (_questsEngine != null) {
+                            try {
+                              await _questsEngine!.uncompleteToday(questId);
+                            } catch (_) {}
+                          }
+                          await _refreshToday();
+                        },
+                      ),
+                    ),
+                  );
+                }
               }),
           SizedBox(height: 24.h),
           // Card 2 (TASK)
@@ -1250,6 +1293,55 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                     const SnackBar(content: Text('Study sprint duration missing')),);
                 }
                 return;
+                final newVal = true;
+                setState(() { _task2Done = newVal; });
+                if (newVal && !_task2Popped) {
+                  HapticFeedback.lightImpact();
+                  SystemSound.play(SystemSoundType.click);
+                  if (_enableSoftXpPop) _showXpChipPop(_task2CardKey, amount: 10);
+                  _task2Popped = true;
+                  _showCheckRipple(_task2CardKey);
+                  // Teaser: show a short timer ring microinteraction
+                  _showTimerRing(_task2CardKey);
+                }
+                if (_questsEngine != null) {
+                  try {
+                    await _questsEngine!.markStart(questId);
+                    if (newVal) {
+                      await _questsEngine!.markComplete(questId);
+                    }
+                    if (kDebugMode) debugPrint('[QuestsEngine] toggled $questId completed=$newVal');
+                  } catch (e) {
+                    if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e');
+                  }
+                  await _refreshToday();
+                }
+                if (mounted) {
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.hideCurrentSnackBar();
+                  messenger.showSnackBar(
+                    SnackBar(
+                      duration: const Duration(seconds: 5),
+                      content: const Text('Study sprint marked complete'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () async {
+                          setState(() {
+                            _task2Done = false;
+                            _task2Popped = false;
+                          });
+                          final questId = _qTask2Id ?? 'task_study_sprint_v2';
+                          if (_questsEngine != null) {
+                            try {
+                              await _questsEngine!.uncompleteToday(questId);
+                            } catch (_) {}
+                          }
+                          await _refreshToday();
+                        },
+                      ),
+                    ),
+                  );
+                }
               }),
           SizedBox(height: 24.h),
           // Card 3 (RESOURCE)
@@ -1258,7 +1350,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
               category: 'RESOURCE',
               title: 'Calm music',
               subtitle: 'Lo‑fi playlist',
-              imagePath: 'assets/images/quests/resource_music_headphones.svg',
+              imagePath: 'assets/images/quests/resource_headphone_match_v8.svg',
               completed: resDone,
               onTap: () async {
                 HapticFeedback.lightImpact();
