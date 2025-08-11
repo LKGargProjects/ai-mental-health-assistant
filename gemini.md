@@ -39,10 +39,9 @@ My learning loop is powered by three key files. I will update them after every s
 
 ### Category: Flutter Development
 
-*   **Root Cause Analysis:** When a UI element is missing, don't just focus on the launch process. **Verify the application's entry point (`main.dart`) to ensure the correct screen is being loaded as the `home` widget.** This is a critical debugging step.
 *   **Definitive Workflow for Launching & UI Changes:**
     1.  Make the code change.
-    2.  Run `flutter clean` if UI changes are not appearing.
+    2.  Run `flutter clean` in the project directory.
     3.  Execute the Port Clearance Protocol.
     4.  Launch the app with a fixed port: `flutter run -d chrome --web-port 8080`.
     5.  Provide the user with the now-known URL (`http://localhost:8080`) and verification instructions.
@@ -50,6 +49,9 @@ My learning loop is powered by three key files. I will update them after every s
 
 ### Category: Shell & Environment
 
+*   **The `directory` Parameter Problem:** The `directory` parameter for `run_shell_command` can be unreliable.
+    *   **Problem:** The tool sometimes fails to recognize a valid workspace directory.
+    *   **Definitive Solution:** Do not use the `directory` parameter. Instead, **always use the `cd <directory> && <command>` pattern** for any command that needs to be run in a specific directory. This is the most robust and reliable method.
 *   **Port Clearance Protocol:**
     *   **Goal:** To reliably free a port before use.
     *   **Step 1: Identify PID:** Run `lsof -ti:<port_number>`.
