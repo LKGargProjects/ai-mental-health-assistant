@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:provider/provider.dart';
 import '../../../providers/progress_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../navigation/route_observer.dart';
 
 // DEBUG ONLY: toggle to reset quest state on each app launch
 const bool _debugResetQuestsOnLaunch = false;
@@ -118,7 +119,7 @@ class _RipplePainter extends CustomPainter {
 }
 
 class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, RouteAware {
   // UI-only state for TASK completion and progress
   bool _task1Done = false; // Focus reset
   bool _task2Done = false; // Study sprint
@@ -126,6 +127,13 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   int _baseXp = 20; // base example XP shown initially
   bool _reminderOn = true; // UI-only reminder toggle (default ON)
   TimeOfDay _reminderTime = const TimeOfDay(hour: 19, minute: 0);
+
+  // DEBUG QA: ensure layout/quest snapshot logs at least once per mount
+  bool _qaLoggedOnce = false;
+
+  // Debug log throttling for reminder prints
+  DateTime _lastReminderLogAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool? _lastReminderNear;
 
   // Optional microinteraction flags (must be explicitly enabled)
   bool _enableSoftXpPop = true; // enabled per user approval
@@ -252,7 +260,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     if (reduceMotion) return;
     final startGlobal = _globalCenterOf(sourceKey);
-    final overlayState = Overlay.of(context, rootOverlay: true);
+    // Use screen-scoped overlay to avoid leaking into other tabs/screens
+    final overlayState = Overlay.of(context);
     if (startGlobal == null) return;
     final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
     if (overlayBox == null || !overlayBox.attached) return;
@@ -287,6 +296,33 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     controller.addListener(() { entry.markNeedsBuild(); });
     controller.addStatusListener((s) { if (s == AnimationStatus.completed) { entry.remove(); controller.dispose(); } });
     controller.forward();
+  }
+
+  // DEBUG ONLY: Log if key sections share the same horizontal padding and current quest IDs/durations
+  void _debugLogLayout() {
+    if (!kDebugMode) return;
+    try {
+      // Resolve 70.h to a concrete double (Sizer provides .h as a scaling unit)
+      final double pad70 = 70.h;
+      // Sections expected to use 70.h gutters:
+      final quickIn = EdgeInsets.symmetric(horizontal: 70.h).horizontal;
+      final progress = EdgeInsets.symmetric(horizontal: 70.h).horizontal;
+      final recs = EdgeInsets.symmetric(horizontal: 70.h).horizontal;
+      final same = (quickIn == progress) && (progress == recs);
+      debugPrint('[QA][Layout] pad70.h=$pad70, equalGutters=$same (quick=$quickIn, progress=$progress, recs=$recs)');
+
+      // Today selection snapshot
+      final items = (_todayData?['todayItems'] as List?)?.length ?? 0;
+      final resId = _qResId;
+      final tipId = _qTipId;
+      final t1 = _qTask1Id;
+      final t2 = _qTask2Id;
+      final d1 = _durationFor(t1);
+      final d2 = _durationFor(t2);
+      debugPrint('[QA][Quests] todayItems=$items resId=$resId tipId=$tipId task1=$t1($d1 m) task2=$t2($d2 m)');
+    } catch (e) {
+      debugPrint('[QA][Layout][ERROR] $e');
+    }
   }
 
   Future<void> _saveReminderPrefs() async {
@@ -482,7 +518,14 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       );
     }
     _qTipId = idOf(tipPick);
+
+  // Debug: note when only one TASK is present today
+  if (kDebugMode && (_qTask1Id != null && _qTask2Id == null)) {
+    try {
+      debugPrint('[QA][Quests] only_one_task=true task1=$_qTask1Id task2=null');
+    } catch (_) {}
   }
+}
 
   void _scheduleMidnightRefresh() {
     _midnightTimer?.cancel();
@@ -497,11 +540,25 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
 
   @override
   void dispose() {
+    // Unsubscribe from route observer
+    try {
+      final route = ModalRoute.of(context);
+      if (route is PageRoute) {
+        routeObserver.unsubscribe(this);
+      }
+    } catch (_) {}
     _removeTimerPill();
     _microTimer?.cancel();
     _midnightTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  @override
+  void deactivate() {
+    // Clean up floating UI when navigating away/tab switching
+    _removeTimerPill();
+    super.deactivate();
   }
 
   String _formatReminderTime(TimeOfDay t) {
@@ -595,15 +652,67 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       // after first frame so keys are mounted
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _debugRunReminderSelfTestOnce();
+        // DEBUG ONLY: auto-check paddings and quest IDs once on first frame
+        _debugLogLayout();
       });
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route changes so we can clean up overlay when covered
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      try {
+        routeObserver.subscribe(this, route);
+      } catch (_) {}
+    }
+  }
+
+  @override
+  void didPushNext() {
+    // Another route pushed on top (e.g., switching tabs or opening sheet)
+    if (kDebugMode) {
+      try { debugPrint('[Pill][ROUTE] didPushNext -> remove pill'); } catch (_) {}
+    }
+    _removeTimerPill();
+  }
+
+  @override
+  void didPopNext() {
+    // A subsequent route popped, revealing this one
+    if (kDebugMode) {
+      try { debugPrint('[Pill][ROUTE] didPopNext'); } catch (_) {}
+    }
+    // No-op: pill is only created explicitly while on this screen
+  }
+
+  @override
+  void didPop() {
+    // This route popped: ensure complete cleanup
+    if (kDebugMode) {
+      try { debugPrint('[Pill][ROUTE] didPop -> remove pill'); } catch (_) {}
+    }
+    _removeTimerPill();
   }
 
   // Start a floating timer pill anchored near the given card.
   void _startTimerPill({required GlobalKey cardKey, required String questId, required Duration total}) {
     _removeTimerPill();
+    // Only show pill on the wellness dashboard route
+    final routeName = ModalRoute.of(context)?.settings.name;
+    if (routeName != '/wellness-dashboard') {
+      return;
+    }
+    if (kDebugMode) {
+      try {
+        debugPrint('[Pill][START] questId=' + questId + ' total=' + total.inMinutes.toString() + 'm route=' + (routeName ?? 'null'));
+      } catch (_) {}
+    }
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    final overlay = Overlay.of(context, rootOverlay: true);
+    // Use screen-scoped overlay so the pill is owned by this screen
+    final overlay = Overlay.of(context);
     final overlayBox = overlay.context.findRenderObject() as RenderBox?;
     final centerGlobal = _globalCenterOf(cardKey);
     if (overlayBox == null || !overlayBox.attached || centerGlobal == null) return;
@@ -639,26 +748,57 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
           child: AnimatedBuilder(
             animation: scaleAnim,
             builder: (context, child) => Transform.scale(scale: scaleAnim.value, child: child),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: ShapeDecoration(
-                color: Theme.of(context).colorScheme.primary,
+            child: Builder(builder: (ctx) {
+              final scheme = Theme.of(ctx).colorScheme;
+              final scaffoldBg = Theme.of(ctx).scaffoldBackgroundColor;
+              Color bg = scheme.primary;
+              // If primary is too close to scaffold background, fall back
+              bool similar(Color a, Color b) {
+                int dr = (a.red - b.red).abs();
+                int dg = (a.green - b.green).abs();
+                int db = (a.blue - b.blue).abs();
+                return (dr + dg + db) < 30; // very similar
+              }
+              if (similar(bg, scaffoldBg)) {
+                bg = scheme.primaryContainer;
+                if (similar(bg, scaffoldBg)) {
+                  bg = scheme.secondary;
+                }
+              }
+              final fg = ThemeData.estimateBrightnessForColor(bg) == Brightness.dark
+                  ? Colors.white
+                  : Colors.black87;
+              return Material(
+                color: bg,
                 shape: const StadiumBorder(),
-                shadows: [
-                  BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2)),
-                ],
-              ),
-              child: Text(
-                txt,
-                style: TextStyleHelper.instance.titleMediumInter.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-            ),
+                elevation: 3,
+                shadowColor: Colors.black.withOpacity(0.2),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Text(
+                    txt,
+                    style: TextStyleHelper.instance.titleMediumInter.copyWith(color: fg, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              );
+            }),
           ),
         ),
       );
     });
     overlay.insert(_timerPillEntry!);
     _timerPillTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      // If route changed away from wellness dashboard, remove immediately
+      final route = ModalRoute.of(context);
+      final currentName = route?.settings.name;
+      final isCurrent = route?.isCurrent ?? true;
+      if (currentName != '/wellness-dashboard' || !isCurrent) {
+        if (kDebugMode) {
+          try { debugPrint('[Pill][CLEANUP] route_changed current=' + (currentName ?? 'null') + ' isCurrent=' + isCurrent.toString() + ' questId=' + questId); } catch (_) {}
+        }
+        _removeTimerPill(forQuestId: questId);
+        return;
+      }
       if (_timerPillEndAt == null) return;
       if (DateTime.now().isAfter(_timerPillEndAt!)) {
         _removeTimerPill(forQuestId: questId);
@@ -671,6 +811,13 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
 
   void _removeTimerPill({String? forQuestId}) {
     if (forQuestId != null && _timerPillQuestId != null && _timerPillQuestId != forQuestId) return;
+    if (kDebugMode) {
+      try {
+        debugPrint('[Pill][REMOVE] questId=' + (forQuestId ?? _timerPillQuestId ?? 'null') +
+            ' hadTicker=' + (_timerPillTicker != null).toString() +
+            ' hadEntry=' + (_timerPillEntry != null).toString());
+      } catch (_) {}
+    }
     _timerPillTicker?.cancel();
     _timerPillTicker = null;
     _timerPillEndAt = null;
@@ -705,7 +852,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
               Text('Estimated ${durationMin} min', style: TextStyleHelper.instance.titleMediumInter.copyWith(color: const Color(0xFF6B7280))),
               const SizedBox(height: 16),
               Row(children: [
-                ElevatedButton(
+                Expanded(
+                  child: ElevatedButton(
                   onPressed: () async {
                     Navigator.of(ctx).pop();
                     try {
@@ -750,9 +898,11 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                     }
                   },
                   child: Text('Start ${durationMin} min'),
+                  ),
                 ),
                 const SizedBox(width: 12),
-                OutlinedButton(
+                Expanded(
+                  child: OutlinedButton(
                   onPressed: () async {
                     // Close the bottom sheet first so SnackBar is visible
                     Navigator.of(ctx).pop();
@@ -783,6 +933,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   },
                   child: const Text('Complete now'),
                 ),
+                ),
                 const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
@@ -802,7 +953,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     if (reduceMotion) return;
     final startGlobal = _globalCenterOf(sourceKey);
-    final overlayState = Overlay.of(context, rootOverlay: true);
+    // Use screen-scoped overlay so ring belongs to this screen
+    final overlayState = Overlay.of(context);
     if (startGlobal == null) return;
     final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
     if (overlayBox == null || !overlayBox.attached) return;
@@ -847,7 +999,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     final endGlobal = _globalCenterOf(_xpCardKey);
     if (startGlobal == null || endGlobal == null) return;
 
-    final overlayState = Navigator.of(context).overlay ?? Overlay.of(context, rootOverlay: true);
+    final overlayState = Navigator.of(context).overlay ?? Overlay.of(context);
 
     final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
     if (overlayBox == null || !overlayBox.attached) return;
@@ -956,6 +1108,15 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Ensure QA logs after first built frame exactly once
+    if (kDebugMode && !_qaLoggedOnce) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_qaLoggedOnce) {
+          _qaLoggedOnce = true;
+          _debugLogLayout();
+        }
+      });
+    }
     return Sizer(builder: (context, orientation, deviceType) {
       return SafeArea(
           child: Scaffold(
@@ -1170,8 +1331,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     // Pull durations for tasks from today's selection for accurate display
     final int? _task1Dur = _durationFor(_qTask1Id);
     final int? _task2Dur = _durationFor(_qTask2Id);
-    return Padding(
-        padding: EdgeInsets.symmetric(horizontal: 69.h).copyWith(bottom: 32.h),
+  return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 70.h).copyWith(bottom: 32.h),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Today\'s Recommendations',
               style: TextStyleHelper.instance.display32BoldInter.copyWith(
@@ -1260,89 +1421,41 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                 }
               }),
           SizedBox(height: 24.h),
-          // Card 2 (TASK)
-          RecommendationCardWidget(
-              containerKey: _task2CardKey,
-              category: 'TASK',
-              title: _task2Dur != null ? 'Study sprint (${_task2Dur} min)' : 'Study sprint',
-              subtitle: 'Timer + no‑phone rule',
-              imagePath: 'assets/images/quests/task_study.svg',
-              doneImagePath: 'assets/images/quests/task_study_done.svg',
-              completed: _task2Done,
-              onTap: () async {
-                if (_task2Done) return; // one-and-done; use Undo to revert
-                // Ensure engine is ready
-                if (_questsEngine == null) {
-                  await _initQuests();
-                }
-                final questId = _qTask2Id;
-                if (questId == null) {
+          // Card 2 (TASK) - show only when a second TASK exists today
+          if (_qTask2Id != null)
+            RecommendationCardWidget(
+                containerKey: _task2CardKey,
+                category: 'TASK',
+                title: _task2Dur != null ? 'Study sprint (${_task2Dur} min)' : 'Study sprint',
+                subtitle: 'Timer + no‑phone rule',
+                imagePath: 'assets/images/quests/task_study.svg',
+                doneImagePath: 'assets/images/quests/task_study_done.svg',
+                completed: _task2Done,
+                onTap: () async {
+                  if (_task2Done) return; // one-and-done; use Undo to revert
+                  // Ensure engine is ready
+                  if (_questsEngine == null) {
+                    await _initQuests();
+                  }
+                  final questId = _qTask2Id;
+                  if (questId == null) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Study sprint not available today')),);
+                    }
+                    return;
+                  }
+                  final dur = _durationFor(questId);
+                  if (dur != null && dur > 0) {
+                    await _openTimerSheet(questId: questId, cardKey: _task2CardKey, title: 'Study sprint', durationMin: dur);
+                    return;
+                  }
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Study sprint not available today')),);
+                      const SnackBar(content: Text('Study sprint duration missing')),);
                   }
                   return;
-                }
-                final dur = _durationFor(questId);
-                if (dur != null && dur > 0) {
-                  await _openTimerSheet(questId: questId, cardKey: _task2CardKey, title: 'Study sprint', durationMin: dur);
-                  return;
-                }
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Study sprint duration missing')),);
-                }
-                return;
-                final newVal = true;
-                setState(() { _task2Done = newVal; });
-                if (newVal && !_task2Popped) {
-                  HapticFeedback.lightImpact();
-                  SystemSound.play(SystemSoundType.click);
-                  if (_enableSoftXpPop) _showXpChipPop(_task2CardKey, amount: 10);
-                  _task2Popped = true;
-                  _showCheckRipple(_task2CardKey);
-                  // Teaser: show a short timer ring microinteraction
-                  _showTimerRing(_task2CardKey);
-                }
-                if (_questsEngine != null) {
-                  try {
-                    await _questsEngine!.markStart(questId);
-                    if (newVal) {
-                      await _questsEngine!.markComplete(questId);
-                    }
-                    if (kDebugMode) debugPrint('[QuestsEngine] toggled $questId completed=$newVal');
-                  } catch (e) {
-                    if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e');
-                  }
-                  await _refreshToday();
-                }
-                if (mounted) {
-                  final messenger = ScaffoldMessenger.of(context);
-                  messenger.hideCurrentSnackBar();
-                  messenger.showSnackBar(
-                    SnackBar(
-                      duration: const Duration(seconds: 5),
-                      content: const Text('Study sprint marked complete'),
-                      action: SnackBarAction(
-                        label: 'Undo',
-                        onPressed: () async {
-                          setState(() {
-                            _task2Done = false;
-                            _task2Popped = false;
-                          });
-                          final questId = _qTask2Id ?? 'task_study_sprint_v2';
-                          if (_questsEngine != null) {
-                            try {
-                              await _questsEngine!.uncompleteToday(questId);
-                            } catch (_) {}
-                          }
-                          await _refreshToday();
-                        },
-                      ),
-                    ),
-                  );
-                }
-              }),
+                }),
           SizedBox(height: 24.h),
           // Card 3 (RESOURCE)
           RecommendationCardWidget(
@@ -1366,8 +1479,16 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                     );
                   }
                 }
-                // Telemetry: impression/start/complete for resource
-                final questId = _qResId ?? 'resource_calm_music_v2';
+                // Telemetry: impression/start/complete for resource (only if present today)
+                final questId = _qResId;
+                if (questId == null) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Calm music not available today')),
+                    );
+                  }
+                  return;
+                }
                 if (_questsEngine != null) {
                   try {
                     await _questsEngine!.markImpression(questId);
@@ -1403,7 +1524,15 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                     );
                   }
                 }
-                final questId = _qTipId ?? 'tip_one_tiny_step_v2';
+                final questId = _qTipId;
+                if (questId == null) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Tip not available today')),
+                    );
+                  }
+                  return;
+                }
                 if (_questsEngine != null) {
                   try {
                     await _questsEngine!.markImpression(questId);
@@ -1422,7 +1551,14 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
             builder: (context) {
               final near = _isReminderNear();
               if (kDebugMode) {
-                debugPrint('[Reminder][near] now=$near on=$_reminderOn time=${_reminderTime.format(context)}');
+                final now = DateTime.now();
+                final shouldLog = (_lastReminderNear != near) ||
+                    (now.difference(_lastReminderLogAt).inSeconds >= 60);
+                if (shouldLog) {
+                  debugPrint('[Reminder][near] now=$near on=$_reminderOn time=${_reminderTime.format(context)}');
+                  _lastReminderNear = near;
+                  _lastReminderLogAt = now;
+                }
               }
               if (near && !_pulseController.isAnimating) {
                 _pulseController.repeat(reverse: true);
