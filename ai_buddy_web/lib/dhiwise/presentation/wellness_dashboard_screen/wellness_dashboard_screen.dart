@@ -218,6 +218,9 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   QuestsEngine? _questsEngine;
   // ignore: unused_field
   Map<String, dynamic>? _todayData; // {'todayItems': List<Quest>, 'progress': {stepsLeft, xpEarned}}
+
+  // RouteObserver subscription guard
+  bool _routeSubscribed = false;
   // IDs for the 4 displayed cards (derived from todayItems; UI copy remains static)
   String? _qTask1Id; // preferred: Focus reset variant
   String? _qTask2Id; // preferred: Study sprint variant
@@ -665,7 +668,13 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     final route = ModalRoute.of(context);
     if (route is PageRoute) {
       try {
+        // Avoid duplicate subscriptions across dependency changes
+        if (_routeSubscribed) {
+          routeObserver.unsubscribe(this);
+          _routeSubscribed = false;
+        }
         routeObserver.subscribe(this, route);
+        _routeSubscribed = true;
       } catch (_) {}
     }
   }
