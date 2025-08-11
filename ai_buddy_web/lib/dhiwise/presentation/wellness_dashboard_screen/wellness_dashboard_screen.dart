@@ -146,6 +146,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   Timer? _timerPillTicker;
   DateTime? _timerPillEndAt;
   String? _timerPillQuestId;
+  AnimationController? _timerPillAnim;
 
   // Compute global center of a widget by key
   Offset? _globalCenterOf(GlobalKey key) {
@@ -548,6 +549,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       final route = ModalRoute.of(context);
       if (route is PageRoute) {
         routeObserver.unsubscribe(this);
+        _routeSubscribed = false;
       }
     } catch (_) {}
     _removeTimerPill();
@@ -709,14 +711,16 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   // Start a floating timer pill anchored near the given card.
   void _startTimerPill({required GlobalKey cardKey, required String questId, required Duration total}) {
     _removeTimerPill();
-    // Only show pill on the wellness dashboard route
-    final routeName = ModalRoute.of(context)?.settings.name;
-    if (routeName != '/wellness-dashboard') {
+    // Only show pill on the wellness dashboard route and when current
+    final route = ModalRoute.of(context);
+    final routeName = route?.settings.name;
+    final isCurrent = route?.isCurrent ?? false;
+    if (routeName != '/wellness-dashboard' || !isCurrent) {
       return;
     }
     if (kDebugMode) {
       try {
-        debugPrint('[Pill][START] questId=' + questId + ' total=' + total.inMinutes.toString() + 'm route=' + (routeName ?? 'null'));
+        debugPrint('[Pill][START] questId=' + questId + ' total=' + total.inMinutes.toString() + 'm route=' + (routeName ?? 'null') + ' isCurrent=' + isCurrent.toString());
       } catch (_) {}
     }
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
@@ -728,12 +732,16 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     final centerLocal = overlayBox.globalToLocal(centerGlobal);
     _timerPillQuestId = questId;
     _timerPillEndAt = DateTime.now().add(total);
-    final controller = reduceMotion
-        ? null
-        : (AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true));
-    final scaleAnim = controller == null
+    // Prepare animation controller and scale tween
+    _timerPillAnim?.dispose();
+    _timerPillAnim = null;
+    if (!reduceMotion) {
+      _timerPillAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
+        ..repeat(reverse: true);
+    }
+    final Animation<double> scaleAnim = _timerPillAnim == null
         ? const AlwaysStoppedAnimation<double>(1.0)
-        : Tween<double>(begin: 0.98, end: 1.02).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
+        : Tween<double>(begin: 0.98, end: 1.02).animate(CurvedAnimation(parent: _timerPillAnim!, curve: Curves.easeInOut));
 
     String _fmt(Duration d) {
       final s = d.inSeconds.clamp(0, 24 * 3600);
@@ -815,7 +823,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
         _timerPillEntry?.markNeedsBuild();
       }
     });
-    controller?.addStatusListener((_) {});
+    _timerPillAnim?.addStatusListener((_) {});
   }
 
   void _removeTimerPill({String? forQuestId}) {
@@ -831,6 +839,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     _timerPillTicker = null;
     _timerPillEndAt = null;
     _timerPillQuestId = null;
+    _timerPillAnim?.dispose();
+    _timerPillAnim = null;
     _timerPillEntry?.remove();
     _timerPillEntry = null;
   }
