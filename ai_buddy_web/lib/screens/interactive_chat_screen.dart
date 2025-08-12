@@ -11,7 +11,8 @@ import '../core/utils/size_utils.dart';
 import '../widgets/app_bottom_nav.dart';
 
 class InteractiveChatScreen extends StatefulWidget {
-  const InteractiveChatScreen({super.key});
+  final bool showBottomNav;
+  const InteractiveChatScreen({super.key, this.showBottomNav = true});
 
   @override
   State<InteractiveChatScreen> createState() => _InteractiveChatScreenState();
@@ -232,7 +233,7 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
         ],
       ),
       // Bottom Navigation (shared)
-      bottomNavigationBar: const AppBottomNav(current: AppTab.talk),
+      bottomNavigationBar: widget.showBottomNav ? const AppBottomNav(current: AppTab.talk) : null,
     );
   }
 

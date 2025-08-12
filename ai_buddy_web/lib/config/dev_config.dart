@@ -5,7 +5,7 @@
 
 class DevConfig {
   // Development API URL
-  static const String devApiUrl = 'http://localhost:5055';
+  static const String devApiUrl = 'http://localhost:5050';
 
   // Development web port
   static const int devWebPort = 8080;

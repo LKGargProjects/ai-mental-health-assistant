@@ -42,16 +42,14 @@ class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
     // Decide tint color heuristically by category/path and completion state
     final cat = widget.category.toLowerCase();
     final path = (widget.completed && widget.doneImagePath != null) ? widget.doneImagePath! : widget.imagePath;
-    final p = path.toLowerCase();
     bool isAssess = cat.contains('assess');
-    bool isMusic = p.contains('music');
     // Policy:
     // - Only Assess keeps overall tint (tertiary) for the whole SVG.
     // - For Task/Resource/Tip, do NOT tint the whole SVG (keep original colors).
     // - For completed tasks, overlay a green check badge instead of tinting the SVG.
     Color? tint = isAssess ? theme.colorScheme.tertiary : null;
-    // Ensure music icon is clearly visible on Android by forcing a neutral stroke color
-    final Color? iconColor = isMusic ? const Color(0xFF4A5261) : tint;
+    // Icons use their own stroke colors; avoid forcing a tint to keep parity with task icons
+    final Color? iconColor = tint;
     return Material(
       color: const Color(0xFFFEFEFE),
       borderRadius: radius,
@@ -122,19 +120,18 @@ class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
                   SizedBox(width: 24.h),
                   Container(
                     decoration: BoxDecoration(
-                      color: isMusic ? const Color(0xFFF7F9FC) : null,
                       borderRadius: BorderRadius.circular(19.h),
                     ),
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
                         Padding(
-                          padding: EdgeInsets.all(isMusic ? 10.h : 0),
+                          padding: EdgeInsets.all(0),
                           child: _IconRenderable(
                             path: path,
                             width: 104.h,
                             height: 104.h,
-                            fit: isMusic ? BoxFit.contain : BoxFit.cover,
+                            fit: BoxFit.cover,
                             color: iconColor,
                             borderRadius: BorderRadius.circular(19.h),
                           ),

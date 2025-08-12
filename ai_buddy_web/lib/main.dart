@@ -16,6 +16,9 @@ import 'providers/assessment_provider.dart';
 import 'providers/task_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/quest_provider.dart';
+import 'navigation/route_observer.dart';
+import 'navigation/home_shell.dart';
+import 'widgets/app_bottom_nav.dart' show AppTab;
 
 void main() {
   runApp(const MyApp());
@@ -49,8 +52,14 @@ class MyApp extends StatelessWidget {
                 ),
                 useMaterial3: true,
               ),
+              navigatorObservers: [routeObserver],
               home: const WelcomeScreen(),
               routes: {
+                '/home': (context) {
+                  final args = ModalRoute.of(context)?.settings.arguments;
+                  final initial = (args is AppTab) ? args : AppTab.talk;
+                  return HomeShell(initialTab: initial);
+                },
                 '/main': (context) => const MainScreen(),
                 '/dhiwise-chat': (context) => const MentalHealthChatScreen(),
                 '/preview-quest': (context) => const QuestPreviewScreen(),

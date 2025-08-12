@@ -36,7 +36,8 @@ const Duration kRingDuration = Duration(milliseconds: 520);
 const Curve kRingCurve = Curves.easeOutCubic;
 
 class WellnessDashboardScreen extends StatefulWidget {
-  WellnessDashboardScreen({Key? key}) : super(key: key);
+  final bool showBottomNav;
+  WellnessDashboardScreen({Key? key, this.showBottomNav = true}) : super(key: key);
 
   @override
   State<WellnessDashboardScreen> createState() => _WellnessDashboardScreenState();
@@ -678,13 +679,16 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   // Start a floating timer pill anchored near the given card.
   void _startTimerPill({required GlobalKey cardKey, required String questId, required Duration total}) {
     _removeTimerPill();
-    // Only show pill on the wellness dashboard route and when current
+    // Only show pill when this screen is visible.
+    // If used standalone (showBottomNav=true), require route '/wellness-dashboard' and current.
+    // If used inside HomeShell (showBottomNav=false), we are on '/home'; allow when current.
     final route = ModalRoute.of(context);
     final routeName = route?.settings.name;
     final isCurrent = route?.isCurrent ?? false;
-    if (routeName != '/wellness-dashboard' || !isCurrent) {
-      return;
-    }
+    final bool allow = widget.showBottomNav
+        ? (routeName == '/wellness-dashboard' && isCurrent)
+        : isCurrent;
+    if (!allow) return;
     if (kDebugMode) {
       try {
         debugPrint('[Pill][START] questId=' + questId + ' total=' + total.inMinutes.toString() + 'm route=' + (routeName ?? 'null') + ' isCurrent=' + isCurrent.toString());
@@ -772,11 +776,14 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     });
     overlay.insert(_timerPillEntry!);
     _timerPillTicker = Timer.periodic(const Duration(seconds: 1), (_) {
-      // If route changed away from wellness dashboard, remove immediately
+      // If screen no longer visible, remove immediately
       final route = ModalRoute.of(context);
       final currentName = route?.settings.name;
       final isCurrent = route?.isCurrent ?? true;
-      if (currentName != '/wellness-dashboard' || !isCurrent) {
+      final bool stillVisible = widget.showBottomNav
+          ? (currentName == '/wellness-dashboard' && isCurrent)
+          : isCurrent;
+      if (!stillVisible) {
         if (kDebugMode) {
           try { debugPrint('[Pill][CLEANUP] route_changed current=' + (currentName ?? 'null') + ' isCurrent=' + isCurrent.toString() + ' questId=' + questId); } catch (_) {}
         }
@@ -1230,7 +1237,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   ])),
             ]),
           ),
-          bottomNavigationBar: const AppBottomNav(current: AppTab.quest));
+          bottomNavigationBar: widget.showBottomNav ? AppBottomNav(current: AppTab.quest) : null);
     });
   }
 

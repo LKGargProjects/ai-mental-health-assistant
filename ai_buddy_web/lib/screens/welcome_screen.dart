@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'interactive_chat_screen.dart';
+import '../widgets/app_bottom_nav.dart' show AppTab;
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -48,7 +49,7 @@ class WelcomeScreen extends StatelessWidget {
               // Quick access to Wellness Dashboard (DhiWise)
               ElevatedButton.icon(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/wellness-dashboard');
+                  Navigator.pushNamed(context, '/home', arguments: AppTab.quest);
                 },
                 icon: const Icon(Icons.emoji_events_outlined),
                 label: const Text('Open Wellness Dashboard'),
@@ -62,7 +63,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/main');
+                  Navigator.pushNamed(context, '/home');
                 },
                 child: const Text(
                   'Get Started',

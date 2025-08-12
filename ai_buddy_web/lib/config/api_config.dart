@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 class ApiConfig {
   // Development - use local backend for testing
-  static const String localUrl = 'http://localhost:5055';
+  static const String localUrl = 'http://localhost:5050';
 
   // Production (Render)
   static const String productionUrl =

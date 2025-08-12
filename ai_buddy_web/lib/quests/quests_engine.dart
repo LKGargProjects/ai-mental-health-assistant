@@ -256,7 +256,21 @@ class QuestsEngine {
       return slice[rng.nextInt(slice.length)];
     }
 
-    addIfNotNull(pickTask());
+    // Ensure at least two TASKs when available for consistent UI (two task cards)
+    final t1 = pickTask();
+    addIfNotNull(t1);
+    if (tasks.length > 1) {
+      // build a second-pick pool excluding t1
+      final pool2 = tasks.where((q) => q.id != (t1?.id ?? '')).toList();
+      if (pool2.isNotEmpty) {
+        pool2.sort((a, b) => (taskUse[a.id] ?? 0).compareTo(taskUse[b.id] ?? 0));
+        final slice2 = pool2.take(min(4, pool2.length)).toList();
+        final t2 = slice2[rng.nextInt(slice2.length)];
+        addIfNotNull(t2);
+      }
+    }
+
+    // Category coverage: at least one TIP/RESOURCE and one CHECK-IN/PROGRESS
     addIfNotNull(pickOne(tipsOrRes, (_) => true));
     addIfNotNull(pickOne(checkOrProg, (_) => true));
 

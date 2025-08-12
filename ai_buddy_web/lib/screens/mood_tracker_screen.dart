@@ -9,7 +9,8 @@ import '../widgets/dhiwise/custom_image_view.dart';
 import '../widgets/app_bottom_nav.dart';
 
 class MoodTrackerScreen extends StatelessWidget {
-  const MoodTrackerScreen({super.key});
+  final bool showBottomNav;
+  const MoodTrackerScreen({super.key, this.showBottomNav = true});
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +76,7 @@ class MoodTrackerScreen extends StatelessWidget {
         ],
       ),
       // Bottom Navigation (shared)
-      bottomNavigationBar: const AppBottomNav(current: AppTab.mood),
+      bottomNavigationBar: showBottomNav ? const AppBottomNav(current: AppTab.mood) : null,
     );
   }
 }
