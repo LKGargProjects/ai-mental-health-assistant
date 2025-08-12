@@ -71,7 +71,6 @@ class _RingPainter extends CustomPainter {
     final sweep = (2 * 3.1415926535) * progress.clamp(0.0, 1.0);
     canvas.drawArc(rect, -3.1415926535 / 2, sweep, false, fg);
   }
-
   @override
   bool shouldRepaint(covariant _RingPainter oldDelegate) {
     return oldDelegate.center != center ||
@@ -128,8 +127,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   bool _reminderOn = true; // UI-only reminder toggle (default ON)
   TimeOfDay _reminderTime = const TimeOfDay(hour: 19, minute: 0);
 
-  // DEBUG QA: ensure layout/quest snapshot logs at least once per mount
-  bool _qaLoggedOnce = false;
+  // DEBUG QA hooks removed post-verification
 
   // Debug log throttling for reminder prints
   DateTime _lastReminderLogAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -194,10 +192,11 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   final GlobalKey _resCardKey = GlobalKey();
   final GlobalKey _tipCardKey = GlobalKey();
   final GlobalKey _xpCardKey = GlobalKey();
+  // Start button key for microinteraction pill
+  final GlobalKey _startBtnKey = GlobalKey();
 
   // Guard to ensure chip pop occurs only once per task per session
-  bool _task1Popped = false;
-  bool _task2Popped = false;
+  // (Removed) _task1Popped was used for a local chip-pop guard; no longer needed.
 
   // Habit formation microcopy (rotates while active)
   final List<String> _microcopy = const [
@@ -215,9 +214,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   late AnimationController _pulseController;
 
   // Week 0 QuestsEngine (minimal glue, no UI changes)
-  // ignore: unused_field
   QuestsEngine? _questsEngine;
-  // ignore: unused_field
   Map<String, dynamic>? _todayData; // {'todayItems': List<Quest>, 'progress': {stepsLeft, xpEarned}}
 
   // RouteObserver subscription guard
@@ -234,7 +231,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   // Daily first-use keys
   static const _prefsTipPopDate = 'xp_pop_tip_date_v1';
   static const _prefsResPopDate = 'xp_pop_res_date_v1';
-  // Removed unused debug-only helpers and constants post-verification
 
   Future<void> _loadReminderPrefs() async {
     try {
@@ -300,33 +296,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     controller.addListener(() { entry.markNeedsBuild(); });
     controller.addStatusListener((s) { if (s == AnimationStatus.completed) { entry.remove(); controller.dispose(); } });
     controller.forward();
-  }
-
-  // DEBUG ONLY: Log if key sections share the same horizontal padding and current quest IDs/durations
-  void _debugLogLayout() {
-    if (!kDebugMode) return;
-    try {
-      // Resolve 70.h to a concrete double (Sizer provides .h as a scaling unit)
-      final double pad70 = 70.h;
-      // Sections expected to use 70.h gutters:
-      final quickIn = EdgeInsets.symmetric(horizontal: 70.h).horizontal;
-      final progress = EdgeInsets.symmetric(horizontal: 70.h).horizontal;
-      final recs = EdgeInsets.symmetric(horizontal: 70.h).horizontal;
-      final same = (quickIn == progress) && (progress == recs);
-      debugPrint('[QA][Layout] pad70.h=$pad70, equalGutters=$same (quick=$quickIn, progress=$progress, recs=$recs)');
-
-      // Today selection snapshot
-      final items = (_todayData?['todayItems'] as List?)?.length ?? 0;
-      final resId = _qResId;
-      final tipId = _qTipId;
-      final t1 = _qTask1Id;
-      final t2 = _qTask2Id;
-      final d1 = _durationFor(t1);
-      final d2 = _durationFor(t2);
-      debugPrint('[QA][Quests] todayItems=$items resId=$resId tipId=$tipId task1=$t1($d1 m) task2=$t2($d2 m)');
-    } catch (e) {
-      debugPrint('[QA][Layout][ERROR] $e');
-    }
   }
 
   Future<void> _saveReminderPrefs() async {
@@ -657,8 +626,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       // after first frame so keys are mounted
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _debugRunReminderSelfTestOnce();
-        // DEBUG ONLY: auto-check paddings and quest IDs once on first frame
-        _debugLogLayout();
       });
     });
   }
@@ -1125,24 +1092,108 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Ensure QA logs after first built frame exactly once
-    if (kDebugMode && !_qaLoggedOnce) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_qaLoggedOnce) {
-          _qaLoggedOnce = true;
-          _debugLogLayout();
-        }
+  // Quick Check-in: show a small "Start" pill above the Start button
+  void _showStartPill(GlobalKey sourceKey) {
+    final centerGlobal = _globalCenterOf(sourceKey);
+    if (centerGlobal == null) return;
+
+    final overlayState = Navigator.of(context).overlay ?? Overlay.of(context);
+    final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
+    if (overlayBox == null || !overlayBox.attached) return;
+
+    final size = overlayBox.size;
+    final center = overlayBox.globalToLocal(centerGlobal);
+
+    // Respect reduce-motion: still show but without scale animation
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 360),
+    );
+    final fade = CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeOutCubic,
+    );
+    final scale = Tween<double>(begin: 0.92, end: 1.0)
+        .chain(CurveTween(curve: Curves.easeOutBack))
+        .animate(controller);
+
+    // Position slightly above the button center
+    double left = center.dx - 36; // approx half of pill width
+    double top = center.dy - 56;  // above the button
+    left = left.clamp(4.0, size.width - 120.0);
+    top = top.clamp(4.0, size.height - 36.0);
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(builder: (ctx) {
+      final primary = Theme.of(context).colorScheme.primary;
+      return Positioned(
+        left: left,
+        top: top,
+        child: IgnorePointer(
+          ignoring: true,
+          child: Opacity(
+            opacity: reduceMotion ? 1.0 : fade.value.clamp(0.0, 1.0),
+            child: Transform.scale(
+              scale: reduceMotion ? 1.0 : scale.value,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: primary,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primary.withOpacity(0.22),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  'Start',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+
+    overlayState.insert(entry);
+    if (!reduceMotion) {
+      controller.addListener(() => entry.markNeedsBuild());
+      controller.forward().whenComplete(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+        entry.remove();
+        controller.dispose();
+      });
+    } else {
+      // Briefly show then remove
+      Future<void>.delayed(const Duration(milliseconds: 400)).then((_) {
+        if (entry.mounted) entry.remove();
       });
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Build
     return Sizer(builder: (context, orientation, deviceType) {
-      return SafeArea(
-          child: Scaffold(
-            body: Stack(children: [
+      return Scaffold(
+          body: SafeArea(
+            top: true,
+            bottom: false,
+            child: Stack(children: [
               // Background Image (use full viewport like chat/mood)
               CustomImageView(
-                  imagePath: ImageConstant.imgBackground1440x6351,
+                  imagePath: ImageConstant.imgBackground1440x635,
                   height: MediaQuery.of(context).size.height,
                   width: MediaQuery.of(context).size.width,
                   fit: BoxFit.cover),
@@ -1152,21 +1203,12 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   height: MediaQuery.of(context).size.height,
                   width: MediaQuery.of(context).size.width,
                   child: Stack(children: [
-                    // Side Background
-                    Positioned(
-                        left: 0,
-                        top: 0,
-                        child: CustomImageView(
-                            imagePath: ImageConstant.imgBackground,
-                            height: 635.h,
-                            width: 3.h,
-                            fit: BoxFit.cover)),
 
                     // Main Content
                     SingleChildScrollView(
+                        padding: EdgeInsets.only(bottom: kBottomNavigationBarHeight + 16.0),
                         child: Padding(
-                            padding: EdgeInsets.all(
-                                0), // Modified: Added required padding parameter
+                            padding: EdgeInsets.zero,
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1187,7 +1229,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                             fit: BoxFit.cover)),
                   ])),
             ]),
-            bottomNavigationBar: const AppBottomNav(current: AppTab.quest)));
+          ),
+          bottomNavigationBar: const AppBottomNav(current: AppTab.quest));
     });
   }
 
@@ -1227,8 +1270,16 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
         margin: EdgeInsets.symmetric(horizontal: 70.h)
             .copyWith(top: 64.h, bottom: 32.h),
         decoration: BoxDecoration(
-            color: Color(0xFFE3ECEF),
-            borderRadius: BorderRadius.circular(28.h)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28.h),
+            border: Border.all(color: const Color(0xFFE0E6EE)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ]),
         padding: EdgeInsets.symmetric(horizontal: 32.h, vertical: 44.h),
         child: Column(children: [
           // Large prompt card title
@@ -1248,17 +1299,21 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   color: Color(0xFF8C9CAA))),
           SizedBox(height: 32.h),
           CustomButton(
+              key: _startBtnKey,
               text: 'Start',
-              backgroundColor: Colors.white,
-              textColor: Color(0xFF5A616F),
-              borderColor: Color(0xFFF1F5F7),
-              showBorder: true,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              textColor: Colors.white,
+              borderColor: Colors.transparent,
+              showBorder: false,
               padding: EdgeInsets.symmetric(horizontal: 48.h, vertical: 24.h),
               borderRadius: 37.h,
               textStyle: TextStyleHelper.instance.headline25BoldInter.copyWith(
                   fontFamily: CoreTextStyles
                       .TextStyleHelper.instance.headline24Bold.fontFamily),
-              onPressed: () {
+              onPressed: () async {
+                HapticFeedback.selectionClick();
+                await Future<void>.delayed(const Duration(milliseconds: 220));
+                if (!mounted) return;
                 showDialog(
                   context: context,
                   barrierDismissible: false, // keep user on quest screen; use X to close
@@ -1390,46 +1445,29 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   await _openTimerSheet(questId: questId, cardKey: _task1CardKey, title: 'Focus reset', durationMin: dur);
                   return;
                 }
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Focus duration missing')),);
-                }
-                return;
-                final newVal = true;
-                setState(() { _task1Done = newVal; });
-                if (newVal && !_task1Popped) {
-                  HapticFeedback.lightImpact();
-                  SystemSound.play(SystemSoundType.click);
-                  if (_enableSoftXpPop) _showXpChipPop(_task1CardKey, amount: 10);
-                  _task1Popped = true;
-                  _showCheckRipple(_task1CardKey);
-                }
-                if (_questsEngine != null) {
-                  try {
-                    await _questsEngine!.markStart(questId);
-                    if (newVal) { await _questsEngine!.markComplete(questId); }
-                  } catch (e) { if (kDebugMode) debugPrint('[QuestsEngine][ERROR] $e'); }
-                  await _refreshToday();
-                }
+                 if (mounted) {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                     const SnackBar(content: Text('Focus duration missing')),);
+                 }
+                 return;
                 // Short undo window via SnackBar
-                if (mounted) {
-                  final messenger = ScaffoldMessenger.of(context);
-                  messenger.hideCurrentSnackBar();
-                  messenger.showSnackBar(
-                    SnackBar(
-                      duration: const Duration(seconds: 5),
-                      content: const Text('Focus reset marked complete'),
-                      action: SnackBarAction(
-                        label: 'Undo',
-                        onPressed: () async {
-                          setState(() {
-                            _task1Done = false;
-                            _task1Popped = false; // allow chip on re-complete
-                          });
-                          final questId = _qTask1Id ?? 'task_focus_reset_v2';
-                          if (_questsEngine != null) {
-                            try {
-                              await _questsEngine!.uncompleteToday(questId);
+                 if (mounted) {
+                   final messenger = ScaffoldMessenger.of(context);
+                   messenger.hideCurrentSnackBar();
+                   messenger.showSnackBar(
+                     SnackBar(
+                       duration: const Duration(seconds: 5),
+                       content: const Text('Focus reset marked complete'),
+                       action: SnackBarAction(
+                         label: 'Undo',
+                         onPressed: () async {
+                           setState(() {
+                             _task1Done = false;
+                           });
+                           final questId = _qTask1Id ?? 'task_focus_reset_v2';
+                           if (_questsEngine != null) {
+                             try {
+                               await _questsEngine!.uncompleteToday(questId);
                             } catch (_) {}
                           }
                           await _refreshToday();
