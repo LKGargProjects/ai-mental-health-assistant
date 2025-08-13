@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'quest_screen.dart';
 import '../dhiwise_export/lokesh_s_application 2/lib/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
 import '../dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
+import '../widgets/app_back_button.dart';
 
 class QuestTabScreen extends StatefulWidget {
   const QuestTabScreen({Key? key}) : super(key: key);
@@ -31,6 +32,18 @@ class _QuestTabScreenState extends State<QuestTabScreen> with SingleTickerProvid
       appBar: AppBar(
         title: const Text('Quest & Wellness', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (ctx) {
+            final canPop = Navigator.of(ctx).canPop();
+            final route = ModalRoute.of(ctx);
+            final isModal = route is PageRoute && route.fullscreenDialog == true;
+            if (canPop) {
+              return AppBackButton(isModal: isModal);
+            }
+            return const SizedBox.shrink();
+          },
+        ),
         bottom: TabBar(
           controller: _tabController,
           labelColor: Theme.of(context).primaryColor,

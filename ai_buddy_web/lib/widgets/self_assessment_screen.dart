@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ai_buddy_web/providers/assessment_provider.dart';
+import './app_back_button.dart';
 
 class SelfAssessmentScreen extends StatefulWidget {
   const SelfAssessmentScreen({super.key});
@@ -46,6 +47,18 @@ class _SelfAssessmentScreenState extends State<SelfAssessmentScreen> {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (ctx) {
+            final canPop = Navigator.of(ctx).canPop();
+            final route = ModalRoute.of(ctx);
+            final isModal = route is PageRoute && route.fullscreenDialog == true;
+            if (canPop) {
+              return AppBackButton(isModal: isModal);
+            }
+            return const SizedBox.shrink();
+          },
+        ),
       ),
       body: PageView.builder(
         controller: _pageController,

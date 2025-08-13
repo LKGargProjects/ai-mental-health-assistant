@@ -2,50 +2,44 @@
 import 'package:flutter/material.dart';
 import '../widgets/mood_tracker.dart';
 import '../core/utils/size_utils.dart';
-import '../core/utils/image_constant.dart';
 import '../theme/theme_helper.dart';
 import '../theme/text_style_helper.dart';
-import '../widgets/dhiwise/custom_image_view.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../widgets/app_back_button.dart';
+import '../widgets/keyboard_dismissible_scaffold.dart';
 
 class MoodTrackerScreen extends StatelessWidget {
   final bool showBottomNav;
-  const MoodTrackerScreen({super.key, this.showBottomNav = true});
+  final ValueNotifier<int>? reselect; // currently unused; reserved for scroll/refresh on re-tap
+  const MoodTrackerScreen({super.key, this.showBottomNav = true, this.reselect});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Background Image (same as chat)
-          CustomImageView(
-            imagePath: ImageConstant.imgBackground1440x635,
-            height: MediaQuery.of(context).size.height,
-            width: MediaQuery.of(context).size.width,
-            fit: BoxFit.cover,
-          ),
-          // Main Content
-          Column(
+    return KeyboardDismissibleScaffold(
+      safeTop: false,
+      safeBottom: false,
+      bottomNavigationBar: showBottomNav ? const AppBottomNav(current: AppTab.mood) : null,
+      body: Column(
             children: [
               // Header
               Container(
                 color: appTheme.whiteCustom,
                 padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
                 child: SafeArea(
+                  top: true,
+                  bottom: false,
                   child: Row(
                     children: [
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).pop();
+                      Builder(
+                        builder: (ctx) {
+                          final canPop = Navigator.of(ctx).canPop();
+                          final route = ModalRoute.of(ctx);
+                          final isModal = route is PageRoute && route.fullscreenDialog == true;
+                          if (canPop) {
+                            return AppBackButton(isModal: isModal);
+                          }
+                          return SizedBox(width: 44.h);
                         },
-                        child: Container(
-                          padding: EdgeInsets.all(8.h),
-                          child: CustomImageView(
-                            imagePath: ImageConstant.imgImage,
-                            height: 24.h,
-                            width: 16.h,
-                          ),
-                        ),
                       ),
                       Expanded(
                         child: Text(
@@ -54,7 +48,7 @@ class MoodTrackerScreen extends StatelessWidget {
                           style: TextStyleHelper.instance.headline24Bold,
                         ),
                       ),
-                      SizedBox(width: 48.h), // Balance the back button
+                      SizedBox(width: 44.h), // balance
                     ],
                   ),
                 ),
@@ -72,11 +66,7 @@ class MoodTrackerScreen extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ],
       ),
-      // Bottom Navigation (shared)
-      bottomNavigationBar: showBottomNav ? const AppBottomNav(current: AppTab.mood) : null,
     );
   }
 }

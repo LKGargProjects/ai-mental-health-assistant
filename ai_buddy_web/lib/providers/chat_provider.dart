@@ -9,6 +9,7 @@ class ChatProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   bool _hasShownGreeting = false; // Track if greeting has been shown
+  bool _isTyping = false; // AI typing indicator state
 
   ChatProvider() : _apiService = ApiService() {
     _loadChatHistory();
@@ -17,6 +18,7 @@ class ChatProvider extends ChangeNotifier {
   List<Message> get messages => List.unmodifiable(_messages);
   bool get isLoading => _isLoading;
   String? get error => _error;
+  bool get isTyping => _isTyping;
 
   Future<void> _loadChatHistory() async {
     _isLoading = true;
@@ -64,26 +66,58 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> sendMessage(String content, {String? country}) async {
     if (content.trim().isEmpty) return;
-
-    _isLoading = true;
     _error = null;
+
+    // Optimistic UI: show user's message immediately and turn on typing indicator
+    final userMessage = Message(content: content, isUser: true);
+    _messages.add(userMessage);
+    _isTyping = true;
     notifyListeners();
 
     try {
-      // Test backend connectivity first
+      // Test backend connectivity and ensure session
       await _testBackendConnection();
-
-      // Ensure session exists
       await _setupSession();
 
-      // Send message to backend first with optional country parameter
+      // Send to backend with optional country parameter
       final aiMessage = await _apiService.sendMessage(content, country: country);
 
-      // Only add user message to UI after backend successfully processes it
-      final userMessage = Message(content: content, isUser: true);
-      _messages.add(userMessage);
-      _messages.add(aiMessage);
+      // Progressive render: create an empty AI message and stream in chunks
+      final streaming = Message(
+        content: '',
+        isUser: false,
+        type: aiMessage.type,
+        riskLevel: aiMessage.riskLevel,
+        crisisMsg: aiMessage.crisisMsg,
+        crisisNumbers: aiMessage.crisisNumbers,
+      );
+      _messages.add(streaming);
       _error = null;
+      notifyListeners();
+
+      // Prepare chunks: prefer newline-based lines; if single line, split by sentence-ish boundaries
+      final full = aiMessage.content;
+      final lines = full.contains('\n')
+          ? full.split('\n')
+          : _splitIntoSentences(full);
+
+      // Reveal lines with natural timing
+      for (var i = 0; i < lines.length; i++) {
+        final line = lines[i];
+        // Respect empty lines too for structure
+        streaming.content += (i == 0 ? '' : '\n') + line;
+        // First chunk: turn off typing indicator
+        if (_isTyping) _isTyping = false;
+        notifyListeners();
+        // Delay proportional to line length with sane bounds
+        final ms = (line.trim().length * 15).clamp(120, 600);
+        await Future.delayed(Duration(milliseconds: ms));
+      }
+      // In case there were zero chunks, ensure typing is off
+      if (_isTyping) {
+        _isTyping = false;
+        notifyListeners();
+      }
     } on DioException catch (e) {
       print('🚨 DIO Exception in sendMessage:');
       print('   Type: ${e.type}');
@@ -91,22 +125,16 @@ class ChatProvider extends ChangeNotifier {
       print('   Status Code: ${e.response?.statusCode}');
       print('   Response Data: ${e.response?.data}');
 
-      String errorMessage = _apiService.getErrorMessage(e);
+      final String errorMessage = _apiService.getErrorMessage(e);
       _error = errorMessage;
 
-      // Add user message even if backend fails
-      _messages.add(Message(content: content, isUser: true));
-
-      // Add error message
+      // Add error message bubble (user message already added above)
       _messages.add(
         Message(content: errorMessage, isUser: false, type: MessageType.error),
       );
     } catch (e) {
       print('❌ Unexpected error in sendMessage: $e');
       _error = 'An unexpected error occurred. Please try again.';
-
-      // Add user message even if backend fails
-      _messages.add(Message(content: content, isUser: true));
 
       _messages.add(
         Message(
@@ -119,6 +147,17 @@ class ChatProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Split a paragraph into sentence-like chunks for smoother progressive rendering
+  List<String> _splitIntoSentences(String text) {
+    final regex = RegExp(r'(?<=[.!?])\s+');
+    final parts = text.split(regex).where((s) => s.isNotEmpty).toList();
+    // Fallback: if still one long part, split by commas to add a bit more granularity
+    if (parts.length <= 1 && text.contains(',')) {
+      return text.split(',').map((e) => e.trim()).where((s) => s.isNotEmpty).toList();
+    }
+    return parts;
   }
 
   Future<void> _testBackendConnection() async {

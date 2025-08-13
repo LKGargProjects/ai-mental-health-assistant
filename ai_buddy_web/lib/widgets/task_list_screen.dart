@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
+import './app_back_button.dart';
 
 class TaskListScreen extends StatelessWidget {
   const TaskListScreen({super.key});
@@ -13,6 +14,18 @@ class TaskListScreen extends StatelessWidget {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (ctx) {
+            final canPop = Navigator.of(ctx).canPop();
+            final route = ModalRoute.of(ctx);
+            final isModal = route is PageRoute && route.fullscreenDialog == true;
+            if (canPop) {
+              return AppBackButton(isModal: isModal);
+            }
+            return const SizedBox.shrink();
+          },
+        ),
       ),
       body: Consumer<TaskProvider>(
         builder: (context, taskProvider, child) {

@@ -6,7 +6,7 @@ enum RiskLevel { none, low, medium, high }
 
 class Message {
   final String id;
-  final String content;
+  String content;
   final bool isUser;
   final DateTime timestamp;
   final MessageType type;

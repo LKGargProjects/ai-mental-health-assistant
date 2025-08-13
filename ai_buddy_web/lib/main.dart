@@ -1,5 +1,4 @@
 import 'package:ai_buddy_web/screens/main_screen.dart';
-import 'package:ai_buddy_web/screens/welcome_screen.dart';
 import 'package:ai_buddy_web/screens/dhiwise_chat_screen.dart';
 import 'package:ai_buddy_web/screens/interactive_chat_screen.dart';
 import 'package:ai_buddy_web/screens/quest_preview_screen.dart';
@@ -53,7 +52,7 @@ class MyApp extends StatelessWidget {
                 useMaterial3: true,
               ),
               navigatorObservers: [routeObserver],
-              home: const WelcomeScreen(),
+              home: HomeShell(initialTab: AppTab.talk),
               routes: {
                 '/home': (context) {
                   final args = ModalRoute.of(context)?.settings.arguments;

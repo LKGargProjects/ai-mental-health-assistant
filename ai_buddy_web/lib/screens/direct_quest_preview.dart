@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:ai_buddy_web/providers/quest_provider.dart';
+import '../widgets/app_back_button.dart';
 
 class DirectQuestPreview extends StatelessWidget {
   const DirectQuestPreview({super.key});
@@ -32,6 +31,18 @@ class QuestPreviewScreen extends StatelessWidget {
         title: const Text('Quest Screen Preview'),
         backgroundColor: const Color(0xFF667EEA),
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (ctx) {
+            final canPop = Navigator.of(ctx).canPop();
+            final route = ModalRoute.of(ctx);
+            final isModal = route is PageRoute && route.fullscreenDialog == true;
+            if (canPop) {
+              return AppBackButton(isModal: isModal, iconColor: Colors.white);
+            }
+            return const SizedBox.shrink();
+          },
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

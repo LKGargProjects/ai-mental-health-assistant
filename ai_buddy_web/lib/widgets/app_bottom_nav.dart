@@ -17,7 +17,7 @@ class AppBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final double vPad = bottomInset > 0 ? 6.0 : 10.0; // sit lower when inset exists
-    const bool kActiveLabelOnlyDemo = true; // demo: show label only for active tab
+    const bool kActiveLabelOnlyDemo = false; // labels always shown (keep note for future option)
 
     return Material(
       color: Colors.white,
@@ -25,7 +25,7 @@ class AppBottomNav extends StatelessWidget {
       surfaceTintColor: Colors.transparent, // avoid M3 overlay tint
       child: Padding(
         // shave a few pixels so it visually sits lower without overlapping gestures
-        padding: EdgeInsets.only(bottom: (bottomInset - 8).clamp(0.0, 100.0)),
+        padding: EdgeInsets.only(bottom: (bottomInset - 12).clamp(0.0, 100.0)),
         child: SafeArea(
           top: false,
           bottom: false,
@@ -57,14 +57,7 @@ class AppBottomNav extends StatelessWidget {
           try { HapticFeedback.selectionClick(); } catch (_) {}
         }
         if (tab == current) {
-          if (onReselect != null) {
-            onReselect!(tab);
-          } else {
-            // Demo fallback: brief message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Re-tap: ' + label), duration: const Duration(milliseconds: 600)),
-            );
-          }
+          if (onReselect != null) onReselect!(tab);
           return;
         }
         if (onTap != null) {

@@ -1,6 +1,5 @@
 import 'package:ai_buddy_web/screens/chat_screen.dart';
 import 'package:ai_buddy_web/screens/mood_tracker_screen.dart';
-import 'package:ai_buddy_web/screens/settings_screen.dart';
 import 'package:ai_buddy_web/dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
 import '../dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
 import 'package:flutter/material.dart';
@@ -21,7 +20,6 @@ class _MainScreenState extends State<MainScreen> {
     DhiwiseSizer.Sizer(
       builder: (context, orientation, deviceType) => WellnessDashboardScreen(),
     ),
-    const SettingsScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -83,10 +81,6 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.emoji_events),
             label: 'Quest',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
           ),
         ],
         currentIndex: _selectedIndex,

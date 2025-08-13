@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/app_back_button.dart';
 
 class QuestPreviewScreen extends StatelessWidget {
   const QuestPreviewScreen({super.key});
@@ -8,9 +9,17 @@ class QuestPreviewScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quest Screen Preview'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (ctx) {
+            final canPop = Navigator.of(ctx).canPop();
+            final route = ModalRoute.of(ctx);
+            final isModal = route is PageRoute && route.fullscreenDialog == true;
+            if (canPop) {
+              return AppBackButton(isModal: isModal);
+            }
+            return const SizedBox.shrink();
+          },
         ),
       ),
       body: SingleChildScrollView(
@@ -69,7 +78,7 @@ class QuestPreviewScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.2),
+                    color: color.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(icon, color: color, size: 24),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/quest_provider.dart';
 import '../models/quest.dart';
+import '../widgets/app_back_button.dart';
 
 class QuestScreen extends StatefulWidget {
   const QuestScreen({Key? key}) : super(key: key);
@@ -34,6 +35,18 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
         appBar: AppBar(
           title: const Text('Quests', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: true,
+          automaticallyImplyLeading: false,
+          leading: Builder(
+            builder: (ctx) {
+              final canPop = Navigator.of(ctx).canPop();
+              final route = ModalRoute.of(ctx);
+              final isModal = route is PageRoute && route.fullscreenDialog == true;
+              if (canPop) {
+                return AppBackButton(isModal: isModal);
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           bottom: TabBar(
             controller: _tabController,
             isScrollable: true,

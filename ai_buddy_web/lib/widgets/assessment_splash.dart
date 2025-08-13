@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import './self_assessment_widget.dart';
 import '../dhiwise/core/app_export.dart';
 import '../theme/text_style_helper.dart' as CoreTextStyles;
+import './app_back_button.dart';
 
 class AssessmentSplash extends StatelessWidget {
   final VoidCallback? onClosed;
@@ -45,15 +46,14 @@ class AssessmentSplash extends StatelessWidget {
                           ),
                         ),
                       ),
-                      // Close button (X)
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        color: const Color(0xFF8C9CAA),
-                        tooltip: 'Close',
+                      // Close button (X) standardized via AppBackButton
+                      AppBackButton(
+                        isModal: true,
                         onPressed: () {
-                          Navigator.of(context).pop();
+                          Navigator.of(context).maybePop();
                           onClosed?.call();
                         },
+                        iconColor: const Color(0xFF8C9CAA),
                       )
                     ],
                   ),

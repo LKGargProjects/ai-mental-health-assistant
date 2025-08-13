@@ -29,6 +29,7 @@ class MoodTrackerWidget extends StatelessWidget {
         }
 
         return SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [

@@ -4,10 +4,8 @@ import 'dart:async';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_image_view.dart';
 import './widgets/progress_card_widget.dart';
 import './widgets/recommendation_card_widget.dart';
-import '../../../widgets/app_bottom_nav.dart';
 import '../../../theme/text_style_helper.dart' as CoreTextStyles;
 import '../../../widgets/assessment_splash.dart';
 import '../../../quests/quests_engine.dart';
@@ -16,6 +14,8 @@ import 'package:provider/provider.dart';
 import '../../../providers/progress_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../navigation/route_observer.dart';
+import '../../../widgets/keyboard_dismissible_scaffold.dart';
+import '../../../widgets/app_bottom_nav.dart';
 
 // DEBUG ONLY: toggle to reset quest state on each app launch
 const bool _debugResetQuestsOnLaunch = false;
@@ -37,7 +37,8 @@ const Curve kRingCurve = Curves.easeOutCubic;
 
 class WellnessDashboardScreen extends StatefulWidget {
   final bool showBottomNav;
-  WellnessDashboardScreen({Key? key, this.showBottomNav = true}) : super(key: key);
+  final ValueNotifier<int>? reselect;
+  WellnessDashboardScreen({Key? key, this.showBottomNav = true, this.reselect}) : super(key: key);
 
   @override
   State<WellnessDashboardScreen> createState() => _WellnessDashboardScreenState();
@@ -56,7 +57,7 @@ class _RingPainter extends CustomPainter {
     final radius = 46.0;
     final rect = Rect.fromCircle(center: center, radius: radius);
     final bg = Paint()
-      ..color = color.withOpacity(0.12)
+      ..color = color.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0
       ..strokeCap = StrokeCap.round;
@@ -98,10 +99,10 @@ class _RipplePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final effectiveOpacity = opacity.clamp(0.0, 1.0);
     final fill = Paint()
-      ..color = color.withOpacity(0.10 * (1.0 - effectiveOpacity))
+      ..color = color.withValues(alpha: 0.10 * (1.0 - effectiveOpacity))
       ..style = PaintingStyle.fill;
     final stroke = Paint()
-      ..color = color.withOpacity(0.35 * (1.0 - effectiveOpacity))
+      ..color = color.withValues(alpha: 0.35 * (1.0 - effectiveOpacity))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
@@ -146,6 +147,9 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
   DateTime? _timerPillEndAt;
   String? _timerPillQuestId;
   AnimationController? _timerPillAnim;
+  
+  // Main scroll controller (for re-tap scroll-to-top)
+  final ScrollController _scrollController = ScrollController();
 
   // Compute global center of a widget by key
   Offset? _globalCenterOf(GlobalKey key) {
@@ -525,6 +529,8 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     _removeTimerPill();
     _microTimer?.cancel();
     _midnightTimer?.cancel();
+    widget.reselect?.removeListener(_onReselect);
+    _scrollController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
@@ -595,6 +601,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     SystemSound.play(SystemSoundType.click);
     _showCheckRipple(_reminderToggleKey);
     await _saveReminderPrefs();
+    if (!mounted) return;
     // 2) Time change ring: move time by +1 min and show ring
     final nextMinute = (TimeOfDay(
       hour: _reminderTime.hour,
@@ -629,6 +636,17 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
         _debugRunReminderSelfTestOnce();
       });
     });
+    // Listen for bottom-tab re-tap events
+    widget.reselect?.addListener(_onReselect);
+  }
+
+  @override
+  void didUpdateWidget(covariant WellnessDashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.reselect != widget.reselect) {
+      oldWidget.reselect?.removeListener(_onReselect);
+      widget.reselect?.addListener(_onReselect);
+    }
   }
 
   @override
@@ -665,6 +683,26 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
       try { debugPrint('[Pill][ROUTE] didPopNext'); } catch (_) {}
     }
     // No-op: pill is only created explicitly while on this screen
+  }
+
+  // Handle bottom tab reselect: scroll to top if scrolled, otherwise refresh
+  void _onReselect() {
+    if (!mounted) return;
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (_scrollController.hasClients) {
+      final offset = _scrollController.offset;
+      const threshold = 64.0;
+      if (offset > threshold) {
+        if (reduceMotion) {
+          _scrollController.jumpTo(0);
+        } else {
+          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        }
+        return;
+      }
+    }
+    // Near top: trigger a lightweight refresh of today data
+    _refreshToday();
   }
 
   @override
@@ -742,10 +780,10 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
               Color bg = scheme.primary;
               // If primary is too close to scaffold background, fall back
               bool similar(Color a, Color b) {
-                int dr = (a.red - b.red).abs();
-                int dg = (a.green - b.green).abs();
-                int db = (a.blue - b.blue).abs();
-                return (dr + dg + db) < 30; // very similar
+                double dr = (a.r - b.r).abs();
+                double dg = (a.g - b.g).abs();
+                double db = (a.b - b.b).abs();
+                return (dr + dg + db) < 0.12; // ~30/255 threshold for normalized channels
               }
               if (similar(bg, scaffoldBg)) {
                 bg = scheme.primaryContainer;
@@ -760,7 +798,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                 color: bg,
                 shape: const StadiumBorder(),
                 elevation: 3,
-                shadowColor: Colors.black.withOpacity(0.2),
+                shadowColor: Colors.black.withValues(alpha: 0.2),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   child: Text(
@@ -1061,7 +1099,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   border: Border.all(color: Colors.white, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: primary.withOpacity(0.22),
+                      color: primary.withValues(alpha: 0.22),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1099,177 +1137,64 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     });
   }
 
-  // Quick Check-in: show a small "Start" pill above the Start button
-  void _showStartPill(GlobalKey sourceKey) {
-    final centerGlobal = _globalCenterOf(sourceKey);
-    if (centerGlobal == null) return;
-
-    final overlayState = Navigator.of(context).overlay ?? Overlay.of(context);
-    final overlayBox = overlayState.context.findRenderObject() as RenderBox?;
-    if (overlayBox == null || !overlayBox.attached) return;
-
-    final size = overlayBox.size;
-    final center = overlayBox.globalToLocal(centerGlobal);
-
-    // Respect reduce-motion: still show but without scale animation
-    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-
-    final controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 360),
-    );
-    final fade = CurvedAnimation(
-      parent: controller,
-      curve: Curves.easeOutCubic,
-    );
-    final scale = Tween<double>(begin: 0.92, end: 1.0)
-        .chain(CurveTween(curve: Curves.easeOutBack))
-        .animate(controller);
-
-    // Position slightly above the button center
-    double left = center.dx - 36; // approx half of pill width
-    double top = center.dy - 56;  // above the button
-    left = left.clamp(4.0, size.width - 120.0);
-    top = top.clamp(4.0, size.height - 36.0);
-
-    late OverlayEntry entry;
-    entry = OverlayEntry(builder: (ctx) {
-      final primary = Theme.of(context).colorScheme.primary;
-      return Positioned(
-        left: left,
-        top: top,
-        child: IgnorePointer(
-          ignoring: true,
-          child: Opacity(
-            opacity: reduceMotion ? 1.0 : fade.value.clamp(0.0, 1.0),
-            child: Transform.scale(
-              scale: reduceMotion ? 1.0 : scale.value,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: primary,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primary.withOpacity(0.22),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'Start',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    });
-
-    overlayState.insert(entry);
-    if (!reduceMotion) {
-      controller.addListener(() => entry.markNeedsBuild());
-      controller.forward().whenComplete(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 120));
-        entry.remove();
-        controller.dispose();
-      });
-    } else {
-      // Briefly show then remove
-      Future<void>.delayed(const Duration(milliseconds: 400)).then((_) {
-        if (entry.mounted) entry.remove();
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     // Build
     return Sizer(builder: (context, orientation, deviceType) {
-      return Scaffold(
-          body: SafeArea(
-            top: true,
-            bottom: false,
-            child: Stack(children: [
-              // Background Image (use full viewport like chat/mood)
-              CustomImageView(
-                  imagePath: ImageConstant.imgBackground1440x635,
-                  height: MediaQuery.of(context).size.height,
-                  width: MediaQuery.of(context).size.width,
-                  fit: BoxFit.cover),
+      return KeyboardDismissibleScaffold(
+        safeTop: true,
+        safeBottom: false,
+        bottomNavigationBar: widget.showBottomNav ? const AppBottomNav(current: AppTab.quest) : null,
+        body: Stack(
+          children: [
+            // Plain themed background (no image)
+            Container(
+              height: MediaQuery.of(context).size.height,
+              width: MediaQuery.of(context).size.width,
+              color: Theme.of(context).scaffoldBackgroundColor,
+            ),
 
-              // Content (full viewport sizing)
-              Container(
-                  height: MediaQuery.of(context).size.height,
-                  width: MediaQuery.of(context).size.width,
-                  child: Stack(children: [
+            // Scrollable content
+            Positioned.fill(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                controller: _scrollController,
+                padding: EdgeInsets.only(bottom: 24.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(height: 24.h),
+                    // Header
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 70.h),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Today\'s Quest',
+                            style: CoreTextStyles
+                                .TextStyleHelper.instance.headline24Bold
+                                .copyWith(color: Color(0xFF47505E)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 24.h),
 
-                    // Main Content
-                    SingleChildScrollView(
-                        padding: EdgeInsets.only(bottom: kBottomNavigationBarHeight + 16.0),
-                        child: Padding(
-                            padding: EdgeInsets.zero,
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildHeaderSection(),
-                                  _buildMoodCheckInSection(),
-                                  _buildProgressSection(),
-                                  _buildRecommendationsSection(),
-                                ]))),
+                    // Sections
+                    _buildMoodCheckInSection(),
+                    _buildProgressSection(),
+                    _buildRecommendationsSection(),
 
-                    // Bottom Background
-                    Positioned(
-                        bottom: 0,
-                        left: 0,
-                        child: CustomImageView(
-                            imagePath: ImageConstant.imgBackground13x635,
-                            height: 13.h,
-                            width: MediaQuery.of(context).size.width,
-                            fit: BoxFit.cover)),
-                  ])),
-            ]),
-          ),
-          bottomNavigationBar: widget.showBottomNav ? AppBottomNav(current: AppTab.quest) : null);
+                    SizedBox(height: 24.h),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     });
-  }
-
-  Widget _buildHeaderSection() {
-    return Padding(
-        padding: EdgeInsets.symmetric(horizontal: 28.h, vertical: 32.h),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      Row(children: [
-        // Header renamed per PDF priorities
-        Text('Today\'s Quest',
-            style: CoreTextStyles.TextStyleHelper.instance.headline24Bold
-                .copyWith(color: Color(0xFF47505E))),
-        SizedBox(width: 12.h),
-        CustomImageView(
-            imagePath: ImageConstant.imgImage43x43,
-            height: 43.h,
-            width: 43.h),
-          ]),
-          GestureDetector(
-              onTap: () {
-                // Handle settings click
-              },
-              child: Container(
-                  height: 38.h,
-                  width: 38.h,
-                  child: CustomImageView(
-                      imagePath: ImageConstant.imgImage38x38,
-                      height: 38.h,
-                      width: 38.h,
-                      fit: BoxFit.cover))),
-        ]));
   }
 
   Widget _buildMoodCheckInSection() {
@@ -1282,7 +1207,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
             border: Border.all(color: const Color(0xFFE0E6EE)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),
@@ -1457,32 +1382,6 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                      const SnackBar(content: Text('Focus duration missing')),);
                  }
                  return;
-                // Short undo window via SnackBar
-                 if (mounted) {
-                   final messenger = ScaffoldMessenger.of(context);
-                   messenger.hideCurrentSnackBar();
-                   messenger.showSnackBar(
-                     SnackBar(
-                       duration: const Duration(seconds: 5),
-                       content: const Text('Focus reset marked complete'),
-                       action: SnackBarAction(
-                         label: 'Undo',
-                         onPressed: () async {
-                           setState(() {
-                             _task1Done = false;
-                           });
-                           final questId = _qTask1Id ?? 'task_focus_reset_v2';
-                           if (_questsEngine != null) {
-                             try {
-                               await _questsEngine!.uncompleteToday(questId);
-                            } catch (_) {}
-                          }
-                          await _refreshToday();
-                        },
-                      ),
-                    ),
-                  );
-                }
               }),
           SizedBox(height: 24.h),
           // Card 2 (TASK) - show only when a second TASK exists today
@@ -1644,7 +1543,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   boxShadow: _reminderOn
                       ? [
                           BoxShadow(
-                            color: primary.withOpacity(0.12),
+                            color: primary.withValues(alpha: 0.12),
                             blurRadius: 18,
                             offset: const Offset(0, 8),
                           ),
@@ -1699,7 +1598,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                       boxShadow: _reminderOn
                                           ? [
                                               BoxShadow(
-                                                color: Theme.of(context).colorScheme.primary.withOpacity(0.35),
+                                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
                                                 blurRadius: 14,
                                                 spreadRadius: 1,
                                                 offset: const Offset(0, 3),
@@ -1771,6 +1670,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                             return Theme(data: Theme.of(context), child: child!);
                                           },
                                         );
+                                        if (!mounted) return;
                                         if (picked != null) {
                                           setState(() {
                                             _reminderTime = picked;
@@ -1778,7 +1678,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                           });
                                           _saveReminderPrefs();
                                           if (kDebugMode) {
-                                            debugPrint('[Reminder][timeChanged] to=${_reminderTime.format(context)}');
+                                            debugPrint('[Reminder][timeChanged] to=${_formatReminderTime(_reminderTime)}');
                                           }
                                           // Microinteraction: confirmation ring + haptics
                                           HapticFeedback.selectionClick();

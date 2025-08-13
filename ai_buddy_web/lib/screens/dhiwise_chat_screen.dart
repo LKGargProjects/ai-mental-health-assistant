@@ -6,6 +6,7 @@ import '../theme/theme_helper.dart';
 import '../theme/text_style_helper.dart';
 import '../widgets/dhiwise/custom_button.dart';
 import '../widgets/dhiwise/custom_image_view.dart';
+import '../widgets/app_back_button.dart';
 
 class MentalHealthChatScreen extends StatelessWidget {
   const MentalHealthChatScreen({super.key});
@@ -31,21 +32,21 @@ class MentalHealthChatScreen extends StatelessWidget {
                 color: appTheme.whiteCustom,
                 padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
                 child: SafeArea(
+                  top: true,
+                  bottom: false,
                   child: Row(
                     children: [
-                      // Back Button
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).pop();
+                      // Back Button (adaptive)
+                      Builder(
+                        builder: (ctx) {
+                          final canPop = Navigator.of(ctx).canPop();
+                          final route = ModalRoute.of(ctx);
+                          final isModal = route is PageRoute && route.fullscreenDialog == true;
+                          if (canPop) {
+                            return AppBackButton(isModal: isModal);
+                          }
+                          return SizedBox(width: 44.h);
                         },
-                        child: Container(
-                          padding: EdgeInsets.all(8.h),
-                          child: CustomImageView(
-                            imagePath: ImageConstant.imgImage,
-                            height: 24.h,
-                            width: 16.h,
-                          ),
-                        ),
                       ),
 
                       Expanded(
@@ -91,7 +92,7 @@ class MentalHealthChatScreen extends StatelessWidget {
                         ),
                       ),
 
-                      SizedBox(width: 32.h),
+                      SizedBox(width: 44.h),
                     ],
                   ),
                 ),
