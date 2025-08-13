@@ -279,7 +279,7 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                         ), // end Container
                       ), // end Expanded
                       SizedBox(
-                        width: 50.h,
+                        width: 74.h,
                         child: Center(
                           child: GestureDetector(
                             onTap: _sendMessage,
