@@ -284,7 +284,7 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                           child: GestureDetector(
                             onTap: _sendMessage,
                             child: Container(
-                              padding: EdgeInsets.all(11.h),
+                              padding: EdgeInsets.all(10.h),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).primaryColor,
                                 shape: BoxShape.circle,
@@ -292,7 +292,7 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                               child: Icon(
                                 Icons.send,
                                 color: Colors.white,
-                                size: 30.h,
+                                size: 32.h,
                               ),
                             ),
                           ),
