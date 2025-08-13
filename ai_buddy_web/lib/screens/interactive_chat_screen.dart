@@ -279,12 +279,12 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                         ), // end Container
                       ), // end Expanded
                       SizedBox(
-                        width: 50.h,
+                        width: 74.h,
                         child: Center(
                           child: GestureDetector(
                             onTap: _sendMessage,
                             child: Container(
-                              padding: EdgeInsets.all(14.h),
+                              padding: EdgeInsets.all(11.h),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).primaryColor,
                                 shape: BoxShape.circle,
@@ -292,7 +292,7 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                               child: Icon(
                                 Icons.send,
                                 color: Colors.white,
-                                size: 22.h,
+                                size: 30.h,
                               ),
                             ),
                           ),
