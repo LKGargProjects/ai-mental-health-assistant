@@ -228,10 +228,12 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
               Container(
                 key: _inputBarKey,
                 color: appTheme.whiteCustom,
-                padding: EdgeInsets.fromLTRB(16.h, 4.h, 16.h, 16.h),
+                padding: EdgeInsets.fromLTRB(16.h, 4.h, 0.h, 16.h),
                 child: SafeArea(
                   top: false,
                   bottom: true,
+                  left: false,
+                  right: false,
                   child: Row(
                     children: [
                       Expanded(
@@ -276,19 +278,23 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                           ),
                         ), // end Container
                       ), // end Expanded
-                      SizedBox(width: 8.h),
-                      GestureDetector(
-                        onTap: _sendMessage,
-                        child: Container(
-                          padding: EdgeInsets.all(14.h),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.send,
-                            color: Colors.white,
-                            size: 22.h,
+                      SizedBox(
+                        width: 50.h,
+                        child: Center(
+                          child: GestureDetector(
+                            onTap: _sendMessage,
+                            child: Container(
+                              padding: EdgeInsets.all(14.h),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.send,
+                                color: Colors.white,
+                                size: 22.h,
+                              ),
+                            ),
                           ),
                         ),
                       ),
