@@ -26,6 +26,9 @@ RUN git fetch && git checkout $FLUTTER_VERSION
 # Add Flutter to PATH
 ENV PATH="$FLUTTER_HOME/bin:$PATH"
 
+# Avoid tar trying to preserve file ownership inside container (fixes gradle-wrapper extraction)
+ENV TAR_OPTIONS=--no-same-owner
+
 # Enable web support
 RUN flutter config --enable-web
 
