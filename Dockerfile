@@ -80,9 +80,6 @@ COPY --from=python-builder /app .
 COPY --from=flutter-builder /app/ai_buddy_web/build/web /var/www/html
 COPY --from=flutter-builder /app/ai_buddy_web/build/web /app/static
 
-# Copy static web files
-COPY web/ /var/www/html/static/
-
 # Configure nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 
