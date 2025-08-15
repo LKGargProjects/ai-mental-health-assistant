@@ -18,7 +18,7 @@ import 'providers/quest_provider.dart';
 import 'navigation/route_observer.dart';
 import 'navigation/home_shell.dart';
 import 'widgets/app_bottom_nav.dart' show AppTab;
-import 'services/api_service.dart';
+import 'services/analytics_service.dart' show logAnalyticsEvent;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,7 +52,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     // Fire a minimal 'app_open' event (respects consent in ApiService)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ApiService().logAnalyticsEvent('app_open', metadata: {
+      logAnalyticsEvent('app_open', metadata: {
         'action': 'app_open',
         'source': 'app',
       });
