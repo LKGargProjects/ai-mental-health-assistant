@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/chat_provider.dart';
 import '../models/message.dart';
-import '../core/utils/image_constant.dart';
 import '../theme/theme_helper.dart';
 import '../theme/text_style_helper.dart';
-import '../widgets/dhiwise/custom_image_view.dart';
+import '../widgets/status_avatar.dart';
+import '../config/profile_config.dart';
 import '../core/utils/size_utils.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_back_button.dart';
 import '../widgets/keyboard_dismissible_scaffold.dart';
+import '../widgets/safety_legal_sheet.dart';
 
 class InteractiveChatScreen extends StatefulWidget {
   final bool showBottomNav;
@@ -29,9 +34,159 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
   final GlobalKey _inputBarKey = GlobalKey();
   double _inputBarHeight = 0.0;
   
+  // One-time legal acknowledgment key
+  static const _prefsLegalAckV1 = 'legal_ack_v1';
+
+  Future<void> _ensureLegalAck() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ack = prefs.getBool(_prefsLegalAckV1) ?? false;
+      if (!ack && mounted) {
+        await showSafetyLegalSheet(context, requireAcknowledge: true);
+        await prefs.setBool(_prefsLegalAckV1, true);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Safety & Legal ack check failed: $e');
+    }
+  }
+  
   void _onReselect() {
     // On re-tap, bring the latest messages into view
     _scrollToBottom();
+  }
+
+  Future<void> _showAllCrisisResourcesSheet(List<Map<String, dynamic>> numbers) async {
+    if (numbers.isEmpty) return;
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: appTheme.whiteCustom,
+      builder: (ctx) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16.h, 12.h, 16.h, 4.h),
+                  child: Text(
+                    'Crisis resources',
+                    style: TextStyleHelper.instance.headline24Bold,
+                  ),
+                ),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.fromLTRB(8.h, 8.h, 8.h, 8.h),
+                    itemCount: numbers.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (ctx, i) {
+                      final n = numbers[i];
+                      final name = (n['name'] ?? '').toString();
+                      final number = ((n['number'] ?? n['phone']) ?? '').toString().trim();
+                      final textInstr = (n['text'] ?? '').toString().trim();
+                      return ListTile(
+                        dense: false,
+                        title: Text(name.isNotEmpty
+                            ? name
+                            : (number.isNotEmpty
+                                ? number
+                                : (textInstr.isNotEmpty ? textInstr : 'Resource'))),
+                        subtitle: number.isNotEmpty
+                            ? Text(number)
+                            : (textInstr.isNotEmpty ? Text(textInstr) : null),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (number.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.phone_forwarded_rounded),
+                                tooltip: 'Call',
+                                onPressed: () async {
+                                  final uri = Uri(scheme: 'tel', path: number);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  } else {
+                                    await Clipboard.setData(ClipboardData(text: number));
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Call not supported. Number copied to clipboard.')),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            if (textInstr.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.sms_rounded),
+                                tooltip: 'Text',
+                                onPressed: () async {
+                                  // Parse patterns like "HOME to 741741" (optionally prefixed by 'Text ')
+                                  String s = textInstr.trim();
+                                  if (s.toLowerCase().startsWith('text ')) {
+                                    s = s.substring(5).trim();
+                                  }
+                                  final reg = RegExp(r'^(.+?)\s+to\s+(\d+)$', caseSensitive: false);
+                                  final m = reg.firstMatch(s);
+                                  if (m != null) {
+                                    final body = m.group(1)!.trim();
+                                    final to = m.group(2)!.trim();
+                                    final uri = Uri(
+                                      scheme: 'sms',
+                                      path: to,
+                                      queryParameters: {'body': body},
+                                    );
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                    } else {
+                                      await Clipboard.setData(ClipboardData(text: textInstr));
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('SMS not supported. Instructions copied to clipboard.')),
+                                        );
+                                      }
+                                    }
+                                  } else {
+                                    await Clipboard.setData(ClipboardData(text: textInstr));
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Instructions copied to clipboard.')),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.copy_rounded),
+                              tooltip: 'Copy',
+                              onPressed: () async {
+                                final toCopy = number.isNotEmpty ? number : (textInstr.isNotEmpty ? textInstr : name);
+                                if (toCopy.trim().isEmpty) return;
+                                await Clipboard.setData(ClipboardData(text: toCopy.trim()));
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Copied to clipboard.')),
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                SizedBox(height: 12.h),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -45,6 +200,8 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
       }
       // Ensure we start at the latest message
       _scrollToBottom();
+      // One-time Safety & Legal acknowledgment
+      _ensureLegalAck();
     });
     // Listen for tab reselect events
     widget.reselect?.addListener(_onReselect);
@@ -125,106 +282,111 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
       safeTop: false,
       safeBottom: false,
       bottomNavigationBar: widget.showBottomNav ? const AppBottomNav(current: AppTab.talk) : null,
-      body: Stack(
-        children: [
-          // Plain themed background
-          Container(
-            color: Theme.of(context).scaffoldBackgroundColor,
-          ),
-          // Main Content
-          Column(
-            children: [
-              // Header
-              Container(
-                color: appTheme.whiteCustom,
-                padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
-                child: SafeArea(
-                  top: true,
-                  bottom: false,
-                  child: Row(
-                    children: [
-                      Builder(
-                        builder: (ctx) {
-                          final route = ModalRoute.of(ctx);
-                          final isModal = route is PageRoute && route.fullscreenDialog == true;
-                          // Always show back button: if there's no history, it will at least dismiss the keyboard
-                          return AppBackButton(isModal: isModal);
-                        },
-                      ),
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Stack(
-                              children: [
-                                CustomImageView(
-                                  imagePath: ImageConstant.imgImage66x66,
-                                  height: 66.h,
-                                  width: 66.h,
-                                  fit: BoxFit.cover,
-                                ),
-                                Positioned(
-                                  bottom: 4.h,
-                                  right: 4.h,
-                                  child: Container(
-                                    height: 12.h,
-                                    width: 12.h,
-                                    decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: appTheme.whiteCustom,
-                                        width: 2.h,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(width: 12.h),
-                            Text(
-                              'Alex',
-                              style: TextStyleHelper.instance.headline24Bold,
+      body: PopScope(
+        canPop: !_inputFocus.hasFocus,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop && _inputFocus.hasFocus) {
+            // First back press: dismiss keyboard instead of popping
+            _inputFocus.unfocus();
+          }
+        },
+        child: Stack(
+          children: [
+            // Plain themed background
+            Container(
+              color: Theme.of(context).scaffoldBackgroundColor,
+            ),
+            // Main Content
+            Column(
+              children: [
+                // Header
+                Container(
+                  color: appTheme.whiteCustom,
+                  padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
+                  child: SafeArea(
+                    top: true,
+                    bottom: false,
+                    child: Row(
+                      children: [
+                        Builder(
+                          builder: (ctx) {
+                            final route = ModalRoute.of(ctx);
+                            final isModal = route is PageRoute && route.fullscreenDialog == true;
+                            // Always show back button: if there's no history, it will at least dismiss the keyboard
+                            return AppBackButton(isModal: isModal);
+                          },
+                        ),
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              StatusAvatar(
+                                name: ProfileConfig.aiName,
+                                imageAsset: ProfileConfig.aiAvatarAsset,
+                                size: 66.h,
+                                status: PresenceStatus.online,
+                                showStatus: true,
+                              ),
+                              SizedBox(width: 12.h),
+                              Text(
+                                ProfileConfig.aiName,
+                                style: TextStyleHelper.instance.headline24Bold,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Overflow menu for Safety & Legal access
+                        PopupMenuButton<String>(
+                          tooltip: 'More',
+                          onSelected: (value) async {
+                            switch (value) {
+                              case 'safety':
+                                await showSafetyLegalSheet(context);
+                                break;
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem<String>(
+                              value: 'safety',
+                              child: Text('Safety & Legal'),
                             ),
                           ],
                         ),
-                      ),
-                      SizedBox(width: 32.h),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              // Divider
-              Container(
-                height: 8.h,
-                color: appTheme.colorFFF3F4,
-              ),
-              // Chat Messages
-              Expanded(
-                child: Consumer<ChatProvider>(
-                  builder: (context, chatProvider, child) {
-                    // Always keep view pinned to bottom on updates (new msgs/typing)
-                    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-                    final count = chatProvider.messages.length + (chatProvider.isTyping ? 1 : 0);
-                    return ListView.builder(
-                      controller: _scrollController,
-                      padding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, _inputBarHeight + 8.h),
-                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-                      itemCount: count,
-                      itemBuilder: (context, index) {
-                        final isTypingRow = chatProvider.isTyping && index == chatProvider.messages.length;
-                        if (isTypingRow) {
-                          return _buildTypingBubble();
-                        }
-                        final message = chatProvider.messages[index];
-                        final isLast = index == chatProvider.messages.length - 1 && !chatProvider.isTyping;
-                        return _buildMessageBubble(message, isLast: isLast);
-                      },
-                    );
-                  },
+                // Divider
+                Container(
+                  height: 8.h,
+                  color: appTheme.colorFFF3F4,
                 ),
-              ),
-              // Input Area
+                // Chat Messages
+                Expanded(
+                  child: Consumer<ChatProvider>(
+                    builder: (context, chatProvider, child) {
+                      // Always keep view pinned to bottom on updates (new msgs/typing)
+                      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+                      final count = chatProvider.messages.length + (chatProvider.isTyping ? 1 : 0);
+                      return ListView.builder(
+                        controller: _scrollController,
+                        padding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, _inputBarHeight + 8.h),
+                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+                        itemCount: count,
+                        itemBuilder: (context, index) {
+                          final isTypingRow = chatProvider.isTyping && index == chatProvider.messages.length;
+                          if (isTypingRow) {
+                            return _buildTypingBubble();
+                          }
+                          final message = chatProvider.messages[index];
+                          final isLast = index == chatProvider.messages.length - 1 && !chatProvider.isTyping;
+                          return _buildMessageBubble(message, isLast: isLast);
+                        },
+                      );
+                    },
+                  ),
+                ),
+                // Input Area
               Container(
                 key: _inputBarKey,
                 color: appTheme.whiteCustom,
@@ -304,12 +466,18 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
               ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildMessageBubble(Message message, {bool isLast = false}) {
+    // Guard: Do not render empty assistant messages (prevents blank bubble on web)
+    if (!message.isUser && message.content.trim().isEmpty) {
+      if (kDebugMode) debugPrint('[UI] Skipping empty assistant message bubble');
+      return const SizedBox.shrink();
+    }
     final reduceMotion = MediaQuery.of(context).accessibleNavigation;
     return AnimatedSize(
       duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 120),
@@ -322,11 +490,12 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
         mainAxisAlignment: message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           if (!message.isUser) ...[
-            CustomImageView(
-              imagePath: ImageConstant.imgImage52x52,
-              height: 52.h,
-              width: 52.h,
-              fit: BoxFit.cover,
+            StatusAvatar(
+              name: ProfileConfig.aiName,
+              imageAsset: ProfileConfig.aiAvatarAsset,
+              size: 52.h,
+              status: PresenceStatus.online,
+              showStatus: true,
             ),
             SizedBox(width: 12.h),
           ],
@@ -344,24 +513,79 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                   ),
                 ],
               ),
-              child: Text(
-                message.content,
-                style: TextStyle(
-                  fontSize: 16.0, // iOS standard body text size
-                  fontWeight: FontWeight.w400,
-                  color: appTheme.colorFF1F29,
-                  height: 1.4, // iOS standard line height
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.content,
+                    style: TextStyle(
+                      fontSize: 16.0,
+                      fontWeight: FontWeight.w400,
+                      color: appTheme.colorFF1F29,
+                      height: 1.4,
+                    ),
+                  ),
+                  // Hidden: do not render internal crisis debug content in UI
+                  if (!message.isUser && (message.crisisNumbers != null && message.crisisNumbers!.isNotEmpty)) ...[
+                    SizedBox(height: 6.h),
+                    Wrap(
+                      spacing: 8.h,
+                      runSpacing: 4.h,
+                      children: [
+                        for (final n in message.crisisNumbers!.take(3))
+                          _CrisisChip(
+                            name: (n['name'] ?? '').toString(),
+                            phone: ((n['number'] ?? n['phone']) ?? '').toString(),
+                            textInstr: (n['text'] ?? '').toString(),
+                          ),
+                        if (message.crisisNumbers!.length > 3)
+                          Semantics(
+                            button: true,
+                            label: 'More crisis resources',
+                            child: GestureDetector(
+                              onTap: () => _showAllCrisisResourcesSheet(message.crisisNumbers!),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.blueGrey.shade50,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(color: Colors.blueGrey.shade200),
+                                ),
+                                child: const Text(
+                                  'More…',
+                                  style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.w600, color: Colors.black87),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    SizedBox(height: 6.h),
+                    Semantics(
+                      label: 'Safety note',
+                      child: Text(
+                        'These resources are informational and not a substitute for professional care. If you\'re in immediate danger, call your local emergency number.',
+                        style: TextStyle(
+                          fontSize: 11.0,
+                          color: Colors.black54,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                  // Hidden: do not render debug footer in UI
+                ],
               ),
             ),
           ),
           if (message.isUser) ...[
             SizedBox(width: 12.h),
-            CustomImageView(
-              imagePath: ImageConstant.imgImage52x52,
-              height: 52.h,
-              width: 52.h,
-              fit: BoxFit.cover,
+            StatusAvatar(
+              name: ProfileConfig.userName,
+              imageAsset: ProfileConfig.userAvatarAsset,
+              size: 52.h,
+              status: PresenceStatus.none,
+              showStatus: false,
             ),
           ],
         ],
@@ -377,38 +601,39 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
       curve: Curves.easeOutCubic,
       alignment: Alignment.topCenter,
       child: Container(
-      margin: EdgeInsets.only(bottom: 16.h),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CustomImageView(
-            imagePath: ImageConstant.imgImage52x52,
-            height: 52.h,
-            width: 52.h,
-            fit: BoxFit.cover,
-          ),
-          SizedBox(width: 12.h),
-          Flexible(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
-              decoration: BoxDecoration(
-                color: appTheme.whiteCustom,
-                borderRadius: BorderRadius.circular(16.h),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 4.h,
-                    offset: Offset(0, 2.h),
-                  ),
-                ],
-              ),
-              child: const _TypingDots(),
+        margin: EdgeInsets.only(bottom: 16.h),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            StatusAvatar(
+              name: ProfileConfig.aiName,
+              imageAsset: ProfileConfig.aiAvatarAsset,
+              size: 52.h,
+              status: PresenceStatus.online,
+              showStatus: true,
             ),
-          ),
-        ],
+            SizedBox(width: 12.h),
+            Flexible(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: appTheme.whiteCustom,
+                  borderRadius: BorderRadius.circular(16.h),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4.h,
+                      offset: Offset(0, 2.h),
+                    ),
+                  ],
+                ),
+                child: const _TypingDots(),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 
   @override
@@ -420,6 +645,166 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
     super.dispose();
   }
 
+}
+
+// Risk pill removed from UI; actionable chips remain.
+
+class _CrisisChip extends StatelessWidget {
+  const _CrisisChip({required this.name, required this.phone, this.textInstr = ''});
+  final String name;
+  final String phone; // may be empty when only text instructions exist (e.g., "HOME to 741741")
+  final String textInstr;
+
+  Future<void> _onTap(BuildContext context) async {
+    final p = phone.trim();
+    final t = textInstr.trim();
+    if (p.isNotEmpty) {
+      final tel = Uri(scheme: 'tel', path: p);
+      try {
+        final can = await canLaunchUrl(tel);
+        if (can) {
+          final ok = await launchUrl(tel, mode: LaunchMode.externalApplication);
+          if (!ok) {
+            // Fall back to copy
+            await Clipboard.setData(ClipboardData(text: p));
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Couldn\'t open dialer. Number copied to clipboard.')),
+              );
+            }
+          }
+        } else {
+          await Clipboard.setData(ClipboardData(text: p));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Call not supported. Number copied to clipboard.')),
+            );
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('tel: launch error: $e');
+        await Clipboard.setData(ClipboardData(text: p));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Number copied to clipboard. Dial manually.')),
+          );
+        }
+      }
+      return;
+    }
+    if (t.isNotEmpty) {
+      // Attempt to parse patterns like "HOME to 741741"
+      String s = t;
+      if (s.toLowerCase().startsWith('text ')) {
+        s = s.substring(5).trim();
+      }
+      final reg = RegExp(r'^(.+?)\s+to\s+(\d+)$', caseSensitive: false);
+      final m = reg.firstMatch(s);
+      if (m != null) {
+        final body = m.group(1)!.trim();
+        final to = m.group(2)!.trim();
+        final sms = Uri(scheme: 'sms', path: to, queryParameters: {'body': body});
+        try {
+          final can = await canLaunchUrl(sms);
+          if (can) {
+            final ok = await launchUrl(sms, mode: LaunchMode.externalApplication);
+            if (!ok) {
+              await Clipboard.setData(ClipboardData(text: t));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Couldn\'t open SMS. Instructions copied.')),
+                );
+              }
+            }
+          } else {
+            await Clipboard.setData(ClipboardData(text: t));
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('SMS not supported. Instructions copied.')),
+              );
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('sms: launch error: $e');
+          await Clipboard.setData(ClipboardData(text: t));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Instructions copied to clipboard.')),
+            );
+          }
+        }
+      } else {
+        await Clipboard.setData(ClipboardData(text: t));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Instructions copied to clipboard.')),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasName = name.trim().isNotEmpty;
+    final hasPhone = phone.trim().isNotEmpty;
+    final hasText = textInstr.trim().isNotEmpty;
+    final label = () {
+      if (hasName && hasPhone) return '$name · ${phone.trim()}';
+      if (hasName && hasText) return '$name · ${textInstr.trim()}';
+      if (hasPhone) return phone.trim();
+      if (hasText) return textInstr.trim();
+      if (hasName) return name.trim();
+      return '';
+    }();
+    if (label.isEmpty) return const SizedBox.shrink();
+    final semanticsLabel = () {
+      if (hasPhone && hasName) return 'Call $name at ${phone.trim()}';
+      if (hasPhone) return 'Call ${phone.trim()}';
+      if (hasText && hasName) return '$name: ${textInstr.trim()}';
+      if (hasText) return textInstr.trim();
+      return label;
+    }();
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      onTapHint: (hasPhone || hasText) ? 'Activate' : null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: (hasPhone || hasText) ? () => _onTap(context) : null,
+        onLongPress: (hasPhone || hasText)
+            ? () async {
+                final toCopy = hasPhone ? phone.trim() : (hasText ? textInstr.trim() : name.trim());
+                await Clipboard.setData(ClipboardData(text: toCopy));
+                if (kDebugMode) debugPrint('Copied crisis info: $toCopy');
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Copied to clipboard.')),
+                  );
+                }
+              }
+            : null,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: 44.h, minHeight: 36.h),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
+            decoration: BoxDecoration(
+              color: Colors.blueGrey.shade50,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.blueGrey.shade200),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12.0, fontWeight: FontWeight.w500, color: Colors.black87),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _TypingDots extends StatefulWidget {

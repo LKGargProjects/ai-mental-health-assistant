@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../screens/interactive_chat_screen.dart';
 import '../screens/mood_tracker_screen.dart';

@@ -39,7 +39,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     // MVP Testing: Use India for crisis detection testing
     // TODO: Implement proper country detection or user preference
-    print('🔍 DEBUG: Sending message with country: in');
+    debugPrint('🔍 DEBUG: Sending message with country: in');
     chatProvider.sendMessage(text, country: 'in');
     _messageController.clear();
     _scrollToBottom();

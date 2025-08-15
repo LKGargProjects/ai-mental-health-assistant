@@ -758,7 +758,7 @@ def _register_routes(app: Flask) -> None:
                 pass
             try:
                 res = db.session.execute(
-                    text("DELETE FROM sessions WHERE last_activity < :cutoff"),
+                    text("DELETE FROM user_sessions WHERE last_active < :cutoff"),
                     {"cutoff": cutoff_sess}
                 )
                 counts['legacy_sessions_deleted'] = getattr(res, 'rowcount', None)
@@ -882,14 +882,14 @@ def _get_or_create_session() -> str:
     try:
         # Check if session exists in database
         existing_session = db.session.execute(
-            text("SELECT id FROM sessions WHERE id = :session_id"),
+            text("SELECT id FROM user_sessions WHERE id = :session_id"),
             {'session_id': session_id}
         ).fetchone()
         
         if not existing_session:
             # Create new session in database
             db.session.execute(
-                text("INSERT INTO sessions (id, created_at, last_activity) VALUES (:session_id, NOW(), NOW())"),
+                text("INSERT INTO user_sessions (id, created_at, last_active) VALUES (:session_id, NOW(), NOW())"),
                 {'session_id': session_id}
             )
             db.session.commit()
@@ -899,7 +899,7 @@ def _get_or_create_session() -> str:
         else:
             # Update last activity
             db.session.execute(
-                text("UPDATE sessions SET last_activity = NOW() WHERE id = :session_id"),
+                text("UPDATE user_sessions SET last_active = NOW() WHERE id = :session_id"),
                 {'session_id': session_id}
             )
             db.session.commit()

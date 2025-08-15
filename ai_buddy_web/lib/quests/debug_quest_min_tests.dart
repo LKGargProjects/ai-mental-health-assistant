@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'quests_engine.dart';
@@ -48,7 +47,9 @@ Future<String> runMinQuestTests({DateTime? now}) async {
       final before = engine.computeProgress(items).stepsLeft;
       await engine.markComplete(tasks.first.id);
       final day1b = await engine.getTodayData(date: d1);
-      final after = engine.computeProgress((day1b['todayItems'] as List<Quest>)).stepsLeft;
+      final after = engine
+          .computeProgress((day1b['todayItems'] as List<Quest>))
+          .stepsLeft;
       passProgress = after <= before && (before - after) <= 1;
     } else {
       // No task today is rare; still treat as pass for minimal test
@@ -65,18 +66,26 @@ Future<String> runMinQuestTests({DateTime? now}) async {
     // Same-day determinism
     final sameDayA = await engine.getTodayData(date: d1);
     final sameDayB = await engine.getTodayData(date: d1);
-    final idsA = (sameDayA['todayItems'] as List<Quest>).map((e) => e.id).toList();
-    final idsB = (sameDayB['todayItems'] as List<Quest>).map((e) => e.id).toList();
+    final idsA = (sameDayA['todayItems'] as List<Quest>)
+        .map((e) => e.id)
+        .toList();
+    final idsB = (sameDayB['todayItems'] as List<Quest>)
+        .map((e) => e.id)
+        .toList();
     final deterministicSameDay = listEquals(idsA, idsB);
 
     // Next-day selection available and typically different
     final nextDay = await engine.getTodayData(date: d2);
-    final idsNext = (nextDay['todayItems'] as List<Quest>).map((e) => e.id).toList();
+    final idsNext = (nextDay['todayItems'] as List<Quest>)
+        .map((e) => e.id)
+        .toList();
     final sizeOk = idsNext.length >= 5;
     // It's possible, though unlikely, that ids are equal day-to-day. Don't fail hard on that.
     passMidnight = deterministicSameDay && sizeOk;
 
-    debugPrint('[Quests-MinTests] progress=$passProgress reminder=$passReminder midnight=$passMidnight');
+    debugPrint(
+      '[Quests-MinTests] progress=$passProgress reminder=$passReminder midnight=$passMidnight',
+    );
   } catch (e, st) {
     debugPrint('[Quests-MinTests] Exception: $e\n$st');
   } finally {

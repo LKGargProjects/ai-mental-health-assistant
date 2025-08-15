@@ -6,16 +6,14 @@ import 'package:ai_buddy_web/models/quest.dart';
 void main() {
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => QuestProvider()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => QuestProvider())],
       child: const QuestPreviewApp(),
     ),
   );
 }
 
 class QuestPreviewApp extends StatelessWidget {
-  const QuestPreviewApp({Key? key}) : super(key: key);
+  const QuestPreviewApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +30,7 @@ class QuestPreviewApp extends StatelessWidget {
 }
 
 class QuestsHomeScreen extends StatefulWidget {
-  const QuestsHomeScreen({Key? key}) : super(key: key);
+  const QuestsHomeScreen({super.key});
 
   @override
   _QuestsHomeScreenState createState() => _QuestsHomeScreenState();
@@ -47,7 +45,7 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
 
   Future<void> _initializeSampleQuests() async {
     final questProvider = Provider.of<QuestProvider>(context, listen: false);
-    
+
     if (questProvider.quests.isEmpty) {
       final sampleQuests = [
         Quest(
@@ -84,7 +82,7 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
           status: QuestStatus.unlocked,
         ),
       ];
-      
+
       // Add sample quests to the provider
       for (var quest in sampleQuests) {
         questProvider.addQuest(quest);
@@ -105,11 +103,11 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
           final inProgressQuests = questProvider.quests
               .where((q) => q.status == QuestStatus.inProgress)
               .toList();
-          
+
           final availableQuests = questProvider.quests
               .where((q) => q.status == QuestStatus.unlocked)
               .toList();
-          
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -118,27 +116,21 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
                 // Level and XP Indicator
                 _buildLevelIndicator(),
                 const SizedBox(height: 24),
-                
+
                 // In Progress Quests
                 const Text(
                   'In Progress',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 _buildQuestList(inProgressQuests, context),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Available Quests
                 const Text(
                   'Available Quests',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 _buildQuestList(availableQuests, context),
@@ -153,9 +145,7 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
   Widget _buildLevelIndicator() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -165,10 +155,7 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
               children: [
                 Text(
                   'Level 5',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   '350 / 1000 XP',
@@ -259,10 +246,7 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
                           ],
                         ),
                       ),
-                      Icon(
-                        Icons.chevron_right,
-                        color: Colors.grey[400],
-                      ),
+                      Icon(Icons.chevron_right, color: Colors.grey[400]),
                     ],
                   ),
                   if (quest.status == QuestStatus.inProgress) ...[
@@ -370,10 +354,7 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
               if (quest.status == QuestStatus.inProgress) ...[
                 const Text(
                   'Progress',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 8),
                 LinearProgressIndicator(
@@ -388,10 +369,7 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
                   alignment: Alignment.centerRight,
                   child: Text(
                     '${quest.progress} / ${quest.target} completed',
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -404,11 +382,11 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
                       if (newProgress <= quest.target) {
                         final updatedQuest = quest.copyWith(
                           progress: newProgress,
-                          status: newProgress >= quest.target 
-                              ? QuestStatus.completed 
+                          status: newProgress >= quest.target
+                              ? QuestStatus.completed
                               : QuestStatus.inProgress,
                         );
-                        
+
                         // Update the quest in the provider
                         questProvider.updateQuest(updatedQuest);
                       }
@@ -427,7 +405,7 @@ class _QuestsHomeScreenState extends State<QuestsHomeScreen> {
                         progress: 1,
                         status: QuestStatus.inProgress,
                       );
-                      
+
                       // Update the quest in the provider
                       questProvider.updateQuest(updatedQuest);
                       Navigator.pop(context);

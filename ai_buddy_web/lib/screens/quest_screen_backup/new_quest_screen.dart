@@ -4,15 +4,12 @@ import 'package:ai_buddy_web/providers/quest_provider.dart';
 import 'package:ai_buddy_web/widgets/quest_card.dart';
 
 class NewQuestScreen extends StatelessWidget {
-  const NewQuestScreen({Key? key}) : super(key: key);
+  const NewQuestScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Quests'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Quests'), elevation: 0),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -36,10 +33,7 @@ class NewQuestScreen extends StatelessWidget {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-      ),
+      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
     );
   }
 

@@ -19,7 +19,7 @@ void main() {
 }
 
 class QuestPreviewApp extends StatelessWidget {
-  const QuestPreviewApp({Key? key}) : super(key: key);
+  const QuestPreviewApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +36,7 @@ class QuestPreviewApp extends StatelessWidget {
 }
 
 class QuestsHomeScreen extends StatelessWidget {
-  const QuestsHomeScreen({Key? key}) : super(key: key);
+  const QuestsHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

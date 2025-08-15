@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 class CustomTextFormField extends StatelessWidget {
   const CustomTextFormField({
-    Key? key,
+    super.key,
     this.alignment,
     this.width,
     this.scrollPadding = const EdgeInsets.all(20.0),
@@ -32,7 +32,7 @@ class CustomTextFormField extends StatelessWidget {
     this.inputFormatters,
     this.enabled = true,
     this.readOnly = false,
-  }) : super(key: key);
+  });
 
   final AlignmentGeometry? alignment;
   final double? width;
@@ -74,81 +74,67 @@ class CustomTextFormField extends StatelessWidget {
   }
 
   Widget get textFormFieldWidget => SizedBox(
-        width: width ?? double.maxFinite,
-        child: TextFormField(
-          scrollPadding: scrollPadding!,
-          controller: controller,
-          focusNode: focusNode,
-          onTap: () {},
-          autofocus: autofocus!,
-          style: textStyle ?? const TextStyle(),
-          obscureText: obscureText!,
-          textInputAction: textInputAction,
-          keyboardType: textInputType,
-          maxLines: maxLines ?? 1,
-          decoration: decoration,
-          validator: validator,
-          onChanged: onChanged,
-          onSaved: onSaved,
-          onFieldSubmitted: onFieldSubmitted,
-          inputFormatters: inputFormatters,
-          enabled: enabled,
-          readOnly: readOnly!,
-        ),
-      );
+    width: width ?? double.maxFinite,
+    child: TextFormField(
+      scrollPadding: scrollPadding!,
+      controller: controller,
+      focusNode: focusNode,
+      onTap: () {},
+      autofocus: autofocus!,
+      style: textStyle ?? const TextStyle(),
+      obscureText: obscureText!,
+      textInputAction: textInputAction,
+      keyboardType: textInputType,
+      maxLines: maxLines ?? 1,
+      decoration: decoration,
+      validator: validator,
+      onChanged: onChanged,
+      onSaved: onSaved,
+      onFieldSubmitted: onFieldSubmitted,
+      inputFormatters: inputFormatters,
+      enabled: enabled,
+      readOnly: readOnly!,
+    ),
+  );
 
   InputDecoration get decoration => InputDecoration(
-        hintText: hintText ?? "",
-        hintStyle: hintStyle ?? const TextStyle(),
-        prefixIcon: prefix,
-        prefixIconConstraints: prefixConstraints,
-        suffixIcon: suffix,
-        suffixIconConstraints: suffixConstraints,
-        isDense: true,
-        contentPadding: contentPadding ??
-            const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 16,
-            ),
-        fillColor: fillColor,
-        filled: filled,
-        border: borderDecoration ??
-            OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: Colors.grey[300]!,
-                width: 1,
-              ),
-            ),
-        enabledBorder: borderDecoration ??
-            OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: Colors.grey[300]!,
-                width: 1,
-              ),
-            ),
-        focusedBorder: borderDecoration ??
-            OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.blue,
-                width: 1,
-              ),
-            ),
-        errorBorder: OutlineInputBorder(
+    hintText: hintText ?? "",
+    hintStyle: hintStyle ?? const TextStyle(),
+    prefixIcon: prefix,
+    prefixIconConstraints: prefixConstraints,
+    suffixIcon: suffix,
+    suffixIconConstraints: suffixConstraints,
+    isDense: true,
+    contentPadding:
+        contentPadding ??
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+    fillColor: fillColor,
+    filled: filled,
+    border:
+        borderDecoration ??
+        OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: Colors.red,
-            width: 1,
-          ),
+          borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
         ),
-        focusedErrorBorder: OutlineInputBorder(
+    enabledBorder:
+        borderDecoration ??
+        OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: Colors.red,
-            width: 1,
-          ),
+          borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
         ),
-      );
+    focusedBorder:
+        borderDecoration ??
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Colors.blue, width: 1),
+        ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: Colors.red, width: 1),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: Colors.red, width: 1),
+    ),
+  );
 }

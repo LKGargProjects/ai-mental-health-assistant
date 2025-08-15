@@ -1,6 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math' as math;
+import '../config/feature_flags.dart';
+import 'streaming/streaming_sse.dart' as sse;
 import '../models/message.dart';
 import '../models/mood_entry.dart';
 import '../config/api_config.dart';
@@ -8,6 +13,7 @@ import '../config/api_config.dart';
 /// Optimized API service with better error handling and performance
 class ApiService {
   static const String _sessionKey = 'session_id';
+  static const String _analyticsConsentKey = 'analytics_consent';
   static const Duration _timeout = Duration(seconds: 30);
   static const int _maxRetries = 3;
 
@@ -19,6 +25,26 @@ class ApiService {
     _storage = const FlutterSecureStorage();
     _dio = _createDio();
     _setupInterceptors();
+  }
+
+  /// Best-effort country inference from device/browser locale (e.g., en_US -> US)
+  String? _deriveCountry() {
+    try {
+      final locale = WidgetsBinding.instance.platformDispatcher.locale;
+      final cc = locale.countryCode;
+      if (cc != null && cc.trim().isNotEmpty) {
+        return cc.toUpperCase();
+      }
+      // Fallback: try parsing from toString if needed (e.g., en_US)
+      final s = locale.toString();
+      final parts = s.split(RegExp(r'[_-]'));
+      if (parts.length >= 2 && parts[1].trim().isNotEmpty) {
+        return parts[1].toUpperCase();
+      }
+    } catch (_) {
+      // Ignore and return null
+    }
+    return null;
   }
 
   /// Create Dio instance with optimized configuration
@@ -65,10 +91,19 @@ class ApiService {
           if (_sessionId != null) {
             options.headers['X-Session-ID'] = _sessionId;
           }
+          // Attach a lightweight request ID for traceability
+          options.headers['X-Request-ID'] = _newRequestId();
           handler.next(options);
         },
       ),
     );
+  }
+
+  /// Create a lightweight request ID without extra dependencies
+  String _newRequestId() {
+    final ts = DateTime.now().microsecondsSinceEpoch;
+    final rnd = math.Random().nextInt(0x7fffffff);
+    return 'req-$ts-$rnd';
   }
 
   /// Log error details for debugging
@@ -96,6 +131,44 @@ class ApiService {
     return _sessionId!;
   }
 
+  /// Check if minimal analytics is enabled (explicit consent only)
+  Future<bool> isAnalyticsEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_analyticsConsentKey) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Persist analytics consent choice
+  Future<void> setAnalyticsConsent(bool enabled) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_analyticsConsentKey, enabled);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  /// Minimal client-side analytics logger (no PII). No-ops if consent is not given.
+  Future<void> logAnalyticsEvent(String eventType, {Map<String, dynamic>? metadata}) async {
+    try {
+      if (!(await isAnalyticsEnabled())) return;
+      await _getSessionId();
+      await _dio.post(
+        '/api/analytics/log',
+        data: {
+          'event_type': eventType,
+          if (metadata != null) 'metadata': metadata,
+        },
+        options: Options(headers: {'X-Analytics-Consent': 'true'}),
+      );
+    } catch (_) {
+      // Swallow analytics failures silently
+    }
+  }
+
   /// Create new session
   Future<String> _createNewSession() async {
     try {
@@ -118,12 +191,35 @@ class ApiService {
     });
   }
 
+  /// Open a streaming chat connection (SSE) when enabled and supported (web).
+  /// Returns null if streaming is disabled or not supported; caller should fall back.
+  Future<sse.SseHandle?> streamMessage(String message, {String? country}) async {
+    if (!FeatureFlags.enableStreaming || !kIsWeb) return null;
+    if (message.trim().isEmpty) return null;
+    await _getSessionId();
+
+    // Auto-derive country if not provided (web)
+    country ??= _deriveCountry();
+    if (kDebugMode) debugPrint('🔍 DEBUG: SSE country param resolved to: ${country ?? '(null)'}');
+
+    final query = <String, String>{
+      'message': message.trim(),
+      if (country != null) 'country': country,
+      'session_id': _sessionId ?? '',
+    };
+
+    final url = '${ApiConfig.baseUrl}/api/chat_stream';
+    return sse.connectSse(url: url, query: query);
+  }
+
   /// Send chat message with optimized error handling and geography-specific crisis detection
   Future<Message> sendMessage(String message, {String? country}) async {
     return _retryOperation(() async {
       await _getSessionId(); // Ensure session is available
 
       // Prepare request data with optional country parameter
+      // Auto-derive country if not provided
+      country ??= _deriveCountry();
       final requestData = <String, dynamic>{
         'message': message.trim(),
       };
@@ -146,44 +242,44 @@ class ApiService {
       RiskLevel riskLevel = RiskLevel.none;
       if (data['risk_level'] != null) {
         final riskLevelStr = data['risk_level'].toString().toLowerCase();
-        print('🔍 DEBUG: Raw risk_level from API: ${data['risk_level']}');
-        print('🔍 DEBUG: Processed risk_level: $riskLevelStr');
+        if (kDebugMode) debugPrint('🔍 DEBUG: Raw risk_level from API: ${data['risk_level']}');
+        if (kDebugMode) debugPrint('🔍 DEBUG: Processed risk_level: $riskLevelStr');
         switch (riskLevelStr) {
           case 'crisis':
           case 'high':
             riskLevel = RiskLevel.high;
-            print('🔍 DEBUG: Set riskLevel to RiskLevel.high');
+            if (kDebugMode) debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.high');
             break;
           case 'medium':
             riskLevel = RiskLevel.medium;
-            print('🔍 DEBUG: Set riskLevel to RiskLevel.medium');
+            if (kDebugMode) debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.medium');
             break;
           case 'low':
             riskLevel = RiskLevel.low;
-            print('🔍 DEBUG: Set riskLevel to RiskLevel.low');
+            if (kDebugMode) debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.low');
             break;
           default:
             riskLevel = RiskLevel.none;
-            print('🔍 DEBUG: Set riskLevel to RiskLevel.none (default)');
+            if (kDebugMode) debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.none (default)');
         }
       } else {
-        print('🔍 DEBUG: No risk_level field in API response');
+        if (kDebugMode) debugPrint('🔍 DEBUG: No risk_level field in API response');
       }
-      print('🔍 DEBUG: Final riskLevel: $riskLevel');
+      if (kDebugMode) debugPrint('🔍 DEBUG: Final riskLevel: $riskLevel');
 
       // Parse geography-specific crisis data
       String? crisisMsg;
       List<Map<String, dynamic>>? crisisNumbers;
       
-      print('🔍 DEBUG: Full API response data: $data');
-      print('🔍 DEBUG: crisis_msg field exists: ${data.containsKey('crisis_msg')}');
-      print('🔍 DEBUG: crisis_numbers field exists: ${data.containsKey('crisis_numbers')}');
+      if (kDebugMode) debugPrint('🔍 DEBUG: Full API response data: $data');
+      if (kDebugMode) debugPrint('🔍 DEBUG: crisis_msg field exists: ${data.containsKey('crisis_msg')}');
+      if (kDebugMode) debugPrint('🔍 DEBUG: crisis_numbers field exists: ${data.containsKey('crisis_numbers')}');
       
       if (data['crisis_msg'] != null) {
         crisisMsg = data['crisis_msg'] as String;
-        print('🔍 DEBUG: Crisis message: $crisisMsg');
+        if (kDebugMode) debugPrint('🔍 DEBUG: Crisis message: $crisisMsg');
       } else {
-        print('🔍 DEBUG: crisis_msg is null or missing');
+        if (kDebugMode) debugPrint('🔍 DEBUG: crisis_msg is null or missing');
       }
       
       if (data['crisis_numbers'] != null) {
@@ -191,9 +287,9 @@ class ApiService {
         crisisNumbers = numbersList.map((item) => 
           Map<String, dynamic>.from(item)
         ).toList();
-        print('🔍 DEBUG: Crisis numbers: $crisisNumbers');
+        if (kDebugMode) debugPrint('🔍 DEBUG: Crisis numbers: $crisisNumbers');
       } else {
-        print('🔍 DEBUG: crisis_numbers is null or missing');
+        if (kDebugMode) debugPrint('🔍 DEBUG: crisis_numbers is null or missing');
       }
 
       return Message(

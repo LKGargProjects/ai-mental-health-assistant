@@ -4,7 +4,7 @@ import 'package:ai_buddy_web/dhiwise/widgets/custom_image_view.dart';
 import 'widgets/quest_card_widget.dart';
 
 class QuestScreen extends StatelessWidget {
-  const QuestScreen({Key? key}) : super(key: key);
+  const QuestScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +19,7 @@ class QuestScreen extends StatelessWidget {
               width: SizeUtils.width,
               fit: BoxFit.cover,
             ),
-            
+
             // Main Content
             SingleChildScrollView(
               child: Padding(
@@ -30,12 +30,12 @@ class QuestScreen extends StatelessWidget {
                     // Header
                     _buildHeaderSection(),
                     SizedBox(height: 24.v),
-                    
+
                     // Active Quests Section
                     _buildSectionTitle('Active Quests'),
                     SizedBox(height: 16.v),
                     _buildActiveQuests(),
-                    
+
                     // Available Quests Section
                     SizedBox(height: 24.v),
                     _buildSectionTitle('Available Quests'),

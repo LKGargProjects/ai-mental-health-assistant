@@ -6,6 +6,12 @@
 # Stage 1: Build Flutter web app
 FROM debian:latest AS build-env
 
+# Build arguments for Sentry and environment metadata (optional)
+ARG SENTRY_DSN_FRONTEND
+ARG SENTRY_ENV
+ARG APP_VERSION
+ARG SENTRY_TRACES_SAMPLE_RATE
+
 # Install Flutter dependencies
 RUN apt-get update && apt-get install -y \
     curl \
@@ -35,7 +41,11 @@ WORKDIR /app
 
 # Get dependencies and build web app
 RUN flutter pub get
-RUN flutter build web --release
+RUN flutter build web --release \
+    --dart-define=SENTRY_DSN_FRONTEND=${SENTRY_DSN_FRONTEND} \
+    --dart-define=SENTRY_ENV=${SENTRY_ENV} \
+    --dart-define=APP_VERSION=${APP_VERSION} \
+    --dart-define=SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE}
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine

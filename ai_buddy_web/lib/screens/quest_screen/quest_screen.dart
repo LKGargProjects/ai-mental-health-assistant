@@ -136,6 +136,8 @@ class QuestScreen extends StatelessWidget {
           color: quest['color'] as Color,
           onTap: () {},
         );
+      },
+    );
   }
 
   // Available Quests List

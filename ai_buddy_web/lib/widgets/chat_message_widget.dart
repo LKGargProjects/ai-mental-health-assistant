@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'status_avatar.dart';
+import '../config/profile_config.dart';
 
 class ChatMessageWidget extends StatelessWidget {
   const ChatMessageWidget({
@@ -20,9 +22,11 @@ class ChatMessageWidget extends StatelessWidget {
             isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           if (!isUser) ...[
-            const CircleAvatar(
-              // Placeholder for AI avatar
-              child: Icon(Icons.android),
+            StatusAvatar(
+              name: ProfileConfig.aiName,
+              imageAsset: ProfileConfig.aiAvatarAsset,
+              size: 40,
+              status: PresenceStatus.online,
             ),
             const SizedBox(width: 8.0),
           ],
@@ -38,9 +42,12 @@ class ChatMessageWidget extends StatelessWidget {
           ),
           if (isUser) ...[
             const SizedBox(width: 8.0),
-            const CircleAvatar(
-              // Placeholder for user avatar
-              child: Icon(Icons.person),
+            StatusAvatar(
+              name: ProfileConfig.userName,
+              imageAsset: ProfileConfig.userAvatarAsset,
+              size: 40,
+              status: PresenceStatus.none,
+              showStatus: false,
             ),
           ],
         ],

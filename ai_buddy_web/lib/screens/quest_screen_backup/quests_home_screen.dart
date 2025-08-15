@@ -5,7 +5,7 @@ import 'package:ai_buddy_web/models/quest.dart';
 import 'package:ai_buddy_web/widgets/quest_card.dart';
 
 class QuestsHomeScreen extends StatelessWidget {
-  const QuestsHomeScreen({Key? key}) : super(key: key);
+  const QuestsHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -24,21 +24,21 @@ class QuestsHomeScreen extends StatelessWidget {
               // Level and XP Indicator
               _buildLevelIndicator(context),
               const SizedBox(height: 24),
-              
+
               // In Progress Quests
               _buildSectionTitle('In Progress'),
               const SizedBox(height: 16),
               _buildQuestList(context, QuestStatus.inProgress),
-              
+
               const SizedBox(height: 24),
-              
+
               // Available Quests
               _buildSectionTitle('Available Quests'),
               const SizedBox(height: 16),
               _buildQuestList(context, QuestStatus.unlocked),
-              
+
               const SizedBox(height: 24),
-              
+
               // Locked Quests (collapsed by default)
               _buildLockedQuestsSection(context),
             ],
@@ -54,7 +54,7 @@ class QuestsHomeScreen extends StatelessWidget {
         final level = questProvider.level;
         final xp = questProvider.totalXP % 1000; // XP in current level
         final xpNeeded = 1000; // XP needed for next level
-        
+
         return Card(
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -102,10 +102,7 @@ class QuestsHomeScreen extends StatelessWidget {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-      ),
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
     );
   }
 
@@ -164,27 +161,26 @@ class QuestsHomeScreen extends StatelessWidget {
         return ExpansionTile(
           title: const Text(
             'Locked Quests',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           children: [
             const SizedBox(height: 8),
-            ...lockedQuests.map((quest) => Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: Opacity(
-                opacity: 0.6,
-                child: QuestCard(
-                  title: '???',
-                  description: 'Complete previous quests to unlock',
-                  progress: 0,
-                  icon: Icons.lock_outline,
-                  color: Colors.grey,
-                  onTap: null,
+            ...lockedQuests.map(
+              (quest) => Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Opacity(
+                  opacity: 0.6,
+                  child: QuestCard(
+                    title: '???',
+                    description: 'Complete previous quests to unlock',
+                    progress: 0,
+                    icon: Icons.lock_outline,
+                    color: Colors.grey,
+                    onTap: null,
+                  ),
                 ),
               ),
-            )),
+            ),
           ],
         );
       },
@@ -230,7 +226,10 @@ class QuestsHomeScreen extends StatelessWidget {
                       color: _getCategoryColor(quest.category).withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(quest.icon, color: _getCategoryColor(quest.category)),
+                    child: Icon(
+                      quest.icon,
+                      color: _getCategoryColor(quest.category),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -266,10 +265,7 @@ class QuestsHomeScreen extends StatelessWidget {
               if (quest.status == QuestStatus.inProgress) ...[
                 const Text(
                   'Progress',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 8),
                 LinearProgressIndicator(
@@ -284,10 +280,7 @@ class QuestsHomeScreen extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: Text(
                     '${quest.progress} / ${quest.target} completed',
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 ),
                 const SizedBox(height: 24),

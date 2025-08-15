@@ -6,16 +6,14 @@ import 'package:ai_buddy_web/models/quest.dart';
 void main() {
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => QuestProvider()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => QuestProvider())],
       child: const QuestPreviewApp(),
     ),
   );
 }
 
 class QuestPreviewApp extends StatelessWidget {
-  const QuestPreviewApp({Key? key}) : super(key: key);
+  const QuestPreviewApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +30,7 @@ class QuestPreviewApp extends StatelessWidget {
 }
 
 class QuestsHomeScreen extends StatelessWidget {
-  const QuestsHomeScreen({Key? key}) : super(key: key);
+  const QuestsHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -47,11 +45,11 @@ class QuestsHomeScreen extends StatelessWidget {
           final inProgressQuests = questProvider.quests
               .where((q) => q.status == QuestStatus.inProgress)
               .toList();
-          
+
           final availableQuests = questProvider.quests
               .where((q) => q.status == QuestStatus.unlocked)
               .toList();
-          
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -60,27 +58,21 @@ class QuestsHomeScreen extends StatelessWidget {
                 // Level and XP Indicator
                 _buildLevelIndicator(),
                 const SizedBox(height: 24),
-                
+
                 // In Progress Quests
                 const Text(
                   'In Progress',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 _buildQuestList(inProgressQuests, context, questProvider),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Available Quests
                 const Text(
                   'Available Quests',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 _buildQuestList(availableQuests, context, questProvider),
@@ -95,9 +87,7 @@ class QuestsHomeScreen extends StatelessWidget {
   Widget _buildLevelIndicator() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: const Padding(
         padding: EdgeInsets.all(16.0),
         child: Column(
@@ -107,10 +97,7 @@ class QuestsHomeScreen extends StatelessWidget {
               children: [
                 Text(
                   'Level 5',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   '350 / 1000 XP',
@@ -133,7 +120,11 @@ class QuestsHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuestList(List<Quest> quests, BuildContext context, QuestProvider questProvider) {
+  Widget _buildQuestList(
+    List<Quest> quests,
+    BuildContext context,
+    QuestProvider questProvider,
+  ) {
     if (quests.isEmpty) {
       return const Center(
         child: Padding(
@@ -206,7 +197,11 @@ class QuestsHomeScreen extends StatelessWidget {
     );
   }
 
-  void _showQuestDetails(BuildContext context, Quest quest, QuestProvider questProvider) {
+  void _showQuestDetails(
+    BuildContext context,
+    Quest quest,
+    QuestProvider questProvider,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -217,7 +212,11 @@ class QuestsHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuestDetails(Quest quest, BuildContext context, QuestProvider questProvider) {
+  Widget _buildQuestDetails(
+    Quest quest,
+    BuildContext context,
+    QuestProvider questProvider,
+  ) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -243,7 +242,10 @@ class QuestsHomeScreen extends StatelessWidget {
                   color: _getCategoryColor(quest.category).withOpacity(0.2),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(quest.icon, color: _getCategoryColor(quest.category)),
+                child: Icon(
+                  quest.icon,
+                  color: _getCategoryColor(quest.category),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -279,10 +281,7 @@ class QuestsHomeScreen extends StatelessWidget {
           if (quest.status == QuestStatus.inProgress) ...[
             const Text(
               'Progress',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
             LinearProgressIndicator(
@@ -297,10 +296,7 @@ class QuestsHomeScreen extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Text(
                 '${quest.progress} / ${quest.target} completed',
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(color: Colors.grey, fontSize: 14),
               ),
             ),
             const SizedBox(height: 24),
@@ -313,11 +309,11 @@ class QuestsHomeScreen extends StatelessWidget {
                   if (newProgress <= quest.target) {
                     final updatedQuest = quest.copyWith(
                       progress: newProgress,
-                      status: newProgress >= quest.target 
-                          ? QuestStatus.completed 
+                      status: newProgress >= quest.target
+                          ? QuestStatus.completed
                           : QuestStatus.inProgress,
                     );
-                    
+
                     // Update the quest in the provider
                     _updateQuestInProvider(questProvider, updatedQuest);
                   }
@@ -336,7 +332,7 @@ class QuestsHomeScreen extends StatelessWidget {
                     progress: 1,
                     status: QuestStatus.inProgress,
                   );
-                  
+
                   // Update the quest in the provider
                   _updateQuestInProvider(questProvider, updatedQuest);
                   Navigator.pop(context);

@@ -9,18 +9,18 @@ ThemeData get theme => ThemeHelper().themeData();
 // ignore_for_file: must_be_immutable
 class ThemeHelper {
   // A map of custom color themes supported by the app
-  Map<String, LightCodeColors> _supportedCustomColor = {
-    'lightCode': LightCodeColors()
+  final Map<String, LightCodeColors> _supportedCustomColor = {
+    'lightCode': LightCodeColors(),
   };
 
   // A map of color schemes supported by the app
-  Map<String, ColorScheme> _supportedColorScheme = {
-    'lightCode': ColorSchemes.lightCodeColorScheme
+  final Map<String, ColorScheme> _supportedColorScheme = {
+    'lightCode': ColorSchemes.lightCodeColorScheme,
   };
 
-  /// Changes the app theme to [_newTheme].
-  void changeTheme(String _newTheme) {
-    _appTheme = _newTheme;
+  /// Changes the app theme to [newTheme].
+  void changeTheme(String newTheme) {
+    _appTheme = newTheme;
   }
 
   /// Returns the lightCode colors for the current theme.

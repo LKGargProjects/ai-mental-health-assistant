@@ -13,7 +13,7 @@ class QuestCard extends StatelessWidget {
   final int? xpReward;
 
   const QuestCard({
-    Key? key,
+    super.key,
     required this.title,
     required this.description,
     this.progress = 0.0,
@@ -23,7 +23,7 @@ class QuestCard extends StatelessWidget {
     this.showProgress = true,
     this.isLocked = false,
     this.xpReward,
-  }) : super(key: key);
+  });
 
   factory QuestCard.fromQuest(Quest quest, {VoidCallback? onTap}) {
     return QuestCard(
@@ -61,9 +61,7 @@ class QuestCard extends StatelessWidget {
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: isLocked ? null : onTap,
         borderRadius: BorderRadius.circular(12),
@@ -117,7 +115,9 @@ class QuestCard extends StatelessWidget {
                           ],
                           const SizedBox(height: 4),
                           Text(
-                            isLocked ? 'Complete previous quests to unlock' : description,
+                            isLocked
+                                ? 'Complete previous quests to unlock'
+                                : description,
                             style: TextStyle(
                               color: Colors.grey[600],
                               fontSize: 14,

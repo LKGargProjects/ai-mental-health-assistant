@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
 
 class AppNavigationScreen extends StatelessWidget {
-  const AppNavigationScreen({Key? key}) : super(key: key);
+  const AppNavigationScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -22,19 +22,23 @@ class AppNavigationScreen extends StatelessWidget {
                         context,
                         screenTitle: "Root",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.mentalHealthChatScreen),
+                          context,
+                          AppRoutes.mentalHealthChatScreen,
+                        ),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Root",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.wellnessDashboardScreen),
+                          context,
+                          AppRoutes.wellnessDashboardScreen,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -63,13 +67,11 @@ class AppNavigationScreen extends StatelessWidget {
                 Text(
                   screenTitle,
                   textAlign: TextAlign.center,
-                  style: TextStyleHelper.instance.title20RegularRoboto
-                      .copyWith(color: Color(0XFF000000)),
+                  style: TextStyleHelper.instance.title20RegularRoboto.copyWith(
+                    color: Color(0XFF000000),
+                  ),
                 ),
-                Icon(
-                  Icons.arrow_forward,
-                  color: Color(0XFF343330),
-                )
+                Icon(Icons.arrow_forward, color: Color(0XFF343330)),
               ],
             ),
             SizedBox(height: 10.h),

@@ -5,29 +5,27 @@ import '../../theme/theme_helper.dart';
 import '../../theme/text_style_helper.dart';
 import './custom_image_view.dart';
 
-/**
- * CustomButton - A flexible button component that supports text, icon, and mixed content
- * with customizable styling including background colors, borders, padding, and sizes.
- * 
- * @param text - Button text content
- * @param imagePath - Path to button icon/image
- * @param onPressed - Callback function when button is pressed
- * @param backgroundColor - Background color of the button
- * @param textColor - Color of the button text
- * @param borderColor - Color of the button border
- * @param showBorder - Whether to show border around button
- * @param padding - Internal padding of the button
- * @param borderRadius - Corner radius of the button
- * @param textStyle - Custom text style for button text
- * @param height - Height of the button
- * @param width - Width of the button
- * @param buttonType - Type of button (text, icon, or elevated)
- * @param imageHeight - Height of the button image
- * @param imageWidth - Width of the button image
- */
+/// CustomButton - A flexible button component that supports text, icon, and mixed content
+/// with customizable styling including background colors, borders, padding, and sizes.
+///
+/// @param text - Button text content
+/// @param imagePath - Path to button icon/image
+/// @param onPressed - Callback function when button is pressed
+/// @param backgroundColor - Background color of the button
+/// @param textColor - Color of the button text
+/// @param borderColor - Color of the button border
+/// @param showBorder - Whether to show border around button
+/// @param padding - Internal padding of the button
+/// @param borderRadius - Corner radius of the button
+/// @param textStyle - Custom text style for button text
+/// @param height - Height of the button
+/// @param width - Width of the button
+/// @param buttonType - Type of button (text, icon, or elevated)
+/// @param imageHeight - Height of the button image
+/// @param imageWidth - Width of the button image
 class CustomButton extends StatelessWidget {
   const CustomButton({
-    Key? key,
+    super.key,
     this.text,
     this.imagePath,
     this.onPressed,
@@ -43,7 +41,7 @@ class CustomButton extends StatelessWidget {
     this.buttonType,
     this.imageHeight,
     this.imageWidth,
-  }) : super(key: key);
+  });
 
   /// Button text content
   final String? text;
@@ -241,7 +239,8 @@ class CustomButton extends StatelessWidget {
           Text(
             text!,
             style: _getEffectiveTextStyle(
-                textColor), // Modified: Fixed method call syntax
+              textColor,
+            ), // Modified: Fixed method call syntax
           ),
         ],
       );
@@ -257,7 +256,8 @@ class CustomButton extends StatelessWidget {
       return Text(
         text!,
         style: _getEffectiveTextStyle(
-            textColor), // Modified: Fixed method call syntax
+          textColor,
+        ), // Modified: Fixed method call syntax
       );
     } else {
       // Fallback
@@ -270,7 +270,8 @@ class CustomButton extends StatelessWidget {
     final baseStyle = textStyle ?? TextStyleHelper.instance.title18Regular;
 
     return baseStyle.copyWith(
-      color: baseStyle.color ??
+      color:
+          baseStyle.color ??
           defaultColor ??
           Colors.black, // Modified: Fixed undefined defaultColor
     );
@@ -278,8 +279,4 @@ class CustomButton extends StatelessWidget {
 }
 
 /// Enum for different button types
-enum CustomButtonType {
-  elevated,
-  text,
-  icon,
-}
+enum CustomButtonType { elevated, text, icon }

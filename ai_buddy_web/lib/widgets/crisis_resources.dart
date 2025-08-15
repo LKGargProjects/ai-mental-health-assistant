@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/message.dart';
 
@@ -48,7 +50,7 @@ class CrisisResourcesWidget extends StatelessWidget {
               runSpacing: 8,
               children: _getGeographySpecificResources().map((resource) {
                 return ElevatedButton.icon(
-                  onPressed: () => _launchUrl(resource.url),
+                  onPressed: () => _launchUrl(context, resource.url, label: resource.label),
                   icon: Icon(resource.icon),
                   label: Text(resource.label),
                   style: ElevatedButton.styleFrom(
@@ -145,7 +147,7 @@ class CrisisResourcesWidget extends StatelessWidget {
     if (crisisNumbers != null && crisisNumbers!.isNotEmpty) {
       for (final number in crisisNumbers!) {
         final name = number['name'] as String? ?? 'Crisis Helpline';
-        final phoneNumber = number['number'] as String?;
+        final phoneNumber = (number['number'] as String?) ?? (number['phone'] as String?);
         final textNumber = number['text'] as String?;
         final url = number['url'] as String?;
 
@@ -159,7 +161,7 @@ class CrisisResourcesWidget extends StatelessWidget {
           );
         } else if (textNumber != null) {
           resources.add(
-            CrisisResource(label: name, url: 'sms:741741', icon: Icons.message),
+            CrisisResource(label: name, url: 'sms:$textNumber', icon: Icons.message),
           );
         } else if (url != null) {
           resources.add(
@@ -209,10 +211,42 @@ class CrisisResourcesWidget extends StatelessWidget {
     return resources;
   }
 
-  Future<void> _launchUrl(String url) async {
+  Future<void> _launchUrl(BuildContext context, String url, {String? label}) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    try {
+      final launched = await canLaunchUrl(uri) && await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (launched) return;
+    } catch (_) {
+      // Fall through to copy-to-clipboard
+    }
+
+    // Fallbacks by scheme, especially for web where tel:/sms: are unsupported
+    if (uri.scheme == 'tel') {
+      final number = uri.path; // after tel:
+      await Clipboard.setData(ClipboardData(text: number));
+      if (!kIsWeb) return; // On mobile, if we reach here copy is enough silently
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Phone number copied: $number')),
+      );
+      return;
+    }
+    if (uri.scheme == 'sms') {
+      final number = uri.path; // after sms:
+      await Clipboard.setData(ClipboardData(text: number));
+      if (!kIsWeb) return;
+      final res = (label != null && label.isNotEmpty) ? ' for $label' : '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('SMS number$res copied: $number')),
+      );
+      return;
+    }
+
+    // Generic URL fallback: copy URL
+    await Clipboard.setData(ClipboardData(text: url));
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Link copied: $url')),
+      );
     }
   }
 }

@@ -7,16 +7,14 @@ import 'package:ai_buddy_web/dhiwise/presentation/wellness_dashboard_screen/well
 void main() {
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => QuestProvider()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => QuestProvider())],
       child: const QuestPreviewApp(),
     ),
   );
 }
 
 class QuestPreviewApp extends StatelessWidget {
-  const QuestPreviewApp({Key? key}) : super(key: key);
+  const QuestPreviewApp({super.key});
 
   @override
   Widget build(BuildContext context) {

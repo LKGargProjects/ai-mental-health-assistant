@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 
 class SelfAssessmentWidget extends StatefulWidget {
@@ -89,9 +90,9 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
         assessmentData['anxiety_level'] = _selectedAnxietyLevel;
       }
 
-      print('📤 Sending self-assessment data: $assessmentData');
+      if (kDebugMode) debugPrint('📤 Sending self-assessment data: $assessmentData');
       final response = await apiService.submitSelfAssessment(assessmentData);
-      print('✅ Self-assessment response: $response');
+      if (kDebugMode) debugPrint('✅ Self-assessment response: $response');
 
       // If we reach here, the submission was successful
       if (mounted) {
@@ -117,7 +118,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
         widget.onAssessmentSubmitted?.call();
       }
     } catch (e) {
-      print('❌ Self-assessment error: $e');
+      if (kDebugMode) debugPrint('❌ Self-assessment error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

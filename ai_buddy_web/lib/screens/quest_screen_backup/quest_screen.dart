@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'widgets/quest_card_widget.dart';
 
 class QuestScreen extends StatelessWidget {
-  const QuestScreen({Key? key}) : super(key: key);
+  const QuestScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

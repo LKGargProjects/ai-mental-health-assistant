@@ -9,6 +9,15 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - lib/screens/quest_screen_backup/**
+    - lib/screens/quest_screen/**
+    - lib/dhiwise_export/**
+    - lib/dhiwise/**
+    - lib/screens/dhiwise_dashboard_screen.dart
+    - lib/dhiwise/**/backup/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

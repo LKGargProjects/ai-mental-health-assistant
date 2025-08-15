@@ -5,7 +5,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 
 class MentalHealthChatScreen extends StatelessWidget {
-  MentalHealthChatScreen({Key? key}) : super(key: key);
+  const MentalHealthChatScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -95,10 +95,7 @@ class MentalHealthChatScreen extends StatelessWidget {
               ),
 
               // Divider
-              Container(
-                height: 8.h,
-                color: appTheme.colorFFF3F4,
-              ),
+              Container(height: 8.h, color: appTheme.colorFFF3F4),
 
               // Chat Messages
               Expanded(
@@ -142,10 +139,7 @@ class MentalHealthChatScreen extends StatelessWidget {
               ),
 
               // Divider
-              Container(
-                height: 16.h,
-                color: appTheme.colorFFF3F4,
-              ),
+              Container(height: 16.h, color: appTheme.colorFFF3F4),
 
               // Quick Response Buttons
               Container(
@@ -162,7 +156,9 @@ class MentalHealthChatScreen extends StatelessWidget {
                         borderColor: appTheme.colorFFE5E7,
                         textStyle: TextStyleHelper.instance.title18,
                         padding: EdgeInsets.symmetric(
-                            horizontal: 24.h, vertical: 12.h),
+                          horizontal: 24.h,
+                          vertical: 12.h,
+                        ),
                         onPressed: () {
                           // Handle quick response
                         },
@@ -176,7 +172,9 @@ class MentalHealthChatScreen extends StatelessWidget {
                         textColor: appTheme.colorFF6B72,
                         textStyle: TextStyleHelper.instance.title18,
                         padding: EdgeInsets.symmetric(
-                            horizontal: 24.h, vertical: 12.h),
+                          horizontal: 24.h,
+                          vertical: 12.h,
+                        ),
                         onPressed: () {
                           // Handle quick response
                         },
@@ -192,7 +190,9 @@ class MentalHealthChatScreen extends StatelessWidget {
                         borderColor: appTheme.colorFFE5E7,
                         textStyle: TextStyleHelper.instance.title18,
                         padding: EdgeInsets.symmetric(
-                            horizontal: 24.h, vertical: 12.h),
+                          horizontal: 24.h,
+                          vertical: 12.h,
+                        ),
                         onPressed: () {
                           // Handle quick response
                         },
@@ -211,8 +211,10 @@ class MentalHealthChatScreen extends StatelessWidget {
                     color: appTheme.colorFFF3F4,
                     borderRadius: BorderRadius.circular(25.h),
                   ),
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.h,
+                    vertical: 16.h,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
@@ -224,8 +226,9 @@ class MentalHealthChatScreen extends StatelessWidget {
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.zero,
                           ),
-                          style: TextStyleHelper.instance.title18
-                              .copyWith(color: appTheme.colorFF6B72),
+                          style: TextStyleHelper.instance.title18.copyWith(
+                            color: appTheme.colorFF6B72,
+                          ),
                         ),
                       ),
                       SizedBox(width: 12.h),
@@ -325,8 +328,10 @@ class MentalHealthChatScreen extends StatelessWidget {
             padding: EdgeInsets.all(16.h),
             child: Text(
               message,
-              style: TextStyleHelper.instance.title18
-                  .copyWith(color: appTheme.colorFF6B72, height: 1.44),
+              style: TextStyleHelper.instance.title18.copyWith(
+                color: appTheme.colorFF6B72,
+                height: 1.44,
+              ),
             ),
           ),
         ),
@@ -352,8 +357,10 @@ class MentalHealthChatScreen extends StatelessWidget {
             padding: EdgeInsets.all(16.h),
             child: Text(
               message,
-              style: TextStyleHelper.instance.title18
-                  .copyWith(color: appTheme.colorFF1665, height: 1.44),
+              style: TextStyleHelper.instance.title18.copyWith(
+                color: appTheme.colorFF1665,
+                height: 1.44,
+              ),
             ),
           ),
         ),
@@ -396,16 +403,13 @@ class MentalHealthChatScreen extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CustomImageView(
-            imagePath: iconPath,
-            height: 40.h,
-            width: 40.h,
-          ),
+          CustomImageView(imagePath: iconPath, height: 40.h, width: 40.h),
           SizedBox(height: 4.h),
           Text(
             label,
             style: TextStyleHelper.instance.body14Medium.copyWith(
-                color: isActive ? appTheme.blackCustom : appTheme.colorFF6B72),
+              color: isActive ? appTheme.blackCustom : appTheme.colorFF6B72,
+            ),
           ),
         ],
       ),

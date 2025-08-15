@@ -12,7 +12,7 @@ class QuestCardWidget extends StatelessWidget {
   final VoidCallback? onTap;
 
   const QuestCardWidget({
-    Key? key,
+    super.key,
     required this.title,
     this.subtitle,
     required this.icon,
@@ -20,7 +20,7 @@ class QuestCardWidget extends StatelessWidget {
     this.isActive = false,
     this.progress,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -52,14 +52,10 @@ class QuestCardWidget extends StatelessWidget {
                     color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12.h),
                   ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: 24.h,
-                  ),
+                  child: Icon(icon, color: color, size: 24.h),
                 ),
                 SizedBox(width: 16.h),
-                
+
                 // Title and Subtitle
                 Expanded(
                   child: Column(
@@ -67,24 +63,24 @@ class QuestCardWidget extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: TextStyleHelper.instance.titleSmallInter.copyWith(
-                          color: ColorConstant.gray900,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyleHelper.instance.titleSmallInter
+                            .copyWith(
+                              color: ColorConstant.gray900,
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       if (subtitle != null) ...[
                         SizedBox(height: 4.v),
                         Text(
                           subtitle!,
-                          style: TextStyleHelper.instance.bodySmallInter.copyWith(
-                            color: ColorConstant.gray500,
-                          ),
+                          style: TextStyleHelper.instance.bodySmallInter
+                              .copyWith(color: ColorConstant.gray500),
                         ),
                       ],
                     ],
                   ),
                 ),
-                
+
                 // Action Button
                 isActive
                     ? CustomButton(
@@ -103,7 +99,7 @@ class QuestCardWidget extends StatelessWidget {
                       ),
               ],
             ),
-            
+
             // Progress Bar (only for active quests)
             if (isActive && progress != null) ...[
               SizedBox(height: 16.v),

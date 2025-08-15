@@ -5,7 +5,7 @@ import 'package:ai_buddy_web/models/quest.dart';
 import 'package:ai_buddy_web/widgets/dhiwise/custom_image_view.dart';
 
 class DhiwiseQuestScreen extends StatelessWidget {
-  const DhiwiseQuestScreen({Key? key}) : super(key: key);
+  const DhiwiseQuestScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -20,25 +20,28 @@ class DhiwiseQuestScreen extends StatelessWidget {
               width: MediaQuery.of(context).size.width,
               fit: BoxFit.cover,
             ),
-            
+
             // Main Content
             Consumer<QuestProvider>(
               builder: (context, questProvider, _) {
                 return SingleChildScrollView(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 24,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Header
                         _buildHeaderSection(context, questProvider),
                         const SizedBox(height: 24),
-                        
+
                         // Active Quests Section
                         _buildSectionTitle('Active Quests'),
                         const SizedBox(height: 16),
                         _buildActiveQuests(questProvider),
-                        
+
                         // Available Quests Section
                         const SizedBox(height: 24),
                         _buildSectionTitle('Available Quests'),
@@ -56,7 +59,10 @@ class DhiwiseQuestScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderSection(BuildContext context, QuestProvider questProvider) {
+  Widget _buildHeaderSection(
+    BuildContext context,
+    QuestProvider questProvider,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -137,12 +143,14 @@ class DhiwiseQuestScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuestCard(Quest quest, QuestProvider questProvider, BuildContext context) {
+  Widget _buildQuestCard(
+    Quest quest,
+    QuestProvider questProvider,
+    BuildContext context,
+  ) {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: Container(
@@ -206,10 +214,7 @@ class DhiwiseQuestScreen extends StatelessWidget {
           const Icon(Icons.info_outline, color: Colors.blue),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
+            child: Text(message, style: TextStyle(color: Colors.grey[600])),
           ),
         ],
       ),
@@ -217,7 +222,10 @@ class DhiwiseQuestScreen extends StatelessWidget {
   }
 
   void _showQuestDetails(
-      BuildContext context, Quest quest, QuestProvider questProvider) {
+    BuildContext context,
+    Quest quest,
+    QuestProvider questProvider,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -229,7 +237,10 @@ class DhiwiseQuestScreen extends StatelessWidget {
   }
 
   Widget _buildQuestDetails(
-      Quest quest, BuildContext context, QuestProvider questProvider) {
+    Quest quest,
+    BuildContext context,
+    QuestProvider questProvider,
+  ) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -294,10 +305,7 @@ class DhiwiseQuestScreen extends StatelessWidget {
           if (quest.status == QuestStatus.inProgress) ...[
             const Text(
               'Progress',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
             LinearProgressIndicator(
@@ -312,10 +320,7 @@ class DhiwiseQuestScreen extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Text(
                 '${quest.progress} / ${quest.target} completed',
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(color: Colors.grey, fontSize: 14),
               ),
             ),
             const SizedBox(height: 24),
@@ -332,7 +337,7 @@ class DhiwiseQuestScreen extends StatelessWidget {
                           ? QuestStatus.completed
                           : QuestStatus.inProgress,
                     );
-                    
+
                     // Update the quest in the provider
                     // Note: In a real implementation, we would call a method on questProvider
                     // to update the quest. For now, we'll just reload the quests.
@@ -353,7 +358,7 @@ class DhiwiseQuestScreen extends StatelessWidget {
                     progress: 1,
                     status: QuestStatus.inProgress,
                   );
-                  
+
                   // Update the quest in the provider
                   // Note: In a real implementation, we would call a method on questProvider
                   // to update the quest. For now, we'll just reload the quests.

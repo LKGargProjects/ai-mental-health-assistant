@@ -19,6 +19,16 @@ services:
       - REDIS_URL=redis://redis:6379
       - VERSION=${VERSION:-1.0.0}
       - BUILD_TIME=${BUILD_TIME:-unknown}
+      # Admin + retention configuration
+      - ADMIN_API_TOKEN=${ADMIN_API_TOKEN:-}
+      - MESSAGE_RETENTION_DAYS=${MESSAGE_RETENTION_DAYS:-30}
+      - SESSION_RETENTION_DAYS=${SESSION_RETENTION_DAYS:-14}
+      - ERROR_LOG_RETENTION_DAYS=${ERROR_LOG_RETENTION_DAYS:-14}
+      - ANALYTICS_RETENTION_DAYS=${ANALYTICS_RETENTION_DAYS:-90}
+      # Sentry backend configuration (optional)
+      - SENTRY_DSN_BACKEND=${SENTRY_DSN_BACKEND:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0}
+      - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
     depends_on:
       - db
       - redis
@@ -80,6 +90,11 @@ services:
     build:
       context: ./ai_buddy_web
       dockerfile: Dockerfile.web
+      args:
+        - SENTRY_DSN_FRONTEND=${SENTRY_DSN_FRONTEND:-}
+        - SENTRY_ENV=${ENVIRONMENT:-docker}
+        - APP_VERSION=${VERSION:-1.0.0}
+        - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0}
     ports:
       - "${FLUTTER_WEB_PORT:-8080}:8080"
     environment:

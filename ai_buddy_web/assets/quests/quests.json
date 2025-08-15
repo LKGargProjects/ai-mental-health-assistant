@@ -38,7 +38,7 @@
     "title": "Calm music",
     "subtitle": "Lo‑fi playlist",
     "duration_min": null,
-    "url": "https://example.com/lofi",
+    "url": null,
     "checklist": [],
     "timer_suggested": false,
     "active": true
@@ -82,7 +82,7 @@
     "title": "Stretch break",
     "subtitle": "Neck/shoulder/chest",
     "duration_min": 3,
-    "url": "https://example.com/stretch",
+    "url": null,
     "checklist": ["Neck rolls x5", "Shoulder shrugs x10", "Chest opener x5"],
     "timer_suggested": true,
     "active": true
@@ -104,7 +104,7 @@
     "title": "Study focus tips",
     "subtitle": "Three pointers",
     "duration_min": null,
-    "url": "https://example.com/focus-tips",
+    "url": null,
     "checklist": [],
     "timer_suggested": false,
     "active": true
@@ -148,7 +148,7 @@
     "title": "Short stretch",
     "subtitle": "Illustrated routine",
     "duration_min": null,
-    "url": "https://example.com/short-stretch",
+    "url": null,
     "checklist": [],
     "timer_suggested": false,
     "active": true
@@ -192,7 +192,7 @@
     "title": "Calm music",
     "subtitle": "Instrumental mix",
     "duration_min": null,
-    "url": "https://example.com/lofi2",
+    "url": null,
     "checklist": [],
     "timer_suggested": false,
     "active": true
@@ -236,7 +236,7 @@
     "title": "Stretch break",
     "subtitle": "Back/hips quick set",
     "duration_min": 3,
-    "url": "https://example.com/stretch2",
+    "url": null,
     "checklist": ["Hip opener x5", "Cat‑cow x5"],
     "timer_suggested": true,
     "active": true
@@ -258,7 +258,7 @@
     "title": "Study focus tips",
     "subtitle": "2 quick ideas",
     "duration_min": null,
-    "url": "https://example.com/focus-tips2",
+    "url": null,
     "checklist": [],
     "timer_suggested": false,
     "active": true
@@ -302,7 +302,7 @@
     "title": "Short stretch",
     "subtitle": "Standing sequence",
     "duration_min": null,
-    "url": "https://example.com/short-stretch2",
+    "url": null,
     "checklist": [],
     "timer_suggested": false,
     "active": true
@@ -324,7 +324,7 @@
     "title": "Box breathing guide",
     "subtitle": "Simple visual",
     "duration_min": 2,
-    "url": "https://example.com/box-breath",
+    "url": null,
     "checklist": [],
     "timer_suggested": false,
     "active": true

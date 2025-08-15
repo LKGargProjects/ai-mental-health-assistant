@@ -6,16 +6,14 @@ import 'dhiwise_quest_screen.dart';
 void main() {
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => QuestProvider()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => QuestProvider())],
       child: const QuestPreviewApp(),
     ),
   );
 }
 
 class QuestPreviewApp extends StatelessWidget {
-  const QuestPreviewApp({Key? key}) : super(key: key);
+  const QuestPreviewApp({super.key});
 
   @override
   Widget build(BuildContext context) {

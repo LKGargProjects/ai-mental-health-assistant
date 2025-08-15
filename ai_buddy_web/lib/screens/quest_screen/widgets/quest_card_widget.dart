@@ -9,36 +9,32 @@ class QuestCardWidget extends StatelessWidget {
   final double? progress;
 
   const QuestCardWidget({
-    Key? key,
+    super.key,
     required this.title,
     this.subtitle,
     required this.icon,
     required this.color,
     required this.onTap,
     this.progress,
-  }) : super(key: key);
+  });
 
   // Button style getters
   ButtonStyle get _buttonStyle => ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        elevation: 0,
-      );
+    backgroundColor: color,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    elevation: 0,
+  );
 
   ButtonStyle get _outlineButtonStyle => ElevatedButton.styleFrom(
-        backgroundColor: Colors.transparent,
-        foregroundColor: color,
-        side: BorderSide(color: color, width: 1.5),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        elevation: 0,
-      );
+    backgroundColor: Colors.transparent,
+    foregroundColor: color,
+    side: BorderSide(color: color, width: 1.5),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    elevation: 0,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -70,11 +66,7 @@ class QuestCardWidget extends StatelessWidget {
                     color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: 24,
-                  ),
+                  child: Icon(icon, color: color, size: 24),
                 ),
                 const SizedBox(width: 16),
 

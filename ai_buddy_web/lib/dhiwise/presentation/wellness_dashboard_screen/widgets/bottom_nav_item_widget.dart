@@ -9,13 +9,13 @@ class BottomNavItemWidget extends StatelessWidget {
   final bool isActive;
   final VoidCallback? onTap;
 
-  BottomNavItemWidget({
-    Key? key,
+  const BottomNavItemWidget({
+    super.key,
     required this.iconPath,
     required this.label,
     this.isActive = false,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +34,8 @@ class BottomNavItemWidget extends StatelessWidget {
           Text(
             label,
             style: TextStyleHelper.instance.title19MediumInter.copyWith(
-                color: isActive ? Color(0xFF16160F) : Color(0xFF8C825E)),
+              color: isActive ? Color(0xFF16160F) : Color(0xFF8C825E),
+            ),
           ),
         ],
       ),

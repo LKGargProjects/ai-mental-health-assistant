@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'screens/quest_screen/quest_screen.dart';
-import 'screens/quest_screen/widgets/quest_card_widget.dart';
 
 void main() {
   runApp(const QuestLauncherApp());
@@ -21,9 +20,7 @@ class QuestLauncherApp extends StatelessWidget {
           secondary: const Color(0xFFFF6B6B),
         ),
       ),
-      home: const Scaffold(
-        body: QuestScreen(),
-      ),
+      home: const Scaffold(body: QuestScreen()),
     );
   }
 }
