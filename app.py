@@ -6,11 +6,12 @@ Optimized for single codebase usage across development, Docker, and Render produ
 import os
 import json
 import uuid
+import re
 import redis
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple, List
 
-from flask import Flask, request, jsonify, session, send_from_directory
+from flask import Flask, request, jsonify, session, send_from_directory, Response, g
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from flask_session import Session
@@ -29,6 +30,12 @@ from providers.openai import get_openai_response
 from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
 from crisis_detection import detect_crisis_level
 import requests
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+    SENTRY_AVAILABLE = True
+except Exception:
+    SENTRY_AVAILABLE = False
 
 # Geography-specific crisis resources
 CRISIS_RESOURCES_BY_COUNTRY = {
@@ -259,8 +266,12 @@ class Config:
     PPLX_API_KEY = os.getenv('PPLX_API_KEY')
     AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
     
-    # CORS configuration
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:8080,http://localhost:3000').split(',')
+    # CORS configuration (env-driven; fallback to environment config)
+    CORS_ORIGINS = [
+        o.strip() for o in (
+            os.getenv('CORS_ORIGINS') or ','.join(ENV_CONFIG.get('cors_origins', []))
+        ).split(',') if o.strip()
+    ]
     
     # Rate limiting
     RATE_LIMIT_ENABLED = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() == 'true'
@@ -273,6 +284,15 @@ class Config:
     # Version and build info
     VERSION = os.getenv('VERSION', '1.0.0')
     BUILD_TIME = os.getenv('BUILD_TIME', 'unknown')
+    
+    # Retention policy (days)
+    MESSAGE_RETENTION_DAYS = int(os.getenv('MESSAGE_RETENTION_DAYS', 30))
+    SESSION_RETENTION_DAYS = int(os.getenv('SESSION_RETENTION_DAYS', 14))
+    ERROR_LOG_RETENTION_DAYS = int(os.getenv('ERROR_LOG_RETENTION_DAYS', 14))
+    ANALYTICS_RETENTION_DAYS = int(os.getenv('ANALYTICS_RETENTION_DAYS', 90))
+    
+    # Admin token for protected maintenance endpoints
+    ADMIN_API_TOKEN = os.getenv('ADMIN_API_TOKEN')
 
 def create_app() -> Flask:
     """Application factory pattern for single codebase usage"""
@@ -280,6 +300,23 @@ def create_app() -> Flask:
     
     # Load configuration
     app.config.from_object(Config)
+    
+    # Initialize Sentry (if DSN provided)
+    try:
+        dsn = os.getenv('SENTRY_DSN_BACKEND', '').strip()
+        if dsn:
+            sentry_sdk.init(
+                dsn=dsn,
+                integrations=[FlaskIntegration()],
+                traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0') or 0),
+                profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE', '0') or 0),
+                environment=Config.ENVIRONMENT,
+                release=Config.VERSION,
+            )
+            app.logger.info("Sentry initialized for backend")
+    except Exception as e:
+        # Non-fatal: continue without Sentry
+        app.logger.warning(f"Sentry init failed: {e}")
     
     # Set SQLAlchemy database URI with explicit psycopg driver
     if Config.DATABASE_URL:
@@ -301,6 +338,30 @@ def create_app() -> Flask:
     # Register routes
     _register_routes(app)
     _register_additional_routes(app)
+    
+    # Attach a request ID to each request and response for traceability
+    @app.before_request
+    def _attach_request_id():
+        try:
+            rid = request.headers.get('X-Request-ID') or str(uuid.uuid4())
+            g.request_id = rid
+            # Also set as Sentry tag if available
+            try:
+                sentry_sdk.set_tag('request_id', rid)
+            except Exception:
+                pass
+        except Exception:
+            pass
+    
+    @app.after_request
+    def _add_request_id_header(resp):
+        try:
+            rid = getattr(g, 'request_id', None)
+            if rid:
+                resp.headers['X-Request-ID'] = rid
+        except Exception:
+            pass
+        return resp
     
     return app
 
@@ -361,6 +422,18 @@ def _init_database(app: Flask) -> None:
                     risk_level VARCHAR(50) NOT NULL,
                     risk_score DECIMAL(3,2) NOT NULL,
                     keywords TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            # Minimal analytics events table (no PII)
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS analytics_events (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) REFERENCES sessions(id),
+                    event_type VARCHAR(64) NOT NULL,
+                    metadata TEXT, -- store compact JSON string (no PII)
+                    request_id VARCHAR(64),
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -431,12 +504,40 @@ def _setup_rate_limiter(app: Flask) -> Limiter:
 
 def _setup_cors(app: Flask) -> None:
     """Configure CORS with security best practices"""
-    CORS(app, 
-         origins="*",
-         supports_credentials=True,
-         allow_headers=["Content-Type", "Authorization", "X-Session-ID", "Accept"],
-         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         expose_headers=["Content-Type", "X-Session-ID"])
+    origins = app.config.get('CORS_ORIGINS') or [
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+        'http://localhost:3000',
+        'http://localhost:9100',
+        'http://127.0.0.1:9100',
+    ]
+    # In local environment, also allow any localhost/127.0.0.1 port to avoid dev port hassle
+    try:
+        if Config.ENVIRONMENT == 'local' or Config.DOCKER_ENV:
+            # Append regex origins that match any port on localhost/127.0.0.1
+            origins = list(origins) + [
+                re.compile(r'^http://localhost:\d+$'),
+                re.compile(r'^http://127\.0\.0\.1:\d+$'),
+            ]
+    except Exception:
+        # Non-fatal: fall back to explicit origins only
+        pass
+    CORS(
+        app,
+        origins=origins,
+        supports_credentials=True,
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "Accept",
+            "X-Session-ID",
+            "X-Request-ID",
+            "X-Analytics-Consent",
+            "X-Admin-Token",
+        ],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        expose_headers=["Content-Type", "X-Session-ID", "X-Request-ID"],
+    )
 
 def _register_routes(app: Flask) -> None:
     """Register all application routes"""
@@ -498,11 +599,13 @@ def _register_routes(app: Flask) -> None:
                 "endpoints": [
                     "/api/health",
                     "/api/chat", 
+                    "/api/chat_stream",
                     "/api/get_or_create_session",
                     "/api/chat_history",
                     "/api/mood_history",
                     "/api/mood_entry",
-                    "/api/self_assessment"
+                    "/api/self_assessment",
+                    "/api/analytics/log"
                 ]
             }
             
@@ -550,6 +653,154 @@ def _register_routes(app: Flask) -> None:
 
     # Additional routes...
     # _register_additional_routes(app)  # Removed duplicate call
+
+    def _purge_old_data_inner():
+        """Delete old records based on retention policy. Returns counts by table."""
+        now = datetime.utcnow()
+        counts = {}
+        try:
+            msg_days = int(app.config.get('MESSAGE_RETENTION_DAYS', 30))
+            sess_days = int(app.config.get('SESSION_RETENTION_DAYS', 14))
+            analytics_days = int(app.config.get('ANALYTICS_RETENTION_DAYS', 90))
+            cutoff_msgs = now - timedelta(days=msg_days)
+            cutoff_sess = now - timedelta(days=sess_days)
+            cutoff_analytics = now - timedelta(days=analytics_days)
+
+            # Messages
+            counts['messages_deleted'] = db.session.query(Message).filter(Message.timestamp < cutoff_msgs).delete(synchronize_session=False)
+            # Conversation logs
+            counts['conversation_logs_deleted'] = db.session.query(ConversationLog).filter(ConversationLog.timestamp < cutoff_msgs).delete(synchronize_session=False)
+            # Crisis events
+            counts['crisis_events_deleted'] = db.session.query(CrisisEvent).filter(CrisisEvent.timestamp < cutoff_msgs).delete(synchronize_session=False)
+            # Self assessments (optional: align with message retention)
+            counts['self_assessments_deleted'] = db.session.query(SelfAssessmentEntry).filter(SelfAssessmentEntry.timestamp < cutoff_msgs).delete(synchronize_session=False)
+            # Sessions inactive beyond retention
+            counts['sessions_deleted'] = db.session.query(UserSession).filter(UserSession.last_active < cutoff_sess).delete(synchronize_session=False)
+
+            # Legacy/raw tables (best-effort). Ignore if not present.
+            try:
+                res = db.session.execute(
+                    text("DELETE FROM chat_messages WHERE timestamp < :cutoff"),
+                    {"cutoff": cutoff_msgs}
+                )
+                counts['chat_messages_deleted'] = getattr(res, 'rowcount', None)
+            except Exception as _:
+                pass
+            try:
+                res = db.session.execute(
+                    text("DELETE FROM sessions WHERE last_activity < :cutoff"),
+                    {"cutoff": cutoff_sess}
+                )
+                counts['legacy_sessions_deleted'] = getattr(res, 'rowcount', None)
+            except Exception as _:
+                pass
+            try:
+                res = db.session.execute(
+                    text("DELETE FROM analytics_events WHERE timestamp < :cutoff"),
+                    {"cutoff": cutoff_analytics}
+                )
+                counts['analytics_events_deleted'] = getattr(res, 'rowcount', None)
+            except Exception as _:
+                pass
+
+            db.session.commit()
+            return counts
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Purge error: {e}")
+            raise
+
+    @app.route('/api/analytics/log', methods=['POST'])
+    @app.limiter.limit("120 per minute")
+    def log_analytics_event():
+        """Minimal analytics logging endpoint.
+        Requirements:
+        - No PII is accepted or stored.
+        - Requires X-Analytics-Consent: true header; otherwise noop (202).
+        - Associates events to a session and request_id for traceability.
+        """
+        try:
+            consent = (request.headers.get('X-Analytics-Consent', '') or '').lower()
+            if consent != 'true':
+                return jsonify({"skipped": "no consent"}), 202
+
+            data = request.get_json(silent=True) or {}
+            event_type = (data.get('event_type') or '').strip()
+            if not event_type or len(event_type) > 64:
+                return jsonify({"error": "Invalid event_type"}), 400
+
+            # Allow only safe characters in event_type
+            allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-")
+            if any(ch not in allowed for ch in event_type):
+                return jsonify({"error": "Invalid event_type"}), 400
+
+            raw_meta = data.get('metadata') or {}
+            metadata: Dict[str, Any] = {}
+            if isinstance(raw_meta, dict):
+                # Whitelist allowed keys and simple types only, trim long strings
+                allowed_keys = {
+                    'action', 'label', 'screen', 'source', 'value', 'count', 'duration_ms', 'success', 'code', 'provider'
+                }
+                for k, v in raw_meta.items():
+                    if k in allowed_keys and isinstance(v, (str, int, float, bool)):
+                        if isinstance(v, str) and len(v) > 200:
+                            v = v[:200]
+                        metadata[k] = v
+
+            # Ensure session exists and get ID
+            session_id = _get_or_create_session()
+            req_id = getattr(g, 'request_id', None)
+
+            # Store as compact JSON string in TEXT column to avoid dialect issues
+            meta_json = json.dumps(metadata, separators=(',', ':'), ensure_ascii=False)
+
+            db.session.execute(
+                text(
+                    "INSERT INTO analytics_events (session_id, event_type, metadata, request_id, timestamp) "
+                    "VALUES (:session_id, :event_type, :metadata, :request_id, NOW())"
+                ),
+                {
+                    'session_id': session_id,
+                    'event_type': event_type,
+                    'metadata': meta_json,
+                    'request_id': req_id,
+                }
+            )
+            db.session.commit()
+            return jsonify({"ok": True}), 201
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Analytics log error: {e}")
+            return jsonify({"error": "Failed to log analytics"}), 500
+
+    @app.route('/api/admin/purge', methods=['POST'])
+    def admin_purge():
+        """Admin-only: Purge old data per retention policy.
+        Requires header X-Admin-Token matching ADMIN_API_TOKEN.
+        """
+        token = request.headers.get('X-Admin-Token')
+        expected = app.config.get('ADMIN_API_TOKEN')
+        if not expected or token != expected:
+            return jsonify({"error": "Unauthorized"}), 401
+        try:
+            counts = _purge_old_data_inner()
+            return jsonify({"success": True, "purged": counts}), 200
+        except Exception as e:
+            return jsonify({"error": "Purge failed", "details": str(e)}), 500
+
+    @app.route('/api/admin/retention_config', methods=['GET'])
+    def retention_config():
+        """Admin-only: View effective retention configuration."""
+        token = request.headers.get('X-Admin-Token')
+        expected = app.config.get('ADMIN_API_TOKEN')
+        if not expected or token != expected:
+            return jsonify({"error": "Unauthorized"}), 401
+        return jsonify({
+            "message_retention_days": app.config.get('MESSAGE_RETENTION_DAYS'),
+            "session_retention_days": app.config.get('SESSION_RETENTION_DAYS'),
+            "error_log_retention_days": app.config.get('ERROR_LOG_RETENTION_DAYS'),
+            "analytics_retention_days": app.config.get('ANALYTICS_RETENTION_DAYS'),
+        }), 200
 
 def _get_or_create_session() -> str:
     """Get or create user session with proper error handling"""
@@ -1016,6 +1267,99 @@ def _log_crisis_detection(session_id: str, message: str, risk_level: str, risk_s
 def _register_additional_routes(app: Flask) -> None:
     """Register additional API routes"""
     
+    @app.route('/api/chat_stream', methods=['GET'])
+    def chat_stream():
+        """Server-Sent Events (SSE) streaming endpoint for chat responses.
+        Accepts query params: message (required), country (optional), session_id (optional)
+        Streams JSON objects with a 'type' field: 'meta', 'token', 'done', 'error'.
+        """
+        try:
+            message = (request.args.get('message') or '').strip()
+            if not message:
+                return jsonify({"error": "Message is required"}), 400
+
+            # Session handling: prefer provided session_id (from web EventSource cannot set headers)
+            session_id = request.args.get('session_id') or _get_or_create_session()
+
+            # Country for geo-specific crisis resources
+            country = request.args.get('country') or 'generic'
+
+            # Crisis detection first
+            risk_level = detect_crisis_level(message)
+            crisis_data = get_crisis_response_and_resources(risk_level, country)
+
+            # Generate full AI response using configured provider
+            from flask import current_app
+            provider = current_app.config.get('AI_PROVIDER', 'gemini')
+            if provider == 'gemini':
+                full_text = get_gemini_response(message, session_id=session_id, risk_level=risk_level)
+            elif provider == 'openai':
+                full_text = get_openai_response(message, risk_level=risk_level)
+            elif provider == 'perplexity':
+                full_text = get_perplexity_response(message, risk_level=risk_level)
+            else:
+                full_text = get_gemini_response(message, session_id=session_id, risk_level=risk_level)
+
+            # Log conversation (non-streaming DB log)
+            _log_conversation(session_id, message, full_text, risk_level)
+
+            def stream_generator():
+                import time
+                import json as _json
+
+                def sse(obj: dict):
+                    data = _json.dumps(obj, ensure_ascii=False)
+                    return f"data: {data}\n\n"
+
+                # Send initial metadata (risk/crisis info and session)
+                yield sse({
+                    'type': 'meta',
+                    'session_id': session_id,
+                    'risk_level': risk_level,
+                    'crisis_msg': crisis_data.get('crisis_msg'),
+                    'crisis_numbers': crisis_data.get('crisis_numbers', []),
+                })
+
+                # Chunk the AI response for progressive reveal
+                text = full_text or ''
+                # Prefer newline splits, then sentence-ish (preserving spaces), then words
+                chunks: List[str]
+                joiner = ''
+                if '\n' in text:
+                    chunks = text.split('\n')
+                    joiner = '\n'
+                else:
+                    import re as _re
+                    parts = [p for p in _re.split(r'(?<=[.!?])\s+', text) if p]
+                    if len(parts) <= 1:
+                        chunks = text.split(' ')
+                    else:
+                        # Re-attach a single space that was consumed by the split for all but the last part.
+                        chunks = [p + (' ' if i < len(parts) - 1 else '') for i, p in enumerate(parts)]
+
+                for idx, ch in enumerate(chunks):
+                    yield sse({'type': 'token', 'text': (joiner + ch) if (idx > 0 and joiner) else ch})
+                    # Small human-like pacing
+                    delay_ms = max(60, min(220, int(len(ch.strip()) * 12)))
+                    time.sleep(delay_ms / 1000.0)
+
+                # Done signal
+                yield sse({'type': 'done'})
+
+            headers = {
+                'Cache-Control': 'no-cache',
+                'Content-Type': 'text/event-stream',
+                'Connection': 'keep-alive',
+            }
+            return Response(stream_generator(), headers=headers)
+
+        except Exception as e:
+            # Use app logger in request context
+            from flask import current_app
+            current_app.logger.error(f"Chat stream error: {e}")
+            # Fallback JSON error (non-SSE)
+            return jsonify({"error": "Internal server error"}), 500
+
     @app.route("/api/get_or_create_session", methods=['GET'])
     def get_or_create_session_endpoint():
         """Get or create user session"""

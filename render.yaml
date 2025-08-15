@@ -2,10 +2,9 @@ services:
   # Backend API Service with Flutter Web
   - type: web
     name: ai-mental-health-backend
-    env: python
+    env: docker
     plan: free
-    buildCommand: ./build.sh
-    startCommand: ./start.sh
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.6
@@ -23,12 +22,8 @@ services:
         sync: false
       - key: AI_PROVIDER
         value: gemini
-      - key: PORT
-        value: 10000
       - key: ENVIRONMENT
         value: production
-      - key: REDIS_URL
-        value: redis://localhost:6379
       - key: RENDER
         value: true
       - key: VERSION
