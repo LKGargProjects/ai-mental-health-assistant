@@ -37,6 +37,8 @@ ai_buddy_web/build/
 # Logs
 *.log
 logs/
+*.log.prev
+backend.log.prev
 
 # Local development
 instance/
@@ -45,6 +47,7 @@ instance/
 .env.development.local
 .env.test.local
 .env.production.local
+*.db
 
 # Dependencies
 node_modules/
