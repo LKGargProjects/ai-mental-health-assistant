@@ -508,8 +508,13 @@ def _init_database(app: Flask) -> None:
             
         except Exception as e:
             app.logger.error(f"Database initialization error: {e}")
-            db.session.rollback()
-            raise
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            # Do NOT crash app during startup; continue and let health endpoint report DB status
+            env = str(getattr(app.config, 'ENVIRONMENT', app.config.get('ENVIRONMENT', 'local'))).lower()
+            app.logger.warning(f"Continuing without DB tables (env={env}). Health checks will reflect DB status.")
 
 
 def _init_extensions(app: Flask) -> None:
