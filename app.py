@@ -504,6 +504,114 @@ def _init_database(app: Flask) -> None:
             """))
             
             db.session.commit()
+            # Ensure SQLAlchemy models exist (creates missing tables only)
+            try:
+                db.create_all()
+                app.logger.info("SQLAlchemy models ensured (create_all)")
+            except Exception as e:
+                app.logger.warning(f"db.create_all() failed (non-fatal): {e}")
+
+            # Lightweight migration: ensure conversation_logs table and columns exist
+            try:
+                engine = db.session.bind
+                dialect = engine.dialect.name if engine else 'unknown'
+
+                required_cols = {
+                    'session_id': "VARCHAR(36)",
+                    'user_message': "TEXT",
+                    'ai_response': "TEXT",
+                    'risk_level': "VARCHAR(20)",
+                    'risk_score': "DOUBLE PRECISION",
+                    'timestamp': "TIMESTAMP",
+                }
+
+                # Create table if missing in a dialect-aware way
+                if dialect == 'postgresql':
+                    db.session.execute(text(
+                        """
+                        CREATE TABLE IF NOT EXISTS conversation_logs (
+                            id SERIAL PRIMARY KEY,
+                            session_id VARCHAR(36),
+                            user_message TEXT,
+                            ai_response TEXT,
+                            risk_level VARCHAR(20) DEFAULT 'low',
+                            risk_score DOUBLE PRECISION DEFAULT 0.0,
+                            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    ))
+                elif dialect == 'sqlite':
+                    db.session.execute(text(
+                        """
+                        CREATE TABLE IF NOT EXISTS conversation_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            session_id TEXT,
+                            user_message TEXT,
+                            ai_response TEXT,
+                            risk_level TEXT DEFAULT 'low',
+                            risk_score REAL DEFAULT 0.0,
+                            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    ))
+                else:
+                    # Fallback generic DDL
+                    db.session.execute(text(
+                        """
+                        CREATE TABLE IF NOT EXISTS conversation_logs (
+                            id SERIAL PRIMARY KEY,
+                            session_id VARCHAR(36),
+                            user_message TEXT,
+                            ai_response TEXT,
+                            risk_level VARCHAR(20) DEFAULT 'low',
+                            risk_score DOUBLE PRECISION DEFAULT 0.0,
+                            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    ))
+
+                # Determine existing columns
+                existing_cols = set()
+                if dialect == 'postgresql':
+                    res = db.session.execute(text(
+                        """
+                        SELECT column_name FROM information_schema.columns
+                        WHERE table_name = 'conversation_logs'
+                        """
+                    )).fetchall()
+                    existing_cols = {row[0] for row in res}
+                    # Add any missing columns safely
+                    for col, coltype in required_cols.items():
+                        if col not in existing_cols:
+                            db.session.execute(text(f"ALTER TABLE conversation_logs ADD COLUMN IF NOT EXISTS {col} {coltype}"))
+                elif dialect == 'sqlite':
+                    res = db.session.execute(text("PRAGMA table_info(conversation_logs)")).fetchall()
+                    # SQLite PRAGMA returns: cid, name, type, notnull, dflt_value, pk
+                    existing_cols = {row[1] for row in res}
+                    for col, coltype in required_cols.items():
+                        if col not in existing_cols:
+                            try:
+                                db.session.execute(text(f"ALTER TABLE conversation_logs ADD COLUMN {col} {coltype}"))
+                            except Exception:
+                                # Column may have been added concurrently; ignore
+                                pass
+                else:
+                    # Best-effort attempt to add columns without IF NOT EXISTS
+                    for col, coltype in required_cols.items():
+                        try:
+                            db.session.execute(text(f"ALTER TABLE conversation_logs ADD COLUMN {col} {coltype}"))
+                        except Exception:
+                            pass
+
+                db.session.commit()
+                app.logger.info("conversation_logs schema ensured/migrated successfully")
+            except Exception as e:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                app.logger.error(f"conversation_logs migration failed (non-fatal): {e}")
+
             app.logger.info("Database tables initialized successfully")
             
         except Exception as e:
