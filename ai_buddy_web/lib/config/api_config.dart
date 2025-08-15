@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 class ApiConfig {
   // Development - use local backend for testing
-  static const String localUrl = 'http://localhost:5050';
+  static const String localUrl = 'http://localhost:5055';
 
   // Production (Render)
   static const String productionUrl =
@@ -10,20 +10,22 @@ class ApiConfig {
 
   // Get the appropriate URL based on environment
   static String get baseUrl {
-    // For mobile apps, always use production URL
+    // Mobile/native -> production URL
     if (!kIsWeb) {
-      print('🔧 DEBUG: Mobile platform detected, using production URL');
+      if (kDebugMode) {
+        debugPrint('🔧 DEBUG: Mobile/native detected, using production URL');
+      }
       return productionUrl;
     }
 
-    // For web in debug mode, use local URL
+    // Web debug -> local backend
     if (kDebugMode) {
-      print('🔧 DEBUG: Web debug mode detected, using local URL');
+      debugPrint('🔧 DEBUG: Web debug detected, using local URL');
       return localUrl;
     }
 
-    // For web in release mode, use production URL
-    print('🔧 DEBUG: Web release mode detected, using production URL');
-    return productionUrl;
+    // Web release -> same-origin (served by Nginx), avoids CORS
+    final origin = Uri.base.origin;
+    return origin;
   }
 }
