@@ -16,7 +16,7 @@ services:
       - key: AI_PROVIDER
         value: gemini
       - key: CORS_ORIGINS
-        value: https://ai-mental-health-backend-3w4b.onrender.com,https://ai-mental-health-assistant-tddc.onrender.com
+        value: https://ai-mental-health-backend-3w4b.onrender.com
 
       # Database: set in dashboard with External Connection String
       # (Blueprints only support `connectionString`, which is private network only)
