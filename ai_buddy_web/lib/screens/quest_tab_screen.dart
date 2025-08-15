@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'quest_screen.dart';
-import '../dhiwise_export/lokesh_s_application 2/lib/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
+import '../dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
 import '../dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
 import '../widgets/app_back_button.dart';
 

@@ -1,4 +1,4 @@
-import 'dart:io';
+// Note: Avoid importing 'dart:io' in Flutter web builds.
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -128,8 +128,9 @@ class CustomImageView extends StatelessWidget {
           ),
         );
       case ImageType.file:
-        return Image.file(
-          File(imagePath!),
+        // Web-safe fallback: use placeholder for file paths on web.
+        return Image.asset(
+          placeHolder ?? ImageConstant.imgImageNotFound,
           height: height,
           width: width,
           fit: fit ?? BoxFit.cover,

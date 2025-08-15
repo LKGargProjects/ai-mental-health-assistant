@@ -1,4 +1,4 @@
-import 'dart:io';
+// Note: Avoid importing 'dart:io' in Flutter web builds.
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -8,14 +8,14 @@ import '../core/app_export.dart';
 
 extension ImageTypeExtension on String {
   ImageType get imageType {
-    if (this.startsWith('http') || this.startsWith('https')) {
-      if (this.endsWith('.svg')) {
+    if (startsWith('http') || startsWith('https')) {
+      if (endsWith('.svg')) {
         return ImageType.networkSvg;
       }
       return ImageType.network;
-    } else if (this.endsWith('.svg')) {
+    } else if (endsWith('.svg')) {
       return ImageType.svg;
-    } else if (this.startsWith('file://')) {
+    } else if (startsWith('file://')) {
       return ImageType.file;
     } else {
       return ImageType.png;
@@ -26,18 +26,20 @@ extension ImageTypeExtension on String {
 enum ImageType { svg, png, network, networkSvg, file, unknown }
 
 class CustomImageView extends StatelessWidget {
-  CustomImageView(
-      {this.imagePath,
-      this.height,
-      this.width,
-      this.color,
-      this.fit,
-      this.alignment,
-      this.onTap,
-      this.radius,
-      this.margin,
-      this.border,
-      this.placeHolder}) {
+  CustomImageView({
+    super.key,
+    this.imagePath,
+    this.height,
+    this.width,
+    this.color,
+    this.fit,
+    this.alignment,
+    this.onTap,
+    this.radius,
+    this.margin,
+    this.border,
+    this.placeHolder,
+  }) {
     if (imagePath == null || imagePath!.isEmpty) {
       imagePath = ImageConstant.imgImageNotFound;
     }
@@ -76,10 +78,7 @@ class CustomImageView extends StatelessWidget {
   Widget _buildWidget() {
     return Padding(
       padding: margin ?? EdgeInsets.zero,
-      child: InkWell(
-        onTap: onTap,
-        child: _buildCircleImage(),
-      ),
+      child: InkWell(onTap: onTap, child: _buildCircleImage()),
     );
   }
 
@@ -99,10 +98,7 @@ class CustomImageView extends StatelessWidget {
   _buildImageWithBorder() {
     if (border != null) {
       return Container(
-        decoration: BoxDecoration(
-          border: border,
-          borderRadius: radius,
-        ),
+        decoration: BoxDecoration(border: border, borderRadius: radius),
         child: _buildImageView(),
       );
     } else {
@@ -113,7 +109,7 @@ class CustomImageView extends StatelessWidget {
   Widget _buildImageView() {
     switch (imagePath!.imageType) {
       case ImageType.svg:
-        return Container(
+        return SizedBox(
           height: height,
           width: width,
           child: SvgPicture.asset(
@@ -121,15 +117,18 @@ class CustomImageView extends StatelessWidget {
             height: height,
             width: width,
             fit: fit ?? BoxFit.contain,
-            colorFilter: this.color != null
+            colorFilter: color != null
                 ? ColorFilter.mode(
-                    this.color ?? appTheme.transparentCustom, BlendMode.srcIn)
+                    color ?? appTheme.transparentCustom,
+                    BlendMode.srcIn,
+                  )
                 : null,
           ),
         );
       case ImageType.file:
-        return Image.file(
-          File(imagePath!),
+        // Web-safe fallback: use placeholder for file paths on web.
+        return Image.asset(
+          placeHolder ?? ImageConstant.imgImageNotFound,
           height: height,
           width: width,
           fit: fit ?? BoxFit.cover,
@@ -141,9 +140,11 @@ class CustomImageView extends StatelessWidget {
           height: height,
           width: width,
           fit: fit ?? BoxFit.contain,
-          colorFilter: this.color != null
+          colorFilter: color != null
               ? ColorFilter.mode(
-                  this.color ?? appTheme.transparentCustom, BlendMode.srcIn)
+                  color ?? appTheme.transparentCustom,
+                  BlendMode.srcIn,
+                )
               : null,
         );
       case ImageType.network:
@@ -153,7 +154,7 @@ class CustomImageView extends StatelessWidget {
           fit: fit,
           imageUrl: imagePath!,
           color: color,
-          placeholder: (context, url) => Container(
+          placeholder: (context, url) => SizedBox(
             height: 30,
             width: 30,
             child: LinearProgressIndicator(
