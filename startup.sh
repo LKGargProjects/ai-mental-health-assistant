@@ -1,11 +1,7 @@
 #!/bin/bash
 
-# Startup script for Render deployment
-echo "Starting AI Mental Health Backend..."
-
-# Set environment variables if not already set
-export PORT=${PORT:-10000}
-export PYTHONPATH=/app
-
-# Run the Flask application
-python app.py 
+# Legacy startup script (deprecated)
+echo "[startup.sh] Deprecated: This script is no longer used."
+echo "Production uses Dockerfile CMD -> /start.sh (Nginx + Gunicorn)."
+echo "If you intended to run locally, use: bash start_local.sh or docker-compose up."
+exit 0

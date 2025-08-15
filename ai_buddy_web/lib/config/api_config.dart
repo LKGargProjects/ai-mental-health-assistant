@@ -6,7 +6,7 @@ class ApiConfig {
 
   // Production (Render)
   static const String productionUrl =
-      'https://ai-mental-health-assistant-tddc.onrender.com';
+      'https://ai-mental-health-backend-3w4b.onrender.com';
 
   // Get the appropriate URL based on environment
   static String get baseUrl {
