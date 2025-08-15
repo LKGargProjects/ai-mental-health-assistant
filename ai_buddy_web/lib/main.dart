@@ -1,4 +1,3 @@
-import 'package:ai_buddy_web/screens/main_screen.dart';
 import 'package:ai_buddy_web/screens/dhiwise_chat_screen.dart';
 import 'package:ai_buddy_web/screens/interactive_chat_screen.dart';
 import 'package:ai_buddy_web/screens/quest_preview_screen.dart';
@@ -7,6 +6,7 @@ import 'dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
 import 'package:ai_buddy_web/dhiwise/presentation/quest_screen/quest_screen.dart' as DhiwiseQuest;
 
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:provider/provider.dart';
 import 'core/utils/size_utils.dart';
 import 'providers/chat_provider.dart';
@@ -18,13 +18,50 @@ import 'providers/quest_provider.dart';
 import 'navigation/route_observer.dart';
 import 'navigation/home_shell.dart';
 import 'widgets/app_bottom_nav.dart' show AppTab;
+import 'services/api_service.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  const dsn = String.fromEnvironment('SENTRY_DSN_FRONTEND', defaultValue: '');
+  const env = String.fromEnvironment('SENTRY_ENV', defaultValue: 'local');
+  const version = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
+  const tracesStr = String.fromEnvironment('SENTRY_TRACES_SAMPLE_RATE', defaultValue: '0');
+  final traces = double.tryParse(tracesStr) ?? 0.0;
+
+  if (dsn.isNotEmpty) {
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = dsn;
+        options.environment = env;
+        options.release = version;
+        options.tracesSampleRate = traces;
+      },
+      appRunner: () => runApp(const MyApp()),
+    );
+  } else {
+    runApp(const MyApp());
+  }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Fire a minimal 'app_open' event (respects consent in ApiService)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ApiService().logAnalyticsEvent('app_open', metadata: {
+        'action': 'app_open',
+        'source': 'app',
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,14 +89,15 @@ class MyApp extends StatelessWidget {
                 useMaterial3: true,
               ),
               navigatorObservers: [routeObserver],
-              home: HomeShell(initialTab: AppTab.talk),
+              home: const InteractiveChatScreen(),
               routes: {
                 '/home': (context) {
                   final args = ModalRoute.of(context)?.settings.arguments;
                   final initial = (args is AppTab) ? args : AppTab.talk;
                   return HomeShell(initialTab: initial);
                 },
-                '/main': (context) => const MainScreen(),
+                // Legacy landing route redirected to HomeShell Talk tab
+                '/main': (context) => HomeShell(initialTab: AppTab.talk),
                 '/dhiwise-chat': (context) => const MentalHealthChatScreen(),
                 '/preview-quest': (context) => const QuestPreviewScreen(),
                 '/interactive-chat': (context) => const InteractiveChatScreen(),
