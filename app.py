@@ -19,6 +19,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from dotenv import load_dotenv
+import socket
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
 # Load environment variables
 load_dotenv()
@@ -318,16 +320,79 @@ def create_app() -> Flask:
         # Non-fatal: continue without Sentry
         app.logger.warning(f"Sentry init failed: {e}")
     
-    # Set SQLAlchemy database URI with explicit psycopg driver
+    # Set SQLAlchemy database URI with explicit psycopg driver and SSL if needed
     if Config.DATABASE_URL:
+        db_url = Config.DATABASE_URL
+        # Normalize legacy scheme if present
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
         # Force use of psycopg driver
-        if 'postgresql://' in Config.DATABASE_URL and 'psycopg' not in Config.DATABASE_URL:
-            Config.DATABASE_URL = Config.DATABASE_URL.replace('postgresql://', 'postgresql+psycopg://')
-        app.config['SQLALCHEMY_DATABASE_URI'] = Config.DATABASE_URL
+        if 'postgresql://' in db_url and 'psycopg' not in db_url:
+            db_url = db_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+
+        # Append sslmode=require in production/Render if not already present
+        try:
+            needs_ssl = (getattr(Config, 'RENDER', False) or str(getattr(Config, 'ENVIRONMENT', '')).lower() == 'production')
+            parsed = urlparse(db_url)
+            query_items = dict(parse_qsl(parsed.query)) if parsed.query else {}
+            if needs_ssl and 'sslmode' not in {k.lower(): v for k, v in query_items.items()}:
+                query_items['sslmode'] = 'require'
+                new_query = urlencode(query_items)
+                parsed = parsed._replace(query=new_query)
+                db_url = urlunparse(parsed)
+        except Exception as e:
+            app.logger.warning(f"Failed to process DB URL SSL params: {e}")
+
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     else:
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
-    
+
+    # SQLAlchemy reliability options
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_size': 5,
+        'max_overflow': 10,
+    }
+
+    # Log effective DB URL (masked) and attempt DNS resolution of host
+    try:
+        effective_url = app.config.get('SQLALCHEMY_DATABASE_URI')
+        def _mask_db_url(url: str) -> str:
+            try:
+                p = urlparse(url)
+                netloc = p.netloc
+                if '@' in netloc:
+                    creds, host = netloc.split('@', 1)
+                    if ':' in creds:
+                        user, _pwd = creds.split(':', 1)
+                        creds_masked = f"{user}:***"
+                    else:
+                        creds_masked = f"{creds}:***"
+                    netloc_masked = f"{creds_masked}@{host}"
+                else:
+                    netloc_masked = netloc
+                return urlunparse((p.scheme, netloc_masked, p.path, p.params, p.query, p.fragment))
+            except Exception:
+                return '<mask_failed>'
+
+        masked = _mask_db_url(effective_url) if effective_url else 'None'
+        app.logger.info(f"Database URL (masked): {masked}")
+
+        # DNS resolution info
+        if effective_url:
+            p = urlparse(effective_url)
+            host = p.hostname
+            if host:
+                try:
+                    addr_list = socket.getaddrinfo(host, None)
+                    ips = sorted({item[4][0] for item in addr_list if item and item[4] and item[4][0]})
+                    app.logger.info(f"DB host '{host}' resolves to: {', '.join(ips)}")
+                except Exception as e:
+                    app.logger.warning(f"DNS resolution failed for DB host '{host}': {e}")
+    except Exception as e:
+        app.logger.warning(f"Failed to log DB URL or DNS info: {e}")
     
     # Initialize extensions
     _init_extensions(app)
@@ -914,6 +979,11 @@ def _check_database_health() -> str:
         db.session.execute(text("SELECT 1"))
         return "healthy"
     except Exception as e:
+        try:
+            from flask import current_app
+            current_app.logger.error(f"Database health check failed: {e}")
+        except Exception:
+            pass
         return f"unhealthy: {str(e)}"
 
 def _check_redis_health() -> str:
