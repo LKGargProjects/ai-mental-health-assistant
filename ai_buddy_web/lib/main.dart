@@ -6,7 +6,7 @@ import 'dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
 import 'package:ai_buddy_web/dhiwise/presentation/quest_screen/quest_screen.dart' as DhiwiseQuest;
 
 import 'package:flutter/material.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:sentry/sentry.dart' as sentry;
 import 'package:provider/provider.dart';
 import 'core/utils/size_utils.dart';
 import 'providers/chat_provider.dart';
@@ -29,18 +29,14 @@ Future<void> main() async {
   final traces = double.tryParse(tracesStr) ?? 0.0;
 
   if (dsn.isNotEmpty) {
-    await SentryFlutter.init(
-      (options) {
-        options.dsn = dsn;
-        options.environment = env;
-        options.release = version;
-        options.tracesSampleRate = traces;
-      },
-      appRunner: () => runApp(const MyApp()),
-    );
-  } else {
-    runApp(const MyApp());
+    await sentry.Sentry.init((options) {
+      options.dsn = dsn;
+      options.environment = env;
+      options.release = version;
+      options.tracesSampleRate = traces;
+    });
   }
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
