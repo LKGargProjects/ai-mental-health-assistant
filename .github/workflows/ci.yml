@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  flutter_web_build:
+    name: Flutter Web analyze + build + asset check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.32.8'
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install deps
+        working-directory: ai_buddy_web
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: ai_buddy_web
+        run: flutter analyze
+
+      - name: Verify referenced avatar assets exist
+        shell: bash
+        working-directory: ai_buddy_web
+        run: |
+          set -e
+          CFG=lib/config/profile_config.dart
+          if [ -f "$CFG" ]; then
+            AV=$(grep -Po "aiAvatarAsset\s*=\s*'\K[^']+" "$CFG" || true)
+            UA=$(grep -Po "userAvatarAsset\s*=\s*'\K[^']+" "$CFG" || true)
+            for P in "$AV" "$UA"; do
+              if [ -n "$P" ]; then
+                if [ ! -f "$P" ]; then
+                  echo "::error::Missing asset $P referenced in $CFG"; exit 1;
+                fi
+              fi
+            done
+          fi
+
+      - name: Build web (release)
+        working-directory: ai_buddy_web
+        run: flutter build web --release
+
+  # Optional: quick backend sanity (uncomment to enable)
+  # backend_quick_check:
+  #   name: Backend quick check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.11'
+  #     - name: Install deps
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install -r requirements.txt
+  #     - name: Import app
+  #       run: python - <<'PY'
+  #         import importlib.util, sys
+  #         spec = importlib.util.spec_from_file_location('app', 'app.py')
+  #         module = importlib.util.module_from_spec(spec)
+  #         spec.loader.exec_module(module)
+  #         print('App import OK')
+  #       PY

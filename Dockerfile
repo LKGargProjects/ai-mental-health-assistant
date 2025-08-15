@@ -32,10 +32,15 @@ ENV TAR_OPTIONS=--no-same-owner
 # Enable web support
 RUN flutter config --enable-web
 
-# Copy Flutter app and build web version
-WORKDIR /app
-COPY ai_buddy_web/ ./ai_buddy_web/
+# Copy Flutter app and build web version (cache-friendly)
 WORKDIR /app/ai_buddy_web
+# Copy pubspec first to leverage Docker layer cache for pub get
+COPY ai_buddy_web/pubspec.yaml ./pubspec.yaml
+RUN flutter pub get
+# Copy sources and assets only (minimal, deterministic)
+COPY ai_buddy_web/lib ./lib
+COPY ai_buddy_web/assets ./assets
+COPY ai_buddy_web/web ./web
 RUN flutter build web --release
 
 # Stage 2: Python backend build

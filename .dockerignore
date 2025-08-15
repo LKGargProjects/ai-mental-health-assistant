@@ -1,0 +1,37 @@
+# Ignore everything by default
+**
+
+# Allow Dockerfile and Render blueprint
+!Dockerfile
+!render.yaml
+
+# Allow backend runtime + install contexts
+!requirements.txt
+!app.py
+!models.py
+!crisis_detection.py
+!providers/
+!providers/**
+!start.sh
+!nginx.conf
+
+# Allow Flutter sources strictly required to build web
+!ai_buddy_web/
+!ai_buddy_web/pubspec.yaml
+!ai_buddy_web/analysis_options.yaml
+!ai_buddy_web/lib/
+!ai_buddy_web/lib/**
+!ai_buddy_web/assets/
+!ai_buddy_web/assets/**
+!ai_buddy_web/web/
+!ai_buddy_web/web/**
+
+# Never send secrets and local artifacts
+.env*
+*.db
+*.log
+.DS_Store
+**/.dart_tool/**
+**/build/**
+**/.venv/**
+**/__pycache__/**
