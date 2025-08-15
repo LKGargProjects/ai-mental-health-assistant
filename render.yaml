@@ -22,7 +22,7 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: ai-mvp-db
-          property: externalConnectionString
+          property: connectionString
 
       # Secrets: values are set in Render dashboard (not committed)
       - key: SECRET_KEY
