@@ -268,6 +268,7 @@ jobs:
         with:
           name: ios-ipa
           path: ${{ steps.locate.outputs.path }}
+          retention-days: 7
           if-no-files-found: error
 
       - name: Upload unsigned app artifact (zipped)
@@ -276,6 +277,7 @@ jobs:
         with:
           name: ios-app
           path: ${{ steps.package.outputs.zip_path }}
+          retention-days: 7
           if-no-files-found: error
 
       - name: Save release notes
@@ -295,6 +297,7 @@ jobs:
         with:
           name: ios-release-notes
           path: release_notes.txt
+          retention-days: 7
           if-no-files-found: ignore
 
     outputs:

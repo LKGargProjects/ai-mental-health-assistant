@@ -1,5 +1,12 @@
 name: Mobile Release (Android + iOS)
 
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:
@@ -89,8 +96,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [android, ios]
     env:
-      DO_GH_RELEASE: 'false'
-      DO_SLACK_NOTIFY: 'false'
+      DO_GH_RELEASE: ${{ vars.DO_GH_RELEASE || 'false' }}
+      DO_SLACK_NOTIFY: ${{ vars.DO_SLACK_NOTIFY || 'false' }}
+      TAG_PREFIX: ${{ vars.TAG_PREFIX || 'mobile-v' }}
     steps:
       - name: Download Android artifact
         uses: actions/download-artifact@v4
@@ -110,7 +118,6 @@ jobs:
         id: meta
         shell: bash
         env:
-          TAG_PREFIX: mobile-v
           BN: ${{ inputs.build_number }}
           RN: ${{ inputs.release_notes }}
         run: |
