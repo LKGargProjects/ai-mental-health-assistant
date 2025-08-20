@@ -1,0 +1,415 @@
+name: iOS Release (IPA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: "iOS bundle identifier (e.g., app.mhb.preview)"
+        required: false
+        default: "app.mhb.preview"
+      scheme:
+        description: "Xcode scheme"
+        required: false
+        default: "Runner"
+      export_method:
+        description: "Export method (app-store, ad-hoc, development)"
+        required: false
+        default: "app-store"
+      build_number:
+        description: "Build number (optional). Defaults to GitHub run number if empty."
+        required: false
+        default: ""
+      release_notes:
+        description: "Release notes/changelog (optional)"
+        required: false
+        default: ""
+      upload:
+        description: "Upload to TestFlight after build?"
+        required: false
+        default: "false"
+      preflight:
+        description: "Run format/analyze/tests before build?"
+        required: false
+        default: "false"
+      environment:
+        description: "GitHub Environment to run upload job (e.g., beta, production)"
+        required: false
+        default: "beta"
+      sentry_upload:
+        description: "Upload dSYMs to Sentry?"
+        required: false
+        default: "false"
+      sentry_org:
+        description: "Sentry organization slug (if uploading dSYMs)"
+        required: false
+        default: ""
+      sentry_project:
+        description: "Sentry project slug (if uploading dSYMs)"
+        required: false
+        default: ""
+      sentry_release:
+        description: "Sentry release version (defaults to <bundle_id>@<build_number>)"
+        required: false
+        default: ""
+      crashlytics_upload:
+        description: "Upload dSYMs to Firebase Crashlytics?"
+        required: false
+        default: "false"
+  workflow_call:
+    inputs:
+      bundle_id:
+        required: false
+        type: string
+        default: "app.mhb.preview"
+      scheme:
+        required: false
+        type: string
+        default: "Runner"
+      export_method:
+        required: false
+        type: string
+        default: "app-store"
+      build_number:
+        required: false
+        type: string
+        default: ""
+      release_notes:
+        required: false
+        type: string
+        default: ""
+      upload:
+        required: false
+        type: string
+        default: "false"
+      preflight:
+        required: false
+        type: string
+        default: "false"
+      environment:
+        required: false
+        type: string
+        default: "beta"
+      sentry_upload:
+        required: false
+        type: string
+        default: "false"
+      sentry_org:
+        required: false
+        type: string
+        default: ""
+      sentry_project:
+        required: false
+        type: string
+        default: ""
+      sentry_release:
+        required: false
+        type: string
+        default: ""
+      crashlytics_upload:
+        required: false
+        type: string
+        default: "false"
+
+jobs:
+  build_ios:
+    name: Build iOS (IPA or App)
+    runs-on: macos-14
+    env:
+      # Flutter location
+      FLUTTER_VERSION: '3.32.8'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Cache Pub (Dart/Flutter packages)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('ai_buddy_web/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install Flutter deps
+        working-directory: ai_buddy_web
+        run: flutter pub get
+
+      - name: Preflight - format check
+        if: ${{ (inputs.preflight || github.event.inputs.preflight) == 'true' }}
+        working-directory: ai_buddy_web
+        run: |
+          set -e
+          # Format only relevant Dart sources; exclude backups/exports to keep CI stable
+          FOUND=$(find . -type f -name "*.dart" \
+            -not -path "./lib/screens/quest_screen_backup/*" \
+            -not -path "./lib/screens/quest_screen/*" \
+            -not -path "./lib/dhiwise_export/*" \
+            -not -path "./lib/dhiwise/*" \
+            -not -path "./lib/dhiwise/**/backup/*" -print)
+          if [ -z "$FOUND" ]; then
+            echo "No Dart files to format"; exit 0;
+          fi
+          printf "%s\n" "$FOUND" | tr '\n' '\0' | xargs -0 dart format --output=none --set-exit-if-changed
+
+      - name: Preflight - analyze
+        if: ${{ (inputs.preflight || github.event.inputs.preflight) == 'true' }}
+        working-directory: ai_buddy_web
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Preflight - tests
+        if: ${{ (inputs.preflight || github.event.inputs.preflight) == 'true' }}
+        working-directory: ai_buddy_web
+        run: |
+          if [ -d test ]; then
+            flutter test -r expanded
+          else
+            echo "No tests/ directory found. Skipping flutter test."
+          fi
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cocoapods
+            ai_buddy_web/ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ai_buddy_web/ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install CocoaPods
+        working-directory: ai_buddy_web/ios
+        run: |
+          set -e
+          pod install --repo-update
+
+      - name: Determine build number
+        id: bn
+        shell: bash
+        env:
+          BN_DISPATCH: ${{ github.event.inputs.build_number }}
+          BN_CALL: ${{ inputs.build_number }}
+        run: |
+          BN="$BN_DISPATCH"; [ -z "$BN" ] && BN="$BN_CALL"; [ -z "$BN" ] && BN="$GITHUB_RUN_NUMBER"
+          echo "bn=$BN" >> $GITHUB_OUTPUT
+
+      - name: Prepare iOS signing (optional)
+        id: signing
+        shell: bash
+        env:
+          IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          IOS_MOBILEPROVISION_BASE64: ${{ secrets.IOS_MOBILEPROVISION_BASE64 }}
+        run: |
+          set -e
+          if [ -n "$IOS_P12_BASE64" ] && [ -n "$IOS_MOBILEPROVISION_BASE64" ]; then
+            echo "with_signing=true" >> $GITHUB_OUTPUT
+            KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+            KEYCHAIN_PASSWORD=$(uuidgen)
+            security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+            security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+            security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+            echo "$IOS_P12_BASE64" | base64 -d > $RUNNER_TEMP/cert.p12
+            security import $RUNNER_TEMP/cert.p12 -k "$KEYCHAIN_PATH" -P "$IOS_P12_PASSWORD" -T /usr/bin/codesign
+            security list-keychains -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/\"//g')
+            security find-identity -p codesigning -v || true
+            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+            echo "$IOS_MOBILEPROVISION_BASE64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          else
+            echo "with_signing=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Find dSYMs (if any)
+        id: dsym
+        shell: bash
+        run: |
+          set -e
+          # Common Flutter/Xcode locations
+          DSYM=$(find ai_buddy_web -type d -name "*.dSYM" -print -quit || true)
+          if [ -n "$DSYM" ]; then echo "path=$DSYM" >> $GITHUB_OUTPUT; fi
+
+      - name: Upload dSYMs to Sentry (optional)
+        if: ${{ (inputs.sentry_upload || github.event.inputs.sentry_upload) == 'true' && steps.dsym.outputs.path != '' }}
+        shell: bash
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ inputs.sentry_org || github.event.inputs.sentry_org }}
+          SENTRY_PROJECT: ${{ inputs.sentry_project || github.event.inputs.sentry_project }}
+          BUNDLE_ID: ${{ inputs.bundle_id || github.event.inputs.bundle_id }}
+          BN: ${{ steps.bn.outputs.bn }}
+          SENTRY_RELEASE_INPUT: ${{ inputs.sentry_release || github.event.inputs.sentry_release }}
+        run: |
+          set -e
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ] || [ -z "$SENTRY_PROJECT" ]; then
+            echo "::warning::Missing Sentry config; skipping dSYM upload"; exit 0; fi
+          REL="$SENTRY_RELEASE_INPUT"; [ -z "$REL" ] && REL="${BUNDLE_ID}@${BN}"
+          echo "Using Sentry release: $REL"
+          curl -sL https://sentry.io/get-cli/ | bash
+          sentry-cli --auth-token "$SENTRY_AUTH_TOKEN" releases --org "$SENTRY_ORG" new "$REL" || true
+          sentry-cli --auth-token "$SENTRY_AUTH_TOKEN" upload-dif --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" "${{ steps.dsym.outputs.path }}"
+
+      - name: Upload dSYMs to Crashlytics (optional)
+        if: ${{ (inputs.crashlytics_upload || github.event.inputs.crashlytics_upload) == 'true' && steps.dsym.outputs.path != '' }}
+        shell: bash
+        run: |
+          set -e
+          DSYM_PATH="${{ steps.dsym.outputs.path }}"
+          SCRIPT="ai_buddy_web/ios/Pods/FirebaseCrashlytics/upload-symbols"
+          GSP1="ai_buddy_web/ios/Runner/GoogleService-Info.plist"
+          GSP2="ai_buddy_web/ios/GoogleService-Info.plist"
+          if [ ! -f "$SCRIPT" ]; then echo "::warning::Crashlytics upload-symbols script not found; skipping"; exit 0; fi
+          GSP=""
+          [ -f "$GSP1" ] && GSP="$GSP1"
+          [ -z "$GSP" ] && [ -f "$GSP2" ] && GSP="$GSP2"
+          if [ -z "$GSP" ]; then echo "::warning::GoogleService-Info.plist not found; skipping Crashlytics upload"; exit 0; fi
+          chmod +x "$SCRIPT" || true
+          echo "Uploading dSYM to Crashlytics using $SCRIPT and $GSP"
+          bash "$SCRIPT" -gsp "$GSP" -p ios "$DSYM_PATH"
+
+      - name: Build (signed IPA when signing available; else unsigned app)
+        working-directory: ai_buddy_web
+        env:
+          EXPORT_METHOD: ${{ inputs.export_method || github.event.inputs.export_method }}
+        run: |
+          set -e
+          BN="${{ steps.bn.outputs.bn }}"
+          echo "Using build number: $BN"
+          if [ "${{ steps.signing.outputs.with_signing }}" = "true" ]; then
+            flutter build ipa --export-method "$EXPORT_METHOD" --build-number "$BN"
+          else
+            flutter build ios --release --no-codesign --build-number "$BN"
+          fi
+
+      - name: Locate artifact
+        id: locate
+        shell: bash
+        run: |
+          set -e
+          IPA=$(find ai_buddy_web -type f -name "*.ipa" -print -quit || true)
+          APP=$(find ai_buddy_web/build/ios/iphoneos -type d -name "*.app" -print -quit || true)
+          if [ -n "$IPA" ]; then
+            echo "type=ipa" >> $GITHUB_OUTPUT
+            echo "path=$IPA" >> $GITHUB_OUTPUT
+          elif [ -n "$APP" ]; then
+            echo "type=app" >> $GITHUB_OUTPUT
+            echo "path=$APP" >> $GITHUB_OUTPUT
+          else
+            echo "::error::No IPA or .app found"; exit 1
+          fi
+
+      - name: Package .app (if unsigned)
+        id: package
+        if: ${{ steps.locate.outputs.type == 'app' }}
+        shell: bash
+        run: |
+          set -e
+          cd "$(dirname '${{ steps.locate.outputs.path }}')"
+          APPNAME=$(basename "${{ steps.locate.outputs.path }}")
+          zip -r "$APPNAME.zip" "$APPNAME"
+          echo "zip_path=$(pwd)/$APPNAME.zip" >> $GITHUB_OUTPUT
+
+      - name: Upload IPA artifact
+        if: ${{ steps.locate.outputs.type == 'ipa' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: ${{ steps.locate.outputs.path }}
+          if-no-files-found: error
+
+      - name: Upload unsigned app artifact (zipped)
+        if: ${{ steps.locate.outputs.type == 'app' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: ${{ steps.package.outputs.zip_path }}
+          if-no-files-found: error
+
+      - name: Save release notes
+        id: rn
+        shell: bash
+        env:
+          RN_DISPATCH: ${{ github.event.inputs.release_notes }}
+          RN_CALL: ${{ inputs.release_notes }}
+        run: |
+          set -e
+          NOTES="$RN_DISPATCH"; [ -z "$NOTES" ] && NOTES="$RN_CALL"
+          echo "$NOTES" > release_notes.txt
+          echo "path=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-notes
+          path: release_notes.txt
+          if-no-files-found: ignore
+
+    outputs:
+      ARTIFACT_TYPE: ${{ steps.locate.outputs.type }}
+      ARTIFACT_PATH: ${{ steps.locate.outputs.path }}
+
+  upload_testflight:
+    name: Upload to TestFlight
+    runs-on: macos-14
+    needs: build_ios
+    if: ${{ (github.event.inputs.upload || inputs.upload) == 'true' && needs.build_ios.outputs.ARTIFACT_TYPE == 'ipa' }}
+    environment: ${{ inputs.environment || github.event.inputs.environment }}
+    steps:
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: dist
+
+      - name: Find IPA
+        id: find
+        shell: bash
+        run: |
+          set -e
+          IPA=$(find dist -type f -name "*.ipa" -print -quit)
+          if [ -z "$IPA" ]; then echo "::error::IPA not found in dist"; exit 1; fi
+          echo "ipa=$IPA" >> $GITHUB_OUTPUT
+
+      - name: Create App Store Connect API key file
+        id: apikey
+        shell: bash
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APPSTORE_API_PRIVATE_KEY_BASE64 }}
+        run: |
+          set -e
+          if [ -z "$KEY_ID" ] || [ -z "$ISSUER_ID" ] || [ -z "$PRIVATE_KEY_B64" ]; then
+            echo "::error::Missing App Store Connect API key secrets"; exit 1;
+          fi
+          echo "$PRIVATE_KEY_B64" | base64 -d > api_key.p8
+          cat > api_key.json <<EOF
+          {
+            "key_id": "$KEY_ID",
+            "issuer_id": "$ISSUER_ID",
+            "key": "$(sed 's/\n/\\n/g' api_key.p8)",
+            "in_house": false
+          }
+          EOF
+
+      - name: Upload via Fastlane Pilot
+        env:
+          FASTLANE_DISABLE_COLORS: 1
+          RN_DISPATCH: ${{ github.event.inputs.release_notes }}
+          RN_CALL: ${{ inputs.release_notes }}
+        run: |
+          set -e
+          NOTES="$RN_DISPATCH"; [ -z "$NOTES" ] && NOTES="$RN_CALL"
+          gem list -i fastlane || sudo gem install fastlane --no-document
+          fastlane pilot upload \
+            --api_key_path api_key.json \
+            --ipa "${{ steps.find.outputs.ipa }}" \
+            --skip_waiting_for_build_processing true \
+            --changelog "$NOTES"
