@@ -1,60 +1,6 @@
 name: Android Release (AAB)
 
 on:
-  workflow_dispatch:
-    inputs:
-      app_id:
-        description: "Custom applicationId (optional)"
-        required: false
-        default: "app.mhb.preview"
-      package_name:
-        description: "Google Play package name (e.g., app.mhb.preview)"
-        required: false
-        default: "app.mhb.preview"
-      track:
-        description: "Play track to upload (internal, alpha, beta, production)"
-        required: false
-        default: "internal"
-      build_number:
-        description: "Build number (optional). Defaults to GitHub run number if empty."
-        required: false
-        default: ""
-      release_notes:
-        description: "Release notes/changelog (optional)"
-        required: false
-        default: ""
-      upload:
-        description: "Upload to Google Play after build?"
-        required: false
-        default: "false"
-      preflight:
-        description: "Run format/analyze/tests before build?"
-        required: false
-        default: "false"
-      environment:
-        description: "GitHub Environment to run upload job (e.g., beta, production)"
-        required: false
-        default: "beta"
-      sentry_upload:
-        description: "Upload ProGuard mapping to Sentry?"
-        required: false
-        default: "false"
-      sentry_org:
-        description: "Sentry organization slug (if uploading symbols)"
-        required: false
-        default: ""
-      sentry_project:
-        description: "Sentry project slug (if uploading symbols)"
-        required: false
-        default: ""
-      sentry_release:
-        description: "Sentry release version (defaults to <package_name>@<build_number>)"
-        required: false
-        default: ""
-      crashlytics_upload:
-        description: "Upload Crashlytics ProGuard mapping? (requires Crashlytics plugin configured)"
-        required: false
-        default: "false"
   workflow_call:
     inputs:
       app_id:
