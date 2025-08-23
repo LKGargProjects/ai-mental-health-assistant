@@ -41,7 +41,9 @@ RUN flutter pub get
 COPY ai_buddy_web/lib ./lib
 COPY ai_buddy_web/assets ./assets
 COPY ai_buddy_web/web ./web
-RUN flutter build web --release
+# Build Flutter web once; disable PWA service worker to avoid stale cached UI on Render
+# This ensures fresh assets are fetched after each deploy
+RUN flutter build web --release --pwa-strategy=none
 
 # Stage 2: Python backend build
 FROM python:3.11-slim AS python-builder
@@ -74,6 +76,7 @@ RUN apt-get update && apt-get install -y \
     nginx \
     libpq5 \
     postgresql-client \
+    redis-tools \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
