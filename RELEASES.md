@@ -1,5 +1,14 @@
 # Releases Guide
 
+## 2025-08-23 — Web UI and Build Fixes (Render)
+
+- Prevent duplicate Safety & Legal modal via guard in `ai_buddy_web/lib/screens/interactive_chat_screen.dart`.
+- Removed `dart:io` usage in `ai_buddy_web/lib/services/notification_service.dart`; use `defaultTargetPlatform`/`kIsWeb` for web compatibility.
+- Verified `KeyboardAwareBackButton` from `ai_buddy_web/lib/widgets/keyboard_dismissible_scaffold.dart` and wiring across screens.
+- Quest tab now uses `WellnessDashboardScreen` via `ai_buddy_web/lib/navigation/home_shell.dart`.
+- Web builds disable PWA caching (`--pwa-strategy=none`) and nginx is configured to avoid stale assets.
+- Dockerfile updated for reproducible web builds; deployment config aligned with Render.
+
 This project includes one-command Android release scripts and a GitHub Actions workflow for signed AAB builds without committing secrets.
 
 ## Local Android releases
