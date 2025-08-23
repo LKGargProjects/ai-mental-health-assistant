@@ -7,6 +7,7 @@ import os
 import json
 import uuid
 import re
+import logging
 import redis
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple, List
@@ -20,6 +21,7 @@ from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from dotenv import load_dotenv
 import socket
+import time
 from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
 # Load environment variables
@@ -303,6 +305,21 @@ def create_app() -> Flask:
     # Load configuration
     app.config.from_object(Config)
     
+    # Configure logging level/handler early so INFO diagnostics are emitted
+    try:
+        level_name = str(app.config.get('LOG_LEVEL', 'INFO')).upper()
+        level = getattr(logging, level_name, logging.INFO)
+        app.logger.setLevel(level)
+        # Ensure a StreamHandler exists (avoid duplicates)
+        if not any(isinstance(h, logging.StreamHandler) for h in app.logger.handlers):
+            sh = logging.StreamHandler()
+            sh.setLevel(level)
+            formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
+            sh.setFormatter(formatter)
+            app.logger.addHandler(sh)
+    except Exception:
+        pass
+    
     # Initialize Sentry (if DSN provided)
     try:
         dsn = os.getenv('SENTRY_DSN_BACKEND', '').strip()
@@ -330,16 +347,25 @@ def create_app() -> Flask:
         if 'postgresql://' in db_url and 'psycopg' not in db_url:
             db_url = db_url.replace('postgresql://', 'postgresql+psycopg://', 1)
 
-        # Append sslmode=require in production/Render if not already present
+        # Append sslmode=require and a short connect_timeout for Postgres if not already present
         try:
             needs_ssl = (getattr(Config, 'RENDER', False) or str(getattr(Config, 'ENVIRONMENT', '')).lower() == 'production')
             parsed = urlparse(db_url)
-            query_items = dict(parse_qsl(parsed.query)) if parsed.query else {}
-            if needs_ssl and 'sslmode' not in {k.lower(): v for k, v in query_items.items()}:
-                query_items['sslmode'] = 'require'
+            # Only mutate query params for Postgres URLs; preserve sqlite formatting (e.g., sqlite:///)
+            if parsed.scheme.startswith('postgresql'):
+                query_items = dict(parse_qsl(parsed.query)) if parsed.query else {}
+                lower_keys = {k.lower() for k in query_items.keys()}
+                if needs_ssl and 'sslmode' not in lower_keys:
+                    query_items['sslmode'] = 'require'
+                # Ensure a short connect timeout for Postgres to prevent long hangs
+                if 'connect_timeout' not in lower_keys:
+                    query_items['connect_timeout'] = '2'
                 new_query = urlencode(query_items)
                 parsed = parsed._replace(query=new_query)
                 db_url = urlunparse(parsed)
+            else:
+                # Non-Postgres schemes (e.g., sqlite) are left untouched
+                pass
         except Exception as e:
             app.logger.warning(f"Failed to process DB URL SSL params: {e}")
 
@@ -354,6 +380,7 @@ def create_app() -> Flask:
         'pool_recycle': 300,
         'pool_size': 5,
         'max_overflow': 10,
+        'pool_timeout': 2,
     }
 
     # Log effective DB URL (masked) and attempt DNS resolution of host
@@ -361,6 +388,9 @@ def create_app() -> Flask:
         effective_url = app.config.get('SQLALCHEMY_DATABASE_URI')
         def _mask_db_url(url: str) -> str:
             try:
+                # For sqlite, return as-is to preserve triple slashes in logs (e.g., sqlite:///file.db)
+                if isinstance(url, str) and url.strip().lower().startswith('sqlite:'):
+                    return url
                 p = urlparse(url)
                 netloc = p.netloc
                 if '@' in netloc:
@@ -383,17 +413,42 @@ def create_app() -> Flask:
         # DNS resolution info
         if effective_url:
             p = urlparse(effective_url)
-            host = p.hostname
-            if host:
-                try:
-                    addr_list = socket.getaddrinfo(host, None)
-                    ips = sorted({item[4][0] for item in addr_list if item and item[4] and item[4][0]})
-                    app.logger.info(f"DB host '{host}' resolves to: {', '.join(ips)}")
-                except Exception as e:
-                    app.logger.warning(f"DNS resolution failed for DB host '{host}': {e}")
+            # Skip DNS resolution for sqlite
+            if p.scheme and p.scheme.lower().startswith('sqlite'):
+                pass
+            else:
+                host = p.hostname
+                if host:
+                    try:
+                        addr_list = socket.getaddrinfo(host, None)
+                        ips = sorted({item[4][0] for item in addr_list if item and item[4] and item[4][0]})
+                        app.logger.info(f"DB host '{host}' resolves to: {', '.join(ips)}")
+                    except Exception as e:
+                        app.logger.warning(f"DNS resolution failed for DB host '{host}': {e}")
     except Exception as e:
         app.logger.warning(f"Failed to log DB URL or DNS info: {e}")
-    
+
+    # AI startup diagnostics
+    try:
+        debug_flag = (os.getenv('AI_DEBUG_LOGS') or '').lower() == 'true'
+        available = _provider_keys_available()
+        configured = str(app.config.get('AI_PROVIDER', 'gemini')).lower()
+        chain = []
+        try:
+            with app.app_context():
+                chain = _build_failover_chain()
+        except Exception:
+            # Build a best-effort chain without app context
+            default_order = ['gemini', 'openai', 'perplexity']
+            if available.get(configured):
+                chain.append(configured)
+            for p in default_order:
+                if available.get(p) and p not in chain:
+                    chain.append(p)
+        app.logger.info(f"AI startup: AI_DEBUG_LOGS={debug_flag} configured={configured} available={available} failover_chain={chain}")
+    except Exception as e_diag:
+        app.logger.warning(f"AI startup diagnostics failed: {e_diag}")
+
     # Initialize extensions
     _init_extensions(app)
     
@@ -652,7 +707,13 @@ def _setup_session(app: Flask) -> None:
     
     if redis_url and redis_url != 'port' and redis_url.strip():
         try:
-            redis_client = redis.from_url(redis_url)
+            # Use short socket timeouts so Redis cannot hang requests
+            redis_client = redis.from_url(
+                redis_url,
+                socket_connect_timeout=1,
+                socket_timeout=1,
+                retry_on_timeout=False,
+            )
             redis_client.ping()
             app.config['SESSION_TYPE'] = 'redis'
             app.config['SESSION_REDIS'] = redis_client
@@ -673,11 +734,19 @@ def _setup_session(app: Flask) -> None:
 
 def _setup_rate_limiter(app: Flask) -> Limiter:
     """Configure rate limiting"""
+    # Choose storage based on Redis availability to avoid blocking when Redis is down
+    storage_uri = 'memory://'
+    try:
+        if app.config.get('SESSION_TYPE') == 'redis' and app.config.get('SESSION_REDIS') is not None:
+            storage_uri = app.config.get('REDIS_URL', 'memory://')
+    except Exception:
+        pass
+
     return Limiter(
         key_func=get_remote_address,
         app=app,
         default_limits=["500 per day", "100 per hour"],
-        storage_uri=app.config.get('REDIS_URL', 'memory://')
+        storage_uri=storage_uri
     )
 
 def _setup_cors(app: Flask) -> None:
@@ -752,20 +821,31 @@ def _register_routes(app: Flask) -> None:
     def health():
         """Enhanced health check endpoint with environment info"""
         try:
-            # Check database connection
+            # Check database and Redis with timing to detect hangs
+            t0 = time.monotonic()
             db_status = _check_database_health()
-            
-            # Check Redis connection
+            db_ms = int((time.monotonic() - t0) * 1000)
+
+            t1 = time.monotonic()
             redis_status = _check_redis_health()
+            redis_ms = int((time.monotonic() - t1) * 1000)
+
+            overall = "healthy"
+            if ('unhealthy' in db_status.lower()) or ('unhealthy' in str(redis_status).lower()):
+                overall = "degraded"
             
             health_data = {
-                "status": "healthy",
+                "status": overall,
                 "timestamp": datetime.utcnow().isoformat(),
                 "environment": app.config.get('ENVIRONMENT'),
                 "port": app.config.get('PORT'),
                 "provider": app.config.get('AI_PROVIDER'),
                 "database": db_status,
                 "redis": redis_status,
+                "latency_ms": {
+                    "db_check": db_ms,
+                    "redis_check": redis_ms,
+                },
                 "cors_enabled": True,
                 "cors_origins": app.config.get('CORS_ORIGINS', []),
                 "deployment": {
@@ -786,6 +866,11 @@ def _register_routes(app: Flask) -> None:
                     "/api/analytics/log"
                 ]
             }
+            try:
+                rid = getattr(g, 'request_id', None)
+            except Exception:
+                rid = None
+            app.logger.info(f"health endpoint status={overall} db={db_status} db_ms={db_ms} redis={redis_status} redis_ms={redis_ms} rid={rid}")
             
             return jsonify(health_data), 200
             
@@ -917,7 +1002,12 @@ def _register_routes(app: Flask) -> None:
             if isinstance(raw_meta, dict):
                 # Whitelist allowed keys and simple types only, trim long strings
                 allowed_keys = {
-                    'action', 'label', 'screen', 'source', 'value', 'count', 'duration_ms', 'success', 'code', 'provider'
+                    # Generic analytics keys
+                    'action', 'label', 'screen', 'source', 'value', 'count', 'duration_ms', 'success', 'code', 'provider',
+                    # Quest telemetry contract keys (PII-free)
+                    'quest_id', 'tag', 'surface', 'variant', 'ts', 'progress',
+                    # UI context (non-PII)
+                    'ui'
                 }
                 for k, v in raw_meta.items():
                     if k in allowed_keys and isinstance(v, (str, int, float, bool)):
@@ -935,7 +1025,7 @@ def _register_routes(app: Flask) -> None:
             db.session.execute(
                 text(
                     "INSERT INTO analytics_events (session_id, event_type, metadata, request_id, timestamp) "
-                    "VALUES (:session_id, :event_type, :metadata, :request_id, NOW())"
+                    "VALUES (:session_id, :event_type, :metadata, :request_id, CURRENT_TIMESTAMP)"
                 ),
                 {
                     'session_id': session_id,
@@ -950,6 +1040,77 @@ def _register_routes(app: Flask) -> None:
             db.session.rollback()
             app.logger.error(f"Analytics log error: {e}")
             return jsonify({"error": "Failed to log analytics"}), 500
+
+    @app.route('/api/analytics/recent', methods=['GET'])
+    @app.limiter.limit("60 per minute")
+    def analytics_recent():
+        """Read-only: Fetch recent analytics events for debugging.
+        Optional query params:
+          - event_prefix: filter event_type with prefix (e.g., 'quest_')
+          - limit: max records (default 50, max 200)
+        """
+        try:
+            prefix = (request.args.get('event_prefix') or '').strip()
+            try:
+                limit = int(request.args.get('limit', '50'))
+            except Exception:
+                limit = 50
+            limit = max(1, min(limit, 200))
+
+            params: Dict[str, Any] = { 'limit': limit }
+            where_clause = ""
+            if prefix:
+                where_clause = "WHERE event_type LIKE :prefix"
+                params['prefix'] = f"{prefix}%"
+
+            # Initialize timing and accumulator to avoid NameError and measure latency
+            start = time.monotonic()
+            events = []
+
+            sql = text(
+                f"""
+                SELECT event_type, metadata, request_id,
+                       CAST("timestamp" AS TEXT) AS ts
+                FROM analytics_events
+                {where_clause}
+                ORDER BY id DESC
+                LIMIT :limit
+                """
+            )
+
+            # Execute with a short statement timeout on Postgres to avoid hangs
+            engine = db.session.bind
+            dialect = engine.dialect.name if engine else None
+            if dialect == 'postgresql':
+                with engine.connect() as conn:
+                    with conn.begin():
+                        conn.execute(text("SET LOCAL statement_timeout = 2000"))
+                        result = conn.execute(sql, params)
+                        rows = list(result.mappings())
+            else:
+                result = db.session.execute(sql, params)
+                rows = list(result.mappings())
+            for r in rows:
+                meta = r.get('metadata')
+                ts_val = r.get('ts')
+                if isinstance(ts_val, datetime):
+                    ts_str = ts_val.isoformat()
+                elif ts_val is not None:
+                    ts_str = str(ts_val)
+                else:
+                    ts_str = None
+                events.append({
+                    'event_type': r.get('event_type'),
+                    'metadata': meta,
+                    'request_id': r.get('request_id'),
+                    'timestamp': ts_str,
+                })
+            elapsed_ms = int((time.monotonic() - start) * 1000)
+            app.logger.info(f"analytics_recent fetched count={len(events)} elapsed_ms={elapsed_ms} prefix='{prefix}' limit={limit}")
+            return jsonify({ 'events': events, 'count': len(events), 'elapsed_ms': elapsed_ms }), 200
+        except Exception as e:
+            app.logger.error(f"Analytics recent error: {e}")
+            return jsonify({"error": "Failed to fetch analytics"}), 500
 
     @app.route('/api/admin/purge', methods=['POST'])
     def admin_purge():
@@ -988,33 +1149,45 @@ def _get_or_create_session() -> str:
         session_id = str(uuid.uuid4())
     
     try:
-        # Check if session exists in database
-        existing_session = db.session.execute(
-            text("SELECT id FROM user_sessions WHERE id = :session_id"),
-            {'session_id': session_id}
+        # First ensure legacy 'sessions' table has the row, since many FKs reference it
+        existing_legacy = db.session.execute(
+            text("SELECT id FROM sessions WHERE id = :session_id"),
+            {"session_id": session_id}
         ).fetchone()
-        
-        if not existing_session:
-            # Create new session in database
+
+        from flask import current_app
+        if not existing_legacy:
+            # Create session in legacy table (authoritative for FK references)
             db.session.execute(
-                text("INSERT INTO user_sessions (id, created_at, last_active) VALUES (:session_id, NOW(), NOW())"),
-                {'session_id': session_id}
+                text("INSERT INTO sessions (id, created_at, last_activity) VALUES (:session_id, NOW(), NOW())"),
+                {"session_id": session_id}
             )
             db.session.commit()
-            # Use current_app for logging in request context
-            from flask import current_app
-            current_app.logger.info(f"Created new session: {session_id}")
+            current_app.logger.info(f"Created new session (sessions): {session_id}")
         else:
-            # Update last activity
+            # Touch last_activity to keep it fresh
             db.session.execute(
-                text("UPDATE user_sessions SET last_active = NOW() WHERE id = :session_id"),
-                {'session_id': session_id}
+                text("UPDATE sessions SET last_activity = NOW() WHERE id = :session_id"),
+                {"session_id": session_id}
             )
             db.session.commit()
-            # Use current_app for logging in request context
-            from flask import current_app
-            current_app.logger.info(f"Using existing session: {session_id}")
-            
+            current_app.logger.info(f"Using existing session (sessions): {session_id}")
+
+        # Best-effort: mirror to SQLAlchemy 'user_sessions' table if present
+        try:
+            db.session.execute(
+                text(
+                    "INSERT INTO user_sessions (id, created_at, last_active) "
+                    "VALUES (:session_id, NOW(), NOW()) "
+                    "ON CONFLICT (id) DO UPDATE SET last_active = EXCLUDED.last_active"
+                ),
+                {"session_id": session_id}
+            )
+            db.session.commit()
+        except Exception as e:
+            # Non-fatal. This table may not exist in older deployments.
+            current_app.logger.warning(f"user_sessions mirror failed: {e}")
+        
     except Exception as e:
         # Use current_app for logging in request context
         from flask import current_app
@@ -1029,18 +1202,8 @@ def _process_chat_message(message: str, session_id: str) -> Tuple[str, str]:
         # Detect crisis level FIRST
         risk_level = detect_crisis_level(message)
         
-        # Get AI response based on configured provider, passing crisis level
-        from flask import current_app
-        provider = current_app.config.get('AI_PROVIDER', 'gemini')
-        
-        if provider == 'gemini':
-            ai_response = get_gemini_response(message, session_id=session_id, risk_level=risk_level)
-        elif provider == 'openai':
-            ai_response = get_openai_response(message, risk_level=risk_level)
-        elif provider == 'perplexity':
-            ai_response = get_perplexity_response(message, risk_level=risk_level)
-        else:
-            ai_response = get_gemini_response(message, session_id=session_id, risk_level=risk_level)  # Default fallback
+        # Get AI response with cross-provider failover inferred from key presence
+        ai_response, _used_provider = _get_ai_response_with_failover(message, session_id, risk_level)
 
         # Log conversation
         _log_conversation(session_id, message, ai_response, risk_level)
@@ -1089,7 +1252,16 @@ def _convert_risk_level_to_score(risk_level: str) -> float:
 def _check_database_health() -> str:
     """Check database connection health"""
     try:
-        db.session.execute(text("SELECT 1"))
+        engine = db.session.bind
+        dialect = engine.dialect.name if engine else None
+        if dialect == 'postgresql':
+            # Run within a short transaction with a statement timeout
+            with engine.connect() as conn:
+                with conn.begin():
+                    conn.execute(text("SET LOCAL statement_timeout = 2000"))
+                    conn.execute(text("SELECT 1"))
+        else:
+            db.session.execute(text("SELECT 1"))
         return "healthy"
     except Exception as e:
         try:
@@ -1106,6 +1278,7 @@ def _check_redis_health() -> str:
         if current_app.config.get('SESSION_TYPE') == 'redis':
             redis_client = current_app.config.get('SESSION_REDIS')
             if redis_client:
+                # ping uses the socket timeouts configured in _setup_session
                 redis_client.ping()
                 return "healthy"
             else:
@@ -1159,6 +1332,90 @@ def _get_fallback_html(app: Flask) -> str:
     </body>
     </html>
     """
+
+def _is_failure_response(text: str) -> bool:
+    """Heuristic to detect unusable provider responses."""
+    if not text:
+        return True
+    t = str(text).strip().lower()
+    if not t:
+        return True
+    markers = (
+        "configuration error:",
+        "error generating response:",
+        "i'm having trouble connecting to my ai services",
+    )
+    return any(m in t for m in markers)
+
+
+def _parse_csv_env(val: str) -> List[str]:
+    try:
+        return [p.strip() for p in (val or "").split(",") if p.strip()]
+    except Exception:
+        return []
+
+
+def _provider_keys_available() -> Dict[str, bool]:
+    """Infer provider availability from environment variables."""
+    import os as _os
+    gem_keys = _parse_csv_env(_os.getenv("GEMINI_API_KEY") or "") + _parse_csv_env(_os.getenv("GEMINI_API_KEYS") or "")
+    has_gemini = len(gem_keys) > 0
+    has_openai = bool((_os.getenv("OPENAI_API_KEY") or "").strip())
+    has_pplx = bool(((_os.getenv("PERPLEXITY_API_KEY") or _os.getenv("PPLX_API_KEY") or "").strip()))
+    return {"gemini": has_gemini, "openai": has_openai, "perplexity": has_pplx}
+
+
+def _build_failover_chain() -> List[str]:
+    """Prefer configured provider if available, then gemini -> openai -> perplexity."""
+    from flask import current_app
+    available = _provider_keys_available()
+    configured = str(current_app.config.get("AI_PROVIDER", "gemini")).lower()
+    default_order = ["gemini", "openai", "perplexity"]
+    chain: List[str] = []
+    if available.get(configured):
+        chain.append(configured)
+    for p in default_order:
+        if available.get(p) and p not in chain:
+            chain.append(p)
+    return chain or ["gemini"]
+
+
+def _call_provider(provider: str, message: str, session_id: str, risk_level: str) -> str:
+    """Call providers with correct signatures and minimal side effects."""
+    from providers.gemini import get_gemini_response
+    from providers.openai import get_openai_response
+    from providers.perplexity import get_perplexity_response
+    import os as _os
+
+    if provider == "gemini":
+        return get_gemini_response(message, session_id=session_id, risk_level=risk_level)
+    elif provider == "openai":
+        return get_openai_response(message)
+    elif provider == "perplexity":
+        # Support alias if only PPLX_API_KEY is present at runtime
+        if not (_os.getenv("PERPLEXITY_API_KEY") or "").strip():
+            alt = (_os.getenv("PPLX_API_KEY") or "").strip()
+            if alt:
+                _os.environ["PERPLEXITY_API_KEY"] = alt
+        return get_perplexity_response(message)
+    else:
+        return get_gemini_response(message, session_id=session_id, risk_level=risk_level)
+
+
+def _get_ai_response_with_failover(message: str, session_id: str, risk_level: str) -> Tuple[str, str]:
+    """Try providers in order until a viable response is obtained. Returns (text, used_provider)."""
+    chain = _build_failover_chain()
+    last_err_text = None
+    for prov in chain:
+        try:
+            resp = _call_provider(prov, message, session_id, risk_level)
+            if not _is_failure_response(resp):
+                return resp, prov
+            last_err_text = resp
+        except Exception as _e:
+            last_err_text = f"Error generating response: {_e}"
+            continue
+    return (last_err_text or "I'm having trouble connecting to my AI services. Please try again in a moment."), (chain[-1] if chain else "unknown")
 
 def _enhanced_crisis_detection(message: str) -> Tuple[str, float, List[str]]:
     """Enhanced crisis detection with keyword analysis"""
@@ -1471,17 +1728,8 @@ def _register_additional_routes(app: Flask) -> None:
             risk_level = detect_crisis_level(message)
             crisis_data = get_crisis_response_and_resources(risk_level, country)
 
-            # Generate full AI response using configured provider
-            from flask import current_app
-            provider = current_app.config.get('AI_PROVIDER', 'gemini')
-            if provider == 'gemini':
-                full_text = get_gemini_response(message, session_id=session_id, risk_level=risk_level)
-            elif provider == 'openai':
-                full_text = get_openai_response(message, risk_level=risk_level)
-            elif provider == 'perplexity':
-                full_text = get_perplexity_response(message, risk_level=risk_level)
-            else:
-                full_text = get_gemini_response(message, session_id=session_id, risk_level=risk_level)
+            # Generate full AI response with failover chain
+            full_text, _used_provider = _get_ai_response_with_failover(message, session_id, risk_level)
 
             # Log conversation (non-streaming DB log)
             _log_conversation(session_id, message, full_text, risk_level)
@@ -1623,7 +1871,8 @@ def _register_additional_routes(app: Flask) -> None:
     def add_mood_entry():
         """Add a new mood entry"""
         try:
-            session_id = request.headers.get('X-Session-ID')
+            # Ensure session exists in DB (also syncs legacy 'sessions' table)
+            session_id = _get_or_create_session()
             if not session_id:
                 return jsonify({'error': 'Session ID required'}), 400
 
@@ -1899,27 +2148,106 @@ def _register_additional_routes(app: Flask) -> None:
         
         try:
             data = request.get_json() or {}
-            
+
+            # Ensure session association
+            session_id = _get_or_create_session()
+            if not session_id:
+                return jsonify({"error": "Session ID required"}), 400
+
             # Clean and validate data
             cleaned_data = {}
             required_fields = ['mood', 'energy', 'sleep', 'stress']
-            
+
             for field in required_fields:
                 value = data.get(field)
                 if value is None or value == "" or str(value).lower() in ['null', 'none']:
                     return jsonify({"error": f"Missing required field: {field}"}), 400
                 cleaned_data[field] = value.strip() if isinstance(value, str) else value
-            
+
             # Optional fields
             optional_fields = ['notes', 'crisis_level', 'anxiety_level']
             for field in optional_fields:
                 value = data.get(field)
                 if value and value != "" and str(value).lower() not in ['null', 'none']:
                     cleaned_data[field] = value.strip() if isinstance(value, str) else value
-            
-            app.logger.info(f"Assessment data processed: {cleaned_data}")
-            
-            return jsonify({"message": "Assessment received", "success": True}), 201
+
+            # Optional timezone offset in minutes to determine local "day" boundaries
+            try:
+                tz_offset_min = int(data.get('tz_offset_minutes') or 0)
+            except Exception:
+                tz_offset_min = 0
+
+            now_utc = datetime.utcnow()
+            # Compute start of local day and convert back to UTC
+            now_local = now_utc + timedelta(minutes=tz_offset_min)
+            start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+            start_of_day_utc = start_local - timedelta(minutes=tz_offset_min)
+
+            # Enforce single completion per (local) day
+            existing = db.session.query(SelfAssessmentEntry) \
+                .filter(SelfAssessmentEntry.session_id == session_id) \
+                .filter(SelfAssessmentEntry.timestamp >= start_of_day_utc) \
+                .first()
+
+            if existing:
+                app.logger.info(
+                    f"Self-assessment already completed today | session_id={session_id} completed_at={existing.timestamp.isoformat()} tz_offset_min={tz_offset_min}"
+                )
+                return jsonify({
+                    "success": True,
+                    "already_completed_today": True,
+                    "xp_awarded": 0,
+                    "completed_at": existing.timestamp.isoformat()
+                }), 200
+
+            # Create new entry (authoritative store)
+            entry = SelfAssessmentEntry(
+                session_id=session_id,
+                timestamp=now_utc,
+                assessment_data=cleaned_data,
+            )
+            db.session.add(entry)
+            db.session.commit()
+
+            # Best-effort mirror to legacy table for compatibility (non-fatal on error)
+            try:
+                db.session.execute(
+                    text(
+                        """
+                        INSERT INTO self_assessments (session_id, mood, energy, sleep, stress, social, work, notes, timestamp)
+                        VALUES (:session_id, :mood, :energy, :sleep, :stress, :social, :work, :notes, :timestamp)
+                        """
+                    ),
+                    {
+                        'session_id': session_id,
+                        'mood': cleaned_data.get('mood'),
+                        'energy': cleaned_data.get('energy'),
+                        'sleep': cleaned_data.get('sleep'),
+                        'stress': cleaned_data.get('stress'),
+                        'social': cleaned_data.get('social'),
+                        'work': cleaned_data.get('work'),
+                        'notes': cleaned_data.get('notes'),
+                        'timestamp': now_utc,
+                    }
+                )
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                app.logger.warning(f"Legacy self_assessments mirror skipped: {e}")
+
+            # Award XP once per day for quick check-in (value can be tuned server-side)
+            xp_awarded = 10
+            app.logger.info(
+                f"Self-assessment recorded | session_id={session_id} xp_awarded={xp_awarded} tz_offset_min={tz_offset_min} data_keys={list(cleaned_data.keys())}"
+            )
+
+            return jsonify({
+                "message": "Assessment recorded",
+                "success": True,
+                "already_completed_today": False,
+                "xp_awarded": xp_awarded,
+                "completed_at": now_utc.isoformat()
+            }), 201
             
         except Exception as e:
             app.logger.error(f"Self-assessment error: {e}")
