@@ -13,7 +13,6 @@ import '../widgets/status_avatar.dart';
 import '../config/profile_config.dart';
 import '../core/utils/size_utils.dart';
 import '../widgets/app_bottom_nav.dart';
-import '../widgets/app_back_button.dart';
 import '../widgets/keyboard_dismissible_scaffold.dart';
 import '../widgets/safety_legal_sheet.dart';
 
@@ -36,13 +35,22 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
   
   // One-time legal acknowledgment key
   static const _prefsLegalAckV1 = 'legal_ack_v1';
+  // Global in-flight guard to prevent duplicate Safety & Legal sheet
+  static bool _legalSheetShowing = false;
 
   Future<void> _ensureLegalAck() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final ack = prefs.getBool(_prefsLegalAckV1) ?? false;
       if (!ack && mounted) {
-        await showSafetyLegalSheet(context, requireAcknowledge: true);
+        // Prevent double invocation from concurrent mounts/renders
+        if (_legalSheetShowing) return;
+        _legalSheetShowing = true;
+        try {
+          await showSafetyLegalSheet(context, requireAcknowledge: true);
+        } finally {
+          _legalSheetShowing = false;
+        }
         await prefs.setBool(_prefsLegalAckV1, true);
       }
     } catch (e) {
@@ -312,8 +320,8 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                           builder: (ctx) {
                             final route = ModalRoute.of(ctx);
                             final isModal = route is PageRoute && route.fullscreenDialog == true;
-                            // Always show back button: if there's no history, it will at least dismiss the keyboard
-                            return AppBackButton(isModal: isModal);
+                            // Show back button only when keyboard is open; keep layout stable otherwise
+                            return KeyboardAwareBackButton(isModal: isModal, size: 44.h);
                           },
                         ),
                         Expanded(
