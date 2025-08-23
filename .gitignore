@@ -47,6 +47,11 @@ instance/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local signing env file for Android release scripts
+scripts/android_signing.env
+# Local signing env file for iOS release scripts
+scripts/ios_signing.env
 *.db
 
 # Dependencies
@@ -58,3 +63,11 @@ full_project.md
 
 # Archive and debug files
 archive/
+
+# iOS local overrides (do not commit)
+ai_buddy_web/ios/Config/local-overrides.xcconfig
+
+# Android signing files (also ignored in android/.gitignore)
+ai_buddy_web/android/key.properties
+**/*.keystore
+**/*.jks

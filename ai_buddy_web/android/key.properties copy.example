@@ -1,0 +1,9 @@
+# Copy this file to: android/key.properties
+# For local builds, you can keep using debug signing; for release, fill real values.
+
+# If you place the keystore at android/app/upload-keystore.jks, this relative path works:
+storeFile=app/upload-keystore.jks
+
+storePassword=changeit
+keyAlias=upload
+keyPassword=changeit

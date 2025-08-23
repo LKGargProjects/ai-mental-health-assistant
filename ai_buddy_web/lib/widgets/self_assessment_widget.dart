@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import '../providers/progress_provider.dart';
 
 class SelfAssessmentWidget extends StatefulWidget {
   final String? sessionId;
   final VoidCallback? onAssessmentSubmitted;
 
   const SelfAssessmentWidget({
-    Key? key,
+    super.key,
     this.sessionId,
     this.onAssessmentSubmitted,
-  }) : super(key: key);
+  });
 
   @override
   State<SelfAssessmentWidget> createState() => _SelfAssessmentWidgetState();
@@ -90,16 +92,37 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
         assessmentData['anxiety_level'] = _selectedAnxietyLevel;
       }
 
-      if (kDebugMode) debugPrint('📤 Sending self-assessment data: $assessmentData');
+      if (kDebugMode) {
+        debugPrint('📤 Sending self-assessment data: $assessmentData');
+      }
       final response = await apiService.submitSelfAssessment(assessmentData);
       if (kDebugMode) debugPrint('✅ Self-assessment response: $response');
 
-      // If we reach here, the submission was successful
+      // Parse XP and daily limit flags
+      final int xpAwarded = ((response['xp_awarded']) is num)
+          ? (response['xp_awarded'] as num).toInt()
+          : 0;
+      final bool alreadyCompletedToday = response['already_completed_today'] == true;
+
+      // Apply XP to progress provider
+      if (xpAwarded > 0 && mounted) {
+        Provider.of<ProgressProvider>(context, listen: false).addXp(xpAwarded);
+      }
+
       if (mounted) {
+        // Contextual feedback
+        final snackText = alreadyCompletedToday
+            ? 'You\'ve already completed today\'s check-in. No extra XP awarded.'
+            : (xpAwarded > 0
+                ? 'Assessment submitted! +$xpAwarded XP'
+                : 'Assessment submitted successfully.');
+        final color = alreadyCompletedToday
+            ? Colors.orange
+            : Colors.green;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Assessment submitted successfully!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text(snackText),
+            backgroundColor: color,
           ),
         );
 
@@ -149,7 +172,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
         Text(
           title,
           style: const TextStyle(
-            fontSize: 14, 
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
@@ -159,8 +182,12 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
           builder: (context, constraints) {
             final w = constraints.maxWidth;
             // More columns for better space utilization
-            int cols = w > 400 ? 6 : w > 350 ? 5 : 4;
-            
+            int cols = w > 400
+                ? 6
+                : w > 350
+                ? 5
+                : 4;
+
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -168,7 +195,9 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
                 crossAxisCount: cols,
                 crossAxisSpacing: 4,
                 mainAxisSpacing: 4,
-                mainAxisExtent: showIcons ? 50 : 40, // Smaller height, especially for non-emoji items
+                mainAxisExtent: showIcons
+                    ? 50
+                    : 40, // Smaller height, especially for non-emoji items
               ),
               itemCount: options.length,
               itemBuilder: (context, index) {
@@ -179,44 +208,53 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
                   onTap: () => onChanged(option['value']),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isSelected 
-                          ? Theme.of(context).primaryColor 
+                      color: isSelected
+                          ? Theme.of(context).primaryColor
                           : Colors.grey[100],
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: isSelected 
-                            ? Theme.of(context).primaryColor 
+                        color: isSelected
+                            ? Theme.of(context).primaryColor
                             : Colors.grey[300]!,
                         width: isSelected ? 1.5 : 1.0,
                       ),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 2),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 0,
+                      horizontal: 2,
+                    ),
                     child: Center(
                       child: showIcons && option['icon'] != null
-                        ? Text(
-                            option['icon'],
-                            style: const TextStyle(fontSize: 22), // Keep emoji size
-                            textAlign: TextAlign.center,
-                          )
-                        : Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                            child: Text(
-                              option['label'],
-                              style: TextStyle(
-                                fontSize: 11, // Slightly larger text for better readability
-                                fontWeight: isSelected 
-                                    ? FontWeight.w600 
-                                    : FontWeight.normal,
-                                color: isSelected 
-                                    ? Colors.white 
-                                    : Colors.black87,
-                                height: 1.0,
-                              ),
+                          ? Text(
+                              option['icon'],
+                              style: const TextStyle(
+                                fontSize: 22,
+                              ), // Keep emoji size
                               textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 4,
+                                horizontal: 2,
+                              ),
+                              child: Text(
+                                option['label'],
+                                style: TextStyle(
+                                  fontSize:
+                                      11, // Slightly larger text for better readability
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.black87,
+                                  height: 1.0,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
                     ),
                   ),
                 );
@@ -287,20 +325,25 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               width: double.infinity,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: _selectedCrisisLevel.isEmpty ? null : _selectedCrisisLevel,
+                value: _selectedCrisisLevel.isEmpty
+                    ? null
+                    : _selectedCrisisLevel,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: 'Select crisis level (if applicable)',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
                 items: [
-                  const DropdownMenuItem(
-                    value: null, 
+                  const DropdownMenuItem<String>(
+                    value: '',
                     child: Text('None', overflow: TextOverflow.ellipsis),
                   ),
                   ..._levelOptions.map(
-                    (option) => DropdownMenuItem(
-                      value: option['value'],
+                    (option) => DropdownMenuItem<String>(
+                      value: option['value'] as String,
                       child: Text(
                         option['label'],
                         overflow: TextOverflow.ellipsis,
@@ -324,20 +367,25 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               width: double.infinity,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: _selectedAnxietyLevel.isEmpty ? null : _selectedAnxietyLevel,
+                value: _selectedAnxietyLevel.isEmpty
+                    ? null
+                    : _selectedAnxietyLevel,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: 'Select anxiety level (if applicable)',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
                 items: [
-                  const DropdownMenuItem(
-                    value: null, 
+                  const DropdownMenuItem<String>(
+                    value: '',
                     child: Text('None', overflow: TextOverflow.ellipsis),
                   ),
                   ..._levelOptions.map(
-                    (option) => DropdownMenuItem(
-                      value: option['value'],
+                    (option) => DropdownMenuItem<String>(
+                      value: option['value'] as String,
                       child: Text(
                         option['label'],
                         overflow: TextOverflow.ellipsis,

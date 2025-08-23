@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../../widgets/keyboard_dismissible_scaffold.dart';
 
 class MentalHealthChatScreen extends StatelessWidget {
   const MentalHealthChatScreen({super.key});
@@ -30,19 +31,13 @@ class MentalHealthChatScreen extends StatelessWidget {
                 child: SafeArea(
                   child: Row(
                     children: [
-                      // Back Button
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).pop();
+                      // Back Button (keyboard-aware)
+                      Builder(
+                        builder: (ctx) {
+                          final route = ModalRoute.of(ctx);
+                          final isModal = route is PageRoute && route.fullscreenDialog == true;
+                          return KeyboardAwareBackButton(isModal: isModal, size: 32.h);
                         },
-                        child: Container(
-                          padding: EdgeInsets.all(8.h),
-                          child: CustomImageView(
-                            imagePath: ImageConstant.imgImage,
-                            height: 24.h,
-                            width: 16.h,
-                          ),
-                        ),
                       ),
 
                       Expanded(

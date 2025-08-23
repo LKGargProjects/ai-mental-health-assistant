@@ -79,8 +79,8 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Mood',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events),
-            label: 'Quest',
+            icon: Icon(Icons.explore_outlined),
+            label: 'Explore',
           ),
         ],
         currentIndex: _selectedIndex,

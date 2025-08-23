@@ -61,7 +61,7 @@ class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
           onTap: widget.onTap,
           onHighlightChanged: (v) => setState(() => _pressed = v),
           borderRadius: radius,
-          splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.10),
+          splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
           highlightColor: Colors.transparent,
           child: AnimatedScale(
             scale: _pressed ? 0.985 : (_hover ? 1.005 : 1.0),
@@ -77,7 +77,7 @@ class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
                 boxShadow: (_hover || _pressed)
                     ? [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
+                          color: Colors.black.withValues(alpha: 0.06),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -136,7 +136,29 @@ class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
                             borderRadius: BorderRadius.circular(19.h),
                           ),
                         ),
-                        // No overlay tick; built-in green tick in SVG is used for completed tasks
+                        // Green completion tick overlay (only when no doneImagePath is provided)
+                        if (widget.completed && widget.doneImagePath == null)
+                          Positioned(
+                            right: -6.h,
+                            top: -6.h,
+                            child: Container(
+                              width: 28.h,
+                              height: 28.h,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF22C55E),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 3),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(Icons.check, size: 16.h, color: Colors.white),
+                            ),
+                          ),
                       ],
                     ),
                   ),

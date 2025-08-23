@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import '../widgets/app_bottom_nav.dart';
 import '../screens/interactive_chat_screen.dart';
 import '../screens/mood_tracker_screen.dart';
-import '../dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart' as DhiwiseWellness;
-import '../dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
+import 'package:ai_buddy_web/dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
+
+// Global deep-link controller for switching HomeShell tabs from anywhere
+// e.g., when handling a notification tap.
+final ValueNotifier<AppTab> homeTabDeepLink = ValueNotifier<AppTab>(AppTab.talk);
 
 class HomeShell extends StatefulWidget {
   final AppTab initialTab;
@@ -30,6 +34,39 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _current = widget.initialTab;
+    _onDeepLinkTab(); // Process any pre-set deep-link tab value on startup
+    // Listen for deep-link tab change requests
+    homeTabDeepLink.addListener(_onDeepLinkTab);
+  }
+
+  void _onDeepLinkTab() {
+    final target = homeTabDeepLink.value;
+    if (kDebugMode) {
+      try { debugPrint('[HomeShell] deepLink request -> $target (current=$_current)'); } catch (_) {}
+    }
+    if (_current != target) {
+      setState(() => _current = target);
+      if (kDebugMode) {
+        try { debugPrint('[HomeShell] switched to $target'); } catch (_) {}
+      }
+    } else {
+      // If already on the tab, pop to its root and trigger reselect behavior
+      final nav = _navFor(target);
+      nav?.popUntil((route) => route.isFirst);
+      switch (target) {
+        case AppTab.talk:
+          _talkReselect.value++;
+          break;
+        case AppTab.mood:
+          _moodReselect.value++;
+          break;
+        case AppTab.quest:
+          _questReselect.value++;
+          break;
+        case AppTab.community:
+          break;
+      }
+    }
   }
 
   int get _index {
@@ -60,7 +97,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    Widget _buildTabNavigator({
+    Widget buildTabNavigator({
       required GlobalKey<NavigatorState> key,
       required WidgetBuilder builder,
       required bool active,
@@ -75,24 +112,29 @@ class _HomeShellState extends State<HomeShell> {
     }
 
     final pages = <Widget>[
-      _buildTabNavigator(
+      buildTabNavigator(
         key: _talkNavKey,
         active: _index == 0,
-        builder: (_) => InteractiveChatScreen(showBottomNav: false, reselect: _talkReselect),
-      ),
-      _buildTabNavigator(
-        key: _moodNavKey,
-        active: _index == 1,
-        builder: (_) => MoodTrackerScreen(showBottomNav: false, reselect: _moodReselect),
-      ),
-      _buildTabNavigator(
-        key: _questNavKey,
-        active: _index == 2,
-        builder: (_) => DhiwiseSizer.Sizer(
-          builder: (context, o, d) => DhiwiseWellness.WellnessDashboardScreen(showBottomNav: false, reselect: _questReselect),
+        builder: (_) => InteractiveChatScreen(
+          showBottomNav: false,
+          reselect: _talkReselect,
         ),
       ),
-      _buildTabNavigator(
+      buildTabNavigator(
+        key: _moodNavKey,
+        active: _index == 1,
+        builder: (_) =>
+            MoodTrackerScreen(showBottomNav: false, reselect: _moodReselect),
+      ),
+      buildTabNavigator(
+        key: _questNavKey,
+        active: _index == 2,
+        builder: (_) => WellnessDashboardScreen(
+          showBottomNav: false,
+          reselect: _questReselect,
+        ),
+      ),
+      buildTabNavigator(
         key: _communityNavKey,
         active: _index == 3,
         builder: (_) => const _CommunityComingSoon(),
@@ -118,10 +160,7 @@ class _HomeShellState extends State<HomeShell> {
         }
       },
       child: Scaffold(
-        body: IndexedStack(
-          index: _index,
-          children: pages,
-        ),
+        body: IndexedStack(index: _index, children: pages),
         bottomNavigationBar: AppBottomNav(
           current: _current,
           onTap: (tab) => setState(() => _current = tab),
@@ -147,6 +186,12 @@ class _HomeShellState extends State<HomeShell> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    homeTabDeepLink.removeListener(_onDeepLinkTab);
+    super.dispose();
+  }
 }
 
 class _CommunityComingSoon extends StatelessWidget {
@@ -154,8 +199,6 @@ class _CommunityComingSoon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Community coming soon!'),
-    );
+    return const Center(child: Text('Community coming soon!'));
   }
 }

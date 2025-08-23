@@ -54,7 +54,7 @@ class _ProgressCardWidgetState extends State<ProgressCardWidget> {
               boxShadow: (_hover || _pressed)
                   ? [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 14,
                         offset: const Offset(0, 6),
                       ),
@@ -62,7 +62,10 @@ class _ProgressCardWidgetState extends State<ProgressCardWidget> {
                   : null,
             ),
             padding: EdgeInsets.all(24.h),
+            alignment: Alignment.center,
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _IconRenderable(
                   path: widget.imagePath,
@@ -75,19 +78,29 @@ class _ProgressCardWidgetState extends State<ProgressCardWidget> {
                 SizedBox(height: 16.h),
                 widget.valueWidget ?? Text(
                   widget.value,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
                   style: TextStyleHelper.instance.headline28BoldInter.copyWith(
                     fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
                     color: Color(0xFF4E5965),
                   ),
                 ),
-                SizedBox(height: 4.h),
-                Text(
-                  widget.label,
-                  style: TextStyleHelper.instance.headline22Inter.copyWith(
-                    fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
-                    color: Color(0xFF8C9CAA),
+                if (widget.label.isNotEmpty) ...[
+                  SizedBox(height: 4.h),
+                  Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
+                    style: TextStyleHelper.instance.headline22Inter.copyWith(
+                      fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                      color: Color(0xFF8C9CAA),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

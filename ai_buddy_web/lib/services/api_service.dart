@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
 import '../config/feature_flags.dart';
@@ -9,20 +8,18 @@ import 'streaming/streaming_sse.dart' as sse;
 import '../models/message.dart';
 import '../models/mood_entry.dart';
 import '../config/api_config.dart';
+import 'session_manager.dart';
 
 /// Optimized API service with better error handling and performance
 class ApiService {
-  static const String _sessionKey = 'session_id';
   static const String _analyticsConsentKey = 'analytics_consent';
   static const Duration _timeout = Duration(seconds: 30);
   static const int _maxRetries = 3;
 
   late final Dio _dio;
-  late final FlutterSecureStorage _storage;
   String? _sessionId;
 
   ApiService() {
-    _storage = const FlutterSecureStorage();
     _dio = _createDio();
     _setupInterceptors();
   }
@@ -87,7 +84,8 @@ class ApiService {
           handler.next(error);
         },
         onRequest: (options, handler) async {
-          // Add session ID to headers if available
+          // Add session ID to headers if available (prefer SessionManager cache)
+          _sessionId ??= SessionManager.peekSessionId();
           if (_sessionId != null) {
             options.headers['X-Session-ID'] = _sessionId;
           }
@@ -117,17 +115,14 @@ class ApiService {
   /// Get or create session ID
   Future<String> _getSessionId() async {
     if (_sessionId != null) return _sessionId!;
-
     try {
-      _sessionId = await _storage.read(key: _sessionKey);
-      if (_sessionId == null) {
-        _sessionId = await _createNewSession();
-      }
+      _sessionId = await SessionManager.getOrCreateSessionId();
     } catch (e) {
       if (kDebugMode) debugPrint('Session error: $e');
-      _sessionId = await _createNewSession();
+      // Best-effort fallback from manager
+      _sessionId = SessionManager.peekSessionId();
+      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
     }
-
     return _sessionId!;
   }
 
@@ -152,7 +147,10 @@ class ApiService {
   }
 
   /// Minimal client-side analytics logger (no PII). No-ops if consent is not given.
-  Future<void> logAnalyticsEvent(String eventType, {Map<String, dynamic>? metadata}) async {
+  Future<void> logAnalyticsEvent(
+    String eventType, {
+    Map<String, dynamic>? metadata,
+  }) async {
     try {
       if (!(await isAnalyticsEnabled())) return;
       await _getSessionId();
@@ -170,18 +168,7 @@ class ApiService {
   }
 
   /// Create new session
-  Future<String> _createNewSession() async {
-    try {
-      final response = await _dio.get('/api/get_or_create_session');
-      final sessionId = response.data['session_id'] as String;
-      await _storage.write(key: _sessionKey, value: sessionId);
-      return sessionId;
-    } catch (e) {
-      if (kDebugMode) debugPrint('Failed to create session: $e');
-      // Generate fallback session ID
-      return DateTime.now().millisecondsSinceEpoch.toString();
-    }
-  }
+  // Removed unused _createNewSession()
 
   /// Test backend connectivity with retry logic
   Future<Map<String, dynamic>> testBackendHealth() async {
@@ -193,14 +180,21 @@ class ApiService {
 
   /// Open a streaming chat connection (SSE) when enabled and supported (web).
   /// Returns null if streaming is disabled or not supported; caller should fall back.
-  Future<sse.SseHandle?> streamMessage(String message, {String? country}) async {
+  Future<sse.SseHandle?> streamMessage(
+    String message, {
+    String? country,
+  }) async {
     if (!FeatureFlags.enableStreaming || !kIsWeb) return null;
     if (message.trim().isEmpty) return null;
     await _getSessionId();
 
     // Auto-derive country if not provided (web)
     country ??= _deriveCountry();
-    if (kDebugMode) debugPrint('🔍 DEBUG: SSE country param resolved to: ${country ?? '(null)'}');
+    if (kDebugMode) {
+      debugPrint(
+        '🔍 DEBUG: SSE country param resolved to: ${country ?? '(null)'}',
+      );
+    }
 
     final query = <String, String>{
       'message': message.trim(),
@@ -214,27 +208,24 @@ class ApiService {
 
   /// Send chat message with optimized error handling and geography-specific crisis detection
   Future<Message> sendMessage(String message, {String? country}) async {
-    return _retryOperation(() async {
+    try {
       await _getSessionId(); // Ensure session is available
 
       // Prepare request data with optional country parameter
       // Auto-derive country if not provided
       country ??= _deriveCountry();
-      final requestData = <String, dynamic>{
-        'message': message.trim(),
-      };
+      final requestData = <String, dynamic>{'message': message.trim()};
       if (country != null) {
         requestData['country'] = country;
-        if (kDebugMode) debugPrint('🔍 DEBUG: Adding country parameter: $country');
+        if (kDebugMode) {
+          debugPrint('🔍 DEBUG: Adding country parameter: $country');
+        }
       } else {
         if (kDebugMode) debugPrint('🔍 DEBUG: No country parameter provided');
       }
       if (kDebugMode) debugPrint('🔍 DEBUG: Request data: $requestData');
 
-      final response = await _dio.post(
-        '/api/chat',
-        data: requestData,
-      );
+      final response = await _dio.post('/api/chat', data: requestData);
 
       final data = response.data as Map<String, dynamic>;
 
@@ -242,54 +233,80 @@ class ApiService {
       RiskLevel riskLevel = RiskLevel.none;
       if (data['risk_level'] != null) {
         final riskLevelStr = data['risk_level'].toString().toLowerCase();
-        if (kDebugMode) debugPrint('🔍 DEBUG: Raw risk_level from API: ${data['risk_level']}');
-        if (kDebugMode) debugPrint('🔍 DEBUG: Processed risk_level: $riskLevelStr');
+        if (kDebugMode) {
+          debugPrint(
+            '🔍 DEBUG: Raw risk_level from API: ${data['risk_level']}',
+          );
+        }
+        if (kDebugMode) {
+          debugPrint('🔍 DEBUG: Processed risk_level: $riskLevelStr');
+        }
         switch (riskLevelStr) {
           case 'crisis':
           case 'high':
             riskLevel = RiskLevel.high;
-            if (kDebugMode) debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.high');
+            if (kDebugMode) {
+              debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.high');
+            }
             break;
           case 'medium':
             riskLevel = RiskLevel.medium;
-            if (kDebugMode) debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.medium');
+            if (kDebugMode) {
+              debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.medium');
+            }
             break;
           case 'low':
             riskLevel = RiskLevel.low;
-            if (kDebugMode) debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.low');
+            if (kDebugMode) {
+              debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.low');
+            }
             break;
           default:
             riskLevel = RiskLevel.none;
-            if (kDebugMode) debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.none (default)');
+            if (kDebugMode) {
+              debugPrint('🔍 DEBUG: Set riskLevel to RiskLevel.none (default)');
+            }
         }
       } else {
-        if (kDebugMode) debugPrint('🔍 DEBUG: No risk_level field in API response');
+        if (kDebugMode) {
+          debugPrint('🔍 DEBUG: No risk_level field in API response');
+        }
       }
       if (kDebugMode) debugPrint('🔍 DEBUG: Final riskLevel: $riskLevel');
 
       // Parse geography-specific crisis data
       String? crisisMsg;
       List<Map<String, dynamic>>? crisisNumbers;
-      
+
       if (kDebugMode) debugPrint('🔍 DEBUG: Full API response data: $data');
-      if (kDebugMode) debugPrint('🔍 DEBUG: crisis_msg field exists: ${data.containsKey('crisis_msg')}');
-      if (kDebugMode) debugPrint('🔍 DEBUG: crisis_numbers field exists: ${data.containsKey('crisis_numbers')}');
-      
+      if (kDebugMode) {
+        debugPrint(
+          '🔍 DEBUG: crisis_msg field exists: ${data.containsKey('crisis_msg')}',
+        );
+      }
+      if (kDebugMode) {
+        debugPrint(
+          '🔍 DEBUG: crisis_numbers field exists: ${data.containsKey('crisis_numbers')}',
+        );
+      }
+
       if (data['crisis_msg'] != null) {
         crisisMsg = data['crisis_msg'] as String;
         if (kDebugMode) debugPrint('🔍 DEBUG: Crisis message: $crisisMsg');
       } else {
         if (kDebugMode) debugPrint('🔍 DEBUG: crisis_msg is null or missing');
       }
-      
+
       if (data['crisis_numbers'] != null) {
         final numbersList = data['crisis_numbers'] as List<dynamic>;
-        crisisNumbers = numbersList.map((item) => 
-          Map<String, dynamic>.from(item)
-        ).toList();
+        crisisNumbers = numbersList
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
         if (kDebugMode) debugPrint('🔍 DEBUG: Crisis numbers: $crisisNumbers');
       } else {
-        if (kDebugMode) debugPrint('🔍 DEBUG: crisis_numbers is null or missing');
+        if (kDebugMode) {
+          debugPrint('🔍 DEBUG: crisis_numbers is null or missing');
+        }
       }
 
       return Message(
@@ -300,7 +317,10 @@ class ApiService {
         crisisMsg: crisisMsg,
         crisisNumbers: crisisNumbers,
       );
-    });
+    } on DioException catch (e) {
+      // Single-shot: do not retry to avoid duplicate LLM requests
+      throw _createUserFriendlyError(e);
+    }
   }
 
   /// Get chat history with pagination support
@@ -330,7 +350,11 @@ class ApiService {
         }
       }
 
-      final response = await _dio.post('/api/self_assessment', data: data);
+      // Include timezone offset (minutes) so server uses user's local day
+      final payload = Map<String, dynamic>.from(data)
+        ..['tz_offset_minutes'] = DateTime.now().timeZoneOffset.inMinutes;
+
+      final response = await _dio.post('/api/self_assessment', data: payload);
       return response.data as Map<String, dynamic>;
     });
   }
@@ -372,6 +396,8 @@ class ApiService {
           return 'Authentication required.';
         } else if (statusCode == 403) {
           return 'Access denied.';
+        } else if (statusCode == 429) {
+          return 'Service is busy (rate limit). Please wait a minute and try again.';
         } else if (statusCode == 404) {
           return 'Service not found.';
         } else if (statusCode == 500) {
@@ -431,6 +457,8 @@ class ApiService {
           message += 'Authentication required.';
         } else if (statusCode == 403) {
           message += 'Access denied.';
+        } else if (statusCode == 429) {
+          message += 'Service is busy (rate limit). Please wait a minute and try again.';
         } else if (statusCode == 404) {
           message += 'Service not found.';
         } else if (statusCode == 500) {
@@ -452,7 +480,7 @@ class ApiService {
   /// Clear session data
   Future<void> clearSession() async {
     try {
-      await _storage.delete(key: _sessionKey);
+      await SessionManager.clear();
       _sessionId = null;
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to clear session: $e');

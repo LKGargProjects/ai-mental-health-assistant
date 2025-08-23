@@ -24,8 +24,12 @@ class QuestCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDone = (progress ?? 0) >= 1.0;
+    final String buttonText = isDone ? 'Done' : (isActive ? 'Continue' : 'Start');
+    final VoidCallback? action = isDone ? null : onTap;
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: action,
       child: Container(
         padding: EdgeInsets.all(16.h),
         decoration: BoxDecoration(
@@ -82,26 +86,20 @@ class QuestCardWidget extends StatelessWidget {
                 ),
 
                 // Action Button
-                isActive
-                    ? CustomButton(
-                        height: 32.h,
-                        width: 90.h,
-                        text: 'Continue',
-                        onTap: onTap,
-                        buttonType: CustomButtonType.outline,
-                        buttonStyle: CustomButtonStyles.outlinePrimary,
-                      )
-                    : CustomButton(
-                        height: 32.h,
-                        width: 90.h,
-                        text: 'Start',
-                        onTap: onTap,
-                      ),
+                CustomButton(
+                  height: 32.h,
+                  width: 90.h,
+                  text: buttonText,
+                  onTap: action,
+                  buttonType: (isActive || isDone)
+                      ? CustomButtonType.outline
+                      : CustomButtonType.elevated,
+                ),
               ],
             ),
 
-            // Progress Bar (only for active quests)
-            if (isActive && progress != null) ...[
+            // Progress Bar (whenever progress is provided)
+            if (progress != null) ...[
               SizedBox(height: 16.v),
               LinearProgressIndicator(
                 value: progress,

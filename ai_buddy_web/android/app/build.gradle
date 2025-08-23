@@ -2,20 +2,65 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'dev.flutter.flutter-gradle-plugin'
 
+// Read Flutter-provided versioning from local.properties
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
+def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0'
+
+// Load keystore properties for release signing if available
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+// Support secure overrides from Gradle -P props or environment variables.
+// Preferred keys: STORE_FILE, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+def envOrProp = { String key, String defaultValue ->
+    if (project.hasProperty(key)) {
+        return project.property(key).toString()
+    }
+    def env = System.getenv(key)
+    return (env != null && env.toString().trim()) ? env.toString() : defaultValue
+}
+def ksStoreFilePath = envOrProp('STORE_FILE', keystoreProperties['storeFile'])
+def ksStorePassword = envOrProp('STORE_PASSWORD', keystoreProperties['storePassword'])
+def ksKeyAlias      = envOrProp('KEY_ALIAS', keystoreProperties['keyAlias'])
+def ksKeyPassword   = envOrProp('KEY_PASSWORD', keystoreProperties['keyPassword'])
+
+// Allow CI overrides for versioning via -PVERSION_CODE/-PVERSION_NAME or env
+def ciVersionCode = envOrProp('VERSION_CODE', flutterVersionCode).toString()
+def ciVersionName = envOrProp('VERSION_NAME', flutterVersionName).toString()
+
+// Determine if a valid release keystore is configured
+def hasReleaseKeystore = (ksStoreFilePath != null && file(ksStoreFilePath).exists())
+
+// Parameterized applicationId with default. Override by passing -PAPP_ID=your.id or
+// setting ORG_GRADLE_PROJECT_APP_ID env var when invoking Gradle/Flutter.
+def appId = project.hasProperty('APP_ID') ? APP_ID : 'app.mhb.preview'
+
 android {
     namespace 'com.example.ai_buddy_web'
-    compileSdkVersion 35
+    compileSdkVersion 36
     ndkVersion '27.0.12077973'
 
     defaultConfig {
-        applicationId "com.example.ai_buddy_web"
-        minSdkVersion 21
-        targetSdkVersion 35
-        versionCode 1
-        versionName "1.0"
+        applicationId appId
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion 36
+        versionCode ciVersionCode.toInteger()
+        versionName ciVersionName
     }
 
     compileOptions {
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
@@ -28,24 +73,44 @@ android {
         main.java.srcDirs += 'src/main/kotlin'
     }
 
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile file(ksStoreFilePath)
+                storePassword ksStorePassword
+                keyAlias ksKeyAlias
+                keyPassword ksKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             minifyEnabled false
             shrinkResources false
+            // Suffix debug builds for side-by-side installs during development
+            applicationIdSuffix ".dev"
         }
         release {
             minifyEnabled false
             shrinkResources false
-            signingConfig signingConfigs.debug
+            // Use release signing if key.properties is present; else fall back to debug for local builds
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
 
 dependencies {
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0"
 }
 
 flutter {
     source '../..'
-} 
+}
+ 

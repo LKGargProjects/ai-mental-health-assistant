@@ -38,6 +38,8 @@ class QuestCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Promote nullable field to a local for sound null-safety checks
+    final double? p = progress;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -47,7 +49,7 @@ class QuestCardWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -63,7 +65,7 @@ class QuestCardWidget extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(icon, color: color, size: 24),
@@ -100,17 +102,21 @@ class QuestCardWidget extends StatelessWidget {
                 // Action Button
                 ElevatedButton(
                   onPressed: onTap,
-                  style: progress != null ? _outlineButtonStyle : _buttonStyle,
-                  child: Text(progress != null ? 'Continue' : 'Start'),
+                  style: p != null ? _outlineButtonStyle : _buttonStyle,
+                  child: Text(
+                    (p != null && p >= 1.0)
+                        ? 'Done'
+                        : (p != null ? 'Continue' : 'Start'),
+                  ),
                 ),
               ],
             ),
 
             // Progress Bar (only for active quests)
-            if (progress != null) ...[
+            if (p != null) ...[
               const SizedBox(height: 16),
               LinearProgressIndicator(
-                value: progress,
+                value: p,
                 backgroundColor: Colors.grey[200],
                 valueColor: AlwaysStoppedAnimation<Color>(color),
                 minHeight: 8,

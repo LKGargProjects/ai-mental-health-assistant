@@ -1,0 +1,15 @@
+# Copy this file to: android/key.properties
+# DO NOT COMMIT android/key.properties (it's gitignored). Keep your real passwords local.
+# For local dev you can rely on debug signing; for Play release, fill real values here
+# OR use environment variables (STORE_FILE, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD).
+
+# If you place the keystore at android/app/upload-keystore.jks, this relative path works:
+storeFile=app/upload-keystore.jks
+
+storePassword=changeit
+keyAlias=upload
+keyPassword=changeit
+
+# Alternative to this file:
+# - Create scripts/android_signing.env from scripts/android_signing.env.example
+# - Or export env vars in your shell before running release scripts.

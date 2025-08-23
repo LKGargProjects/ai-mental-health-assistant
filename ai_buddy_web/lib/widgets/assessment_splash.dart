@@ -6,7 +6,8 @@ import './app_back_button.dart';
 
 class AssessmentSplash extends StatelessWidget {
   final VoidCallback? onClosed;
-  const AssessmentSplash({super.key, this.onClosed});
+  final VoidCallback? onSubmitted;
+  const AssessmentSplash({super.key, this.onClosed, this.onSubmitted});
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +52,8 @@ class AssessmentSplash extends StatelessWidget {
                         isModal: true,
                         onPressed: () {
                           Navigator.of(context).maybePop();
+                          // For QA/telemetry: ensure close without submit is visible in logs
+                          try { debugPrint('[QuickCheckin][ClosedWithoutSubmit]'); } catch (_) {}
                           onClosed?.call();
                         },
                         iconColor: const Color(0xFF8C9CAA),
@@ -74,7 +77,7 @@ class AssessmentSplash extends StatelessWidget {
                       onAssessmentSubmitted: () {
                         // Close on successful submit
                         Navigator.of(context).maybePop();
-                        onClosed?.call();
+                        onSubmitted?.call();
                       },
                     ),
                   ),

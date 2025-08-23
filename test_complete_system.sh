@@ -85,24 +85,38 @@ echo ""
 print_info "Step 4: API Endpoint Tests"
 echo "-------------------------------"
 
+# Create a single session for API tests
+SESSION_ID=$(curl -s http://localhost:5055/api/get_or_create_session | python3 -c 'import sys,json; print(json.load(sys.stdin)["session_id"])' 2>/dev/null)
+if [ -z "$SESSION_ID" ]; then
+    print_status 1 "Failed to create/get session"
+fi
+
 # Test assessment endpoint
-assessment_response=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Session-ID: test-session-$(date +%s)" -d '{"mood": "happy", "energy": "high", "sleep": "good", "stress": "low", "notes": "System test"}' http://localhost:5055/api/self_assessment)
+assessment_response=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Session-ID: $SESSION_ID" -d '{"mood": "happy", "energy": "high", "sleep": "good", "stress": "low", "notes": "System test"}' http://localhost:5055/api/self_assessment)
 if [ $? -eq 0 ] && echo "$assessment_response" | grep -q "success.*true"; then
     print_status 0 "Assessment endpoint is working"
 else
     print_status 1 "Assessment endpoint is not working"
 fi
 
-# Test mood history endpoint
-mood_response=$(curl -s -H "X-Session-ID: test-session-$(date +%s)" http://localhost:5055/api/mood_history)
-if [ $? -eq 0 ]; then
+# Insert a mood entry
+mood_insert_response=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Session-ID: $SESSION_ID" -d '{"mood_level": 4, "note": "System test mood"}' http://localhost:5055/api/mood_entry)
+if [ $? -eq 0 ] && echo "$mood_insert_response" | grep -q "Mood entry added successfully"; then
+    print_status 0 "Mood entry insert is working"
+else
+    print_status 1 "Mood entry insert is not working"
+fi
+
+# Test mood history endpoint (should include at least one entry)
+mood_response=$(curl -s -H "X-Session-ID: $SESSION_ID" http://localhost:5055/api/mood_history)
+if [ $? -eq 0 ] && echo "$mood_response" | grep -q "\["; then
     print_status 0 "Mood history endpoint is working"
 else
     print_status 1 "Mood history endpoint is not working"
 fi
 
 # Test chat endpoint
-chat_response=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Session-ID: test-session-$(date +%s)" -d '{"message": "Hello", "session_id": "test-session-$(date +%s)"}' http://localhost:5055/api/chat)
+chat_response=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Session-ID: $SESSION_ID" -d '{"message": "Hello", "session_id": "'$SESSION_ID'"}' http://localhost:5055/api/chat)
 if [ $? -eq 0 ]; then
     print_status 0 "Chat endpoint is working"
 else

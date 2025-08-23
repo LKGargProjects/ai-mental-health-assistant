@@ -3,23 +3,26 @@ import 'package:provider/provider.dart';
 import '../providers/quest_provider.dart';
 import '../models/quest.dart';
 import '../widgets/app_back_button.dart';
+import '../theme/text_style_helper.dart';
+import '../theme/theme_helper.dart';
 
 class QuestScreen extends StatefulWidget {
-  const QuestScreen({Key? key}) : super(key: key);
+  const QuestScreen({super.key});
 
   @override
   _QuestScreenState createState() => _QuestScreenState();
 }
 
-class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStateMixin {
+class _QuestScreenState extends State<QuestScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
   }
-  
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -33,35 +36,51 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('Quests', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+          title: Text(
+            "Today's Quests",
+            style: TextStyleHelper.instance.headline24Bold,
+          ),
           centerTitle: true,
           automaticallyImplyLeading: false,
           leading: Builder(
             builder: (ctx) {
               final canPop = Navigator.of(ctx).canPop();
               final route = ModalRoute.of(ctx);
-              final isModal = route is PageRoute && route.fullscreenDialog == true;
+              final isModal =
+                  route is PageRoute && route.fullscreenDialog == true;
               if (canPop) {
                 return AppBackButton(isModal: isModal);
               }
               return const SizedBox.shrink();
             },
           ),
-          bottom: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.grey[600],
-            indicator: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: Theme.of(context).primaryColor,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(56 + 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.grey[600],
+                  indicator: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  tabs: const [
+                    Tab(text: 'All'),
+                    Tab(text: 'Active'),
+                    Tab(text: 'Completed'),
+                    Tab(text: 'Categories'),
+                  ],
+                ),
+                Container(height: 8, color: appTheme.colorFFF3F4),
+              ],
             ),
-            tabs: const [
-              Tab(text: 'All'),
-              Tab(text: 'Active'),
-              Tab(text: 'Completed'),
-              Tab(text: 'Categories'),
-            ],
           ),
         ),
         body: Consumer<QuestProvider>(
@@ -71,20 +90,20 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
               children: [
                 // All Quests Tab
                 _buildQuestList(questProvider.quests, 'No quests available'),
-                
+
                 // Active Quests Tab
                 _buildQuestList(
                   questProvider.inProgressQuests,
                   'No active quests. Start a new quest!',
                 ),
-                
+
                 // Completed Quests Tab
                 _buildQuestList(
                   questProvider.completedQuests,
                   'No completed quests yet. Keep going!',
                   showProgress: false,
                 ),
-                
+
                 // Categories Tab
                 _buildCategoriesTab(questProvider),
               ],
@@ -94,24 +113,25 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       ),
     );
   }
-  
-  Widget _buildQuestList(List<Quest> quests, String emptyMessage, {bool showProgress = true}) {
+
+  Widget _buildQuestList(
+    List<Quest> quests,
+    String emptyMessage, {
+    bool showProgress = true,
+  }) {
     if (quests.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Text(
             emptyMessage,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
             textAlign: TextAlign.center,
           ),
         ),
       );
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16.0),
       itemCount: quests.length,
@@ -121,7 +141,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       },
     );
   }
-  
+
   Widget _buildQuestCard(Quest quest, {bool showProgress = true}) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -129,9 +149,9 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: quest.status == QuestStatus.completed 
-              ? Colors.green.withOpacity(0.5) 
-              : Colors.grey.withOpacity(0.2),
+          color: quest.status == QuestStatus.completed
+              ? Colors.green.withValues(alpha: 0.5)
+              : Colors.grey.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -150,7 +170,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: quest.categoryColor.withOpacity(0.1),
+                      color: quest.categoryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -185,7 +205,10 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                   ),
                   // XP Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.amber[50],
                       borderRadius: BorderRadius.circular(12),
@@ -209,18 +232,15 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Description
               Text(
                 quest.description,
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
               ),
-              
+
               // Progress bar
               if (showProgress && quest.status != QuestStatus.completed) ...[
                 const SizedBox(height: 12),
@@ -228,8 +248,8 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                   value: quest.progress / quest.target,
                   backgroundColor: Colors.grey[200],
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    quest.status == QuestStatus.completed 
-                        ? Colors.green 
+                    quest.status == QuestStatus.completed
+                        ? Colors.green
                         : Theme.of(context).primaryColor,
                   ),
                   minHeight: 8,
@@ -240,12 +260,9 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '${quest.progress} / ${quest.target} ${quest.target > 1 ? 'times' : 'time'}' +
-                          (quest.target > 1 ? ' (${(quest.progress / quest.target * 100).toStringAsFixed(0)}%)' : ''),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      '${quest.progress} / ${quest.target} ${quest.target > 1 ? 'times' : 'time'}'
+                      '${quest.target > 1 ? ' (${(quest.progress / quest.target * 100).toStringAsFixed(0)}%)' : ''}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                     if (quest.status == QuestStatus.unlocked)
                       TextButton(
@@ -255,12 +272,14 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text('Start', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Start',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                   ],
                 ),
               ]
-              
               // Completed indicator
               else if (quest.status == QuestStatus.completed) ...[
                 const SizedBox(height: 8),
@@ -285,10 +304,10 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildCategoriesTab(QuestProvider questProvider) {
     final categories = QuestCategory.values;
-    
+
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -301,9 +320,13 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       itemBuilder: (context, index) {
         final category = categories[index];
         final questsInCategory = questProvider.getQuestsByCategory(category);
-        final completedQuests = questsInCategory.where((q) => q.isCompleted).length;
-        final progress = questsInCategory.isEmpty ? 0.0 : completedQuests / questsInCategory.length;
-        
+        final completedQuests = questsInCategory
+            .where((q) => q.isCompleted)
+            .length;
+        final progress = questsInCategory.isEmpty
+            ? 0.0
+            : completedQuests / questsInCategory.length;
+
         return Card(
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -321,7 +344,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _getCategoryColor(category).withOpacity(0.1),
+                      color: _getCategoryColor(category).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -346,10 +369,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                   // Progress text
                   Text(
                     '$completedQuests/${questsInCategory.length} quests',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 8),
                   // Progress bar
@@ -370,7 +390,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       },
     );
   }
-  
+
   Color _getCategoryColor(QuestCategory category) {
     switch (category) {
       case QuestCategory.mindfulness:
@@ -385,7 +405,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
         return Colors.red;
     }
   }
-  
+
   String _getCategoryName(QuestCategory category) {
     switch (category) {
       case QuestCategory.mindfulness:
@@ -400,7 +420,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
         return 'Challenge';
     }
   }
-  
+
   void _showQuestDetails(Quest quest) {
     showModalBottomSheet(
       context: context,
@@ -411,7 +431,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       builder: (context) => _buildQuestDetails(quest),
     );
   }
-  
+
   Widget _buildQuestDetails(Quest quest) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -425,14 +445,10 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: quest.categoryColor.withOpacity(0.1),
+                  color: quest.categoryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  quest.icon,
-                  color: quest.categoryColor,
-                  size: 32,
-                ),
+                child: Icon(quest.icon, color: quest.categoryColor, size: 32),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -448,9 +464,12 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: quest.categoryColor.withOpacity(0.1),
+                        color: quest.categoryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -467,9 +486,9 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
               ),
             ],
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // XP Reward
           Row(
             children: [
@@ -485,16 +504,13 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Description
           const Text(
             'Description',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -505,24 +521,21 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
               height: 1.5,
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Progress
           const Text(
             'Progress',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           LinearProgressIndicator(
             value: quest.progress / quest.target,
             backgroundColor: Colors.grey[200],
             valueColor: AlwaysStoppedAnimation<Color>(
-              quest.status == QuestStatus.completed 
-                  ? Colors.green 
+              quest.status == QuestStatus.completed
+                  ? Colors.green
                   : Theme.of(context).primaryColor,
             ),
             minHeight: 10,
@@ -533,8 +546,8 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${quest.progress} / ${quest.target} ${quest.target > 1 ? 'times' : 'time'}' +
-                    (quest.target > 1 ? ' (${(quest.progress / quest.target * 100).toStringAsFixed(0)}%)' : ''),
+                '${quest.progress} / ${quest.target} ${quest.target > 1 ? 'times' : 'time'}'
+                '${quest.target > 1 ? ' (${(quest.progress / quest.target * 100).toStringAsFixed(0)}%)' : ''}',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[700],
@@ -558,9 +571,9 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                 ),
             ],
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Action button
           if (quest.status == QuestStatus.unlocked)
             SizedBox(
@@ -578,10 +591,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                 ),
                 child: const Text(
                   'Start Quest',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             )
@@ -632,42 +642,40 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                 ),
               ),
             ),
-          
+
           const SizedBox(height: 16),
         ],
       ),
     );
   }
-  
+
   void _startQuest(Quest quest) {
     // Mark as in progress with 0 progress
     context.read<QuestProvider>().updateQuestProgress(quest.id, 0);
-    
+
     // Show a snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Started quest: ${quest.title}'),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
-  
+
   void _updateQuestProgress(Quest quest) {
     final newProgress = (quest.progress + 1).clamp(0, quest.target);
     context.read<QuestProvider>().updateQuestProgress(quest.id, newProgress);
-    
+
     // Show a snackbar
     if (newProgress >= quest.target) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🎉 Quest completed: ${quest.title}! +${quest.xpReward} XP'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+          content: Text(
+            '🎉 Quest completed: ${quest.title}! +${quest.xpReward} XP',
           ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           duration: const Duration(seconds: 3),
         ),
       );
@@ -676,36 +684,35 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
         SnackBar(
           content: Text('Progress updated: $newProgress/${quest.target}'),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
     }
   }
-  
+
   void _restartQuest(Quest quest) {
     // Reset progress to 0 and mark as in progress
     context.read<QuestProvider>().updateQuestProgress(quest.id, 0);
-    
+
     // Show a snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Restarted quest: ${quest.title}'),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
-    
+
     // Close the bottom sheet
     Navigator.pop(context);
   }
-  
-  void _showCategoryQuests(QuestProvider questProvider, QuestCategory category) {
+
+  void _showCategoryQuests(
+    QuestProvider questProvider,
+    QuestCategory category,
+  ) {
     final quests = questProvider.getQuestsByCategory(category);
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -727,7 +734,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  _getCategoryName(category) + ' Quests',
+                  '${_getCategoryName(category)} Quests',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -741,10 +748,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                   ? Center(
                       child: Text(
                         'No quests in this category yet.',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 16,
-                        ),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
                       ),
                     )
                   : ListView.builder(
@@ -761,7 +765,10 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
                             '${quest.progress}/${quest.target} (${(quest.progress / quest.target * 100).toStringAsFixed(0)}%)',
                           ),
                           trailing: quest.isCompleted
-                              ? const Icon(Icons.check_circle, color: Colors.green)
+                              ? const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                )
                               : null,
                           onTap: () {
                             Navigator.pop(context); // Close the category sheet
@@ -784,7 +791,7 @@ class _QuestScreenState extends State<QuestScreen> with SingleTickerProviderStat
       ),
     );
   }
-  
+
   IconData _getCategoryIcon(QuestCategory category) {
     switch (category) {
       case QuestCategory.mindfulness:

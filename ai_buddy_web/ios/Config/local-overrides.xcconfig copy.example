@@ -1,0 +1,9 @@
+// Copy this file to: ios/Config/local-overrides.xcconfig
+// Set your bundle id and optional overrides used by the project.
+
+APP_BUNDLE_ID = app.mhb.preview
+
+// Optional overrides (set if you want to control from xcconfig)
+DEVELOPMENT_TEAM = 828Q2S3G4Q
+MARKETING_VERSION = 1.0
+CURRENT_PROJECT_VERSION = 1

@@ -11,10 +11,24 @@ class ChatProvider extends ChangeNotifier {
   String? _error;
   bool _hasShownGreeting = false; // Track if greeting has been shown
   bool _isTyping = false; // AI typing indicator state
+  bool _isSending = false; // Prevent concurrent sends (tap debouncing)
   final List<StreamSubscription<Map<String, dynamic>>> _subscriptions = [];
   final List<void Function()> _closers = [];
 
   ChatProvider() : _apiService = ApiService() {
+    // Pre-insert a greeting immediately for instant UI; hydrate history in background
+    if (_messages.isEmpty && !_hasShownGreeting) {
+      _messages.add(
+        Message(
+          content:
+              "Hey there! How are you doing today? I'm here if you want to chat about anything. 🙂",
+          isUser: false,
+          type: MessageType.text,
+        ),
+      );
+      _hasShownGreeting = true;
+      notifyListeners();
+    }
     _loadChatHistory();
   }
 
@@ -30,37 +44,16 @@ class ChatProvider extends ChangeNotifier {
 
     try {
       final history = await _apiService.getChatHistory();
-      _messages.clear();
-      _messages.addAll(history);
-
-      // Always add initial greeting if no messages exist OR if we haven't shown greeting yet
-      if (_messages.isEmpty || !_hasShownGreeting) {
-        _messages.add(
-          Message(
-            content:
-                "Hey there! How are you doing today? I'm here if you want to chat about anything. 🙂",
-            isUser: false,
-            type: MessageType.text,
-          ),
-        );
-        _hasShownGreeting = true;
+      // Only replace local messages if server has any. If history is empty,
+      // keep the pre-inserted greeting for a friendlier first-load UX.
+      if (history.isNotEmpty) {
+        _messages
+          ..clear()
+          ..addAll(history);
       }
     } catch (e) {
       debugPrint('❌ Error loading chat history: $e');
       _error = 'Failed to load chat history';
-
-      // Always add initial greeting even if history loading fails
-      if (_messages.isEmpty || !_hasShownGreeting) {
-        _messages.add(
-          Message(
-            content:
-                "Hey there! How are you doing today? I'm here if you want to chat about anything. 🙂",
-            isUser: false,
-            type: MessageType.text,
-          ),
-        );
-        _hasShownGreeting = true;
-      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -69,7 +62,10 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> sendMessage(String content, {String? country}) async {
     if (content.trim().isEmpty) return;
+    if (_isSending) return; // debounce concurrent taps
+    _isSending = true;
     _error = null;
+    _isLoading = true;
 
     // Optimistic UI: show user's message immediately and turn on typing indicator
     final userMessage = Message(content: content, isUser: true);
@@ -78,10 +74,6 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Test backend connectivity and ensure session
-      await _testBackendConnection();
-      await _setupSession();
-
       // Try streaming first (web-only, feature-gated). Fallback to non-streaming.
       final handle = await _apiService.streamMessage(content, country: country);
       if (handle != null) {
@@ -100,10 +92,15 @@ class ChatProvider extends ChangeNotifier {
               // Capture meta and replace message to include immutable fields
               metaRisk = _mapRisk(event['risk_level']) ?? RiskLevel.none;
               metaCrisisMsg = event['crisis_msg'] as String?;
-              metaCrisisNumbers = (event['crisis_numbers'] as List?)?.cast<Map<String, dynamic>>();
+              metaCrisisNumbers = (event['crisis_numbers'] as List?)
+                  ?.cast<Map<String, dynamic>>();
               if (kDebugMode) {
-                debugPrint('🟡 [SSE meta] risk=${event['risk_level']}, crisis_msg=${metaCrisisMsg?.substring(0, metaCrisisMsg!.length.clamp(0, 120))}');
-                final nums = metaCrisisNumbers?.map((e) => e['phone'] ?? e['name'] ?? e.toString()).toList();
+                debugPrint(
+                  '🟡 [SSE meta] risk=${event['risk_level']}, crisis_msg=${metaCrisisMsg?.substring(0, metaCrisisMsg!.length.clamp(0, 120))}',
+                );
+                final nums = metaCrisisNumbers
+                    ?.map((e) => e['phone'] ?? e['name'] ?? e.toString())
+                    .toList();
                 debugPrint('🟡 [SSE meta] crisis_numbers=${nums?.join(', ')}');
               }
               if (streaming != null) {
@@ -140,8 +137,12 @@ class ChatProvider extends ChangeNotifier {
               }
               streaming!.content += text;
               if (kDebugMode) {
-                final sample = text.length > 60 ? '${text.substring(0, 60)}…' : text;
-                debugPrint('🟢 [SSE token] +${text.length} chars: "$sample" (total=${streaming!.content.length})');
+                final sample = text.length > 60
+                    ? '${text.substring(0, 60)}…'
+                    : text;
+                debugPrint(
+                  '🟢 [SSE token] +${text.length} chars: "$sample" (total=${streaming!.content.length})',
+                );
               }
               if (firstToken) {
                 firstToken = false;
@@ -152,13 +153,19 @@ class ChatProvider extends ChangeNotifier {
               if (_isTyping) _isTyping = false;
               notifyListeners();
               if (kDebugMode) {
-                debugPrint('🔵 [SSE done] total_chars=${streaming?.content.length ?? 0}, risk=$metaRisk');
+                debugPrint(
+                  '🔵 [SSE done] total_chars=${streaming?.content.length ?? 0}, risk=$metaRisk',
+                );
               }
               handle.close();
             } else if (type == 'error') {
               // Show a soft error and stop typing
               _messages.add(
-                Message(content: 'Streaming error. Retrying soon...', isUser: false, type: MessageType.error),
+                Message(
+                  content: 'Streaming error. Retrying soon...',
+                  isUser: false,
+                  type: MessageType.error,
+                ),
               );
               if (_isTyping) _isTyping = false;
               notifyListeners();
@@ -191,16 +198,25 @@ class ChatProvider extends ChangeNotifier {
       }
 
       // Fallback: non-streaming request, progressively reveal locally
-      final aiMessage = await _apiService.sendMessage(content, country: country);
+      final aiMessage = await _apiService.sendMessage(
+        content,
+        country: country,
+      );
       if (kDebugMode) {
         debugPrint('🟣 [HTTP chat] risk=${aiMessage.riskLevel}');
-        debugPrint('🟣 [HTTP chat] crisis_msg_len=${aiMessage.crisisMsg?.length ?? 0}');
-        debugPrint('🟣 [HTTP chat] crisis_numbers=${aiMessage.crisisNumbers?.length ?? 0}');
+        debugPrint(
+          '🟣 [HTTP chat] crisis_msg_len=${aiMessage.crisisMsg?.length ?? 0}',
+        );
+        debugPrint(
+          '🟣 [HTTP chat] crisis_numbers=${aiMessage.crisisNumbers?.length ?? 0}',
+        );
       }
 
       // Avoid adding an empty bubble. Delay insertion until first chunk exists.
       final full = aiMessage.content;
-      final lines = full.contains('\n') ? full.split('\n') : _splitIntoSentences(full);
+      final lines = full.contains('\n')
+          ? full.split('\n')
+          : _splitIntoSentences(full);
 
       if (lines.isEmpty || full.trim().isEmpty) {
         // Nothing meaningful to show; just stop typing and return.
@@ -228,7 +244,7 @@ class ChatProvider extends ChangeNotifier {
       // Append remaining chunks with a subtle delay for progressive effect
       for (var i = 1; i < lines.length; i++) {
         final line = lines[i];
-        streaming.content += '\n' + line;
+        streaming.content += '\n$line';
         notifyListeners();
         final ms = (line.trim().length * 15).clamp(120, 600);
         await Future.delayed(Duration(milliseconds: ms));
@@ -242,6 +258,7 @@ class ChatProvider extends ChangeNotifier {
 
       final String errorMessage = _apiService.getErrorMessage(e);
       _error = errorMessage;
+      if (_isTyping) _isTyping = false;
 
       // Add error message bubble (user message already added above)
       _messages.add(
@@ -250,6 +267,7 @@ class ChatProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Unexpected error in sendMessage: $e');
       _error = 'An unexpected error occurred. Please try again.';
+      if (_isTyping) _isTyping = false;
 
       _messages.add(
         Message(
@@ -259,6 +277,7 @@ class ChatProvider extends ChangeNotifier {
         ),
       );
     } finally {
+      _isSending = false; // reset tap debounce so future sends work
       _isLoading = false;
       notifyListeners();
     }
@@ -270,28 +289,13 @@ class ChatProvider extends ChangeNotifier {
     final parts = text.split(regex).where((s) => s.isNotEmpty).toList();
     // Fallback: if still one long part, split by commas to add a bit more granularity
     if (parts.length <= 1 && text.contains(',')) {
-      return text.split(',').map((e) => e.trim()).where((s) => s.isNotEmpty).toList();
+      return text
+          .split(',')
+          .map((e) => e.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
     }
     return parts;
-  }
-
-  Future<void> _testBackendConnection() async {
-    try {
-      await _apiService.testBackendHealth();
-    } catch (e) {
-      debugPrint('❌ Backend connection test failed: $e');
-      throw Exception('Backend not reachable. Please start your Flask server.');
-    }
-  }
-
-  Future<void> _setupSession() async {
-    try {
-      // This will be handled by the API service
-      // Just ensure we have a valid session
-    } catch (e) {
-      debugPrint('❌ Session setup failed: $e');
-      throw Exception('Failed to establish session with backend.');
-    }
   }
 
   Future<void> prefetchSession() async {
@@ -328,7 +332,9 @@ class ChatProvider extends ChangeNotifier {
       sub.cancel();
     }
     for (final c in _closers) {
-      try { c(); } catch (_) {}
+      try {
+        c();
+      } catch (_) {}
     }
     _subscriptions.clear();
     _closers.clear();
