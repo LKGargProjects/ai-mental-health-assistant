@@ -16,7 +16,7 @@ services:
       - key: AI_PROVIDER
         value: gemini
       - key: CORS_ORIGINS
-        value: https://ai-mental-health-backend-3w4b.onrender.com
+        value: "https://ai-mental-health-backend-3w4b.onrender.com,https://gentlequest.com,https://www.gentlequest.com,https://gentlequest.app,https://www.gentlequest.app"
 
       # Database: set in dashboard with External Connection String
       # (Blueprints only support `connectionString`, which is private network only)
@@ -58,6 +58,66 @@ services:
         value: "0"
 
       # Informational
+      - key: VERSION
+        value: 1.0.0
+      - key: BUILD_TIME
+        generateValue: true
+      - key: PLATFORM
+        value: render
+      - key: PYTHON_VERSION
+        value: "3.9.6"
+
+  - type: web
+    name: GentleQuest
+    env: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - key: RENDER
+        value: true
+      - key: ENVIRONMENT
+        value: production
+
+      - key: AI_PROVIDER
+        value: gemini
+      - key: CORS_ORIGINS
+        value: "https://gentlequest.com,https://www.gentlequest.com,https://gentlequest.app,https://www.gentlequest.app,https://*.onrender.com"
+
+      - key: DATABASE_URL
+        sync: false
+
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEYS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PPLX_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ADMIN_API_TOKEN
+        sync: false
+
+      - key: MESSAGE_RETENTION_DAYS
+        value: "30"
+      - key: SESSION_RETENTION_DAYS
+        value: "14"
+      - key: ERROR_LOG_RETENTION_DAYS
+        value: "14"
+      - key: ANALYTICS_RETENTION_DAYS
+        value: "90"
+
+      - key: SENTRY_DSN_BACKEND
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0"
+      - key: SENTRY_PROFILES_SAMPLE_RATE
+        value: "0"
+
       - key: VERSION
         value: 1.0.0
       - key: BUILD_TIME
