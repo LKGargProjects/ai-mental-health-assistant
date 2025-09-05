@@ -51,8 +51,6 @@ class QuestCard extends StatelessWidget {
         return Colors.orange;
       case QuestCategory.challenge:
         return Colors.red;
-      default:
-        return Colors.grey;
     }
   }
 
@@ -77,7 +75,7 @@ class QuestCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.2),
+                        color: color.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(

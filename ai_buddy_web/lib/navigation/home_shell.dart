@@ -5,6 +5,12 @@ import '../screens/interactive_chat_screen.dart';
 import '../screens/mood_tracker_screen.dart';
 import 'package:ai_buddy_web/dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
 
+import '../widgets/crisis_resources.dart';
+import '../models/message.dart';
+import '../widgets/safety_legal_sheet.dart';
+import '../widgets/help_entrypoint.dart';
+// Removed Provider dependency for Help overlay risk plumbing
+
 // Global deep-link controller for switching HomeShell tabs from anywhere
 // e.g., when handling a notification tap.
 final ValueNotifier<AppTab> homeTabDeepLink = ValueNotifier<AppTab>(AppTab.talk);
@@ -94,9 +100,77 @@ class _HomeShellState extends State<HomeShell> {
         return _communityNavKey.currentState;
     }
   }
+  
+  Future<void> _showHelpSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16.0,
+              right: 16.0,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16.0,
+              top: 12.0,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Need help now?',
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.of(ctx).maybePop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'If you are in immediate danger, call your local emergency number.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+                  ),
+                  const SizedBox(height: 12),
+                  const CrisisResourcesWidget(riskLevel: RiskLevel.high),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        Navigator.of(ctx).maybePop();
+                        await Future.delayed(Duration.zero);
+                        if (!mounted) return;
+                        await showSafetyLegalSheet(context);
+                      },
+                      icon: const Icon(Icons.gavel_outlined),
+                      label: const Text('Safety & Legal'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Help overlay no longer depends on chat risk; static and shown only on Community tab
     Widget buildTabNavigator({
       required GlobalKey<NavigatorState> key,
       required WidgetBuilder builder,
@@ -160,7 +234,14 @@ class _HomeShellState extends State<HomeShell> {
         }
       },
       child: Scaffold(
-        body: IndexedStack(index: _index, children: pages),
+        body: Stack(
+          children: [
+            IndexedStack(index: _index, children: pages),
+            // Show Help entrypoint only on the Community tab
+            if (_current == AppTab.community)
+              HelpEntrypointOverlay(onPressed: _showHelpSheet),
+          ],
+        ),
         bottomNavigationBar: AppBottomNav(
           current: _current,
           onTap: (tab) => setState(() => _current = tab),
@@ -192,6 +273,7 @@ class _HomeShellState extends State<HomeShell> {
     homeTabDeepLink.removeListener(_onDeepLinkTab);
     super.dispose();
   }
+
 }
 
 class _CommunityComingSoon extends StatelessWidget {

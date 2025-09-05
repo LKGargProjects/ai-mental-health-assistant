@@ -30,7 +30,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               const Text(
-                'Wellness Buddy',
+                'GentleQuest',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -111,7 +111,7 @@ class WelcomeScreen extends StatelessWidget {
                     context: context,
                     builder: (BuildContext context) {
                       return AlertDialog(
-                        title: const Text('About AI Mental Health Buddy'),
+                        title: const Text('About GentleQuest'),
                         content: const Text(
                           'This app provides AI-powered mental health support, mood tracking, and crisis intervention resources. '
                           'It uses advanced AI to provide personalized assistance while maintaining your privacy and security.',

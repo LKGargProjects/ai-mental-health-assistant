@@ -44,7 +44,7 @@ def hasReleaseKeystore = (ksStoreFilePath != null && file(ksStoreFilePath).exist
 
 // Parameterized applicationId with default. Override by passing -PAPP_ID=your.id or
 // setting ORG_GRADLE_PROJECT_APP_ID env var when invoking Gradle/Flutter.
-def appId = project.hasProperty('APP_ID') ? APP_ID : 'app.mhb.preview'
+def appId = project.hasProperty('APP_ID') ? APP_ID : 'app.gentlequest.www'
 
 android {
     namespace 'com.example.ai_buddy_web'

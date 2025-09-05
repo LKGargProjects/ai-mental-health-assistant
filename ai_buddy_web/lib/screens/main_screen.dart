@@ -1,7 +1,7 @@
 import 'package:ai_buddy_web/screens/chat_screen.dart';
 import 'package:ai_buddy_web/screens/mood_tracker_screen.dart';
 import 'package:ai_buddy_web/dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
-import '../dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
+import '../dhiwise/core/utils/size_utils.dart' as dhiwise_sizer;
 import 'package:flutter/material.dart';
 
 class MainScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   static final List<Widget> _widgetOptions = <Widget>[
     const ChatScreen(),
     const MoodTrackerScreen(),
-    DhiwiseSizer.Sizer(
+    dhiwise_sizer.Sizer(
       builder: (context, orientation, deviceType) => WellnessDashboardScreen(),
     ),
   ];
@@ -32,7 +32,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Mental Health Buddy'),
+        title: const Text('GentleQuest'),
         actions: [
           // Quick access to Wellness Dashboard (optional)
           IconButton(
@@ -41,7 +41,7 @@ class _MainScreenState extends State<MainScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DhiwiseSizer.Sizer(
+                  builder: (context) => dhiwise_sizer.Sizer(
                     builder: (context, orientation, deviceType) => WellnessDashboardScreen(),
                   ),
                 ),

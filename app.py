@@ -215,9 +215,12 @@ def _get_environment_config(environment: str) -> Dict[str, Any]:
             'database_url': os.environ.get('DATABASE_URL'),
             'redis_url': 'redis://localhost:6379',
             'cors_origins': [
-                'https://ai-mental-health-assistant-tddc.onrender.com',
+                'https://gentlequest.onrender.com',
                 'https://*.onrender.com',
-                'https://ai-mental-health-backend.onrender.com'
+                'https://gentlequest.com',
+                'https://www.gentlequest.com',
+                'https://gentlequest.app',
+                'https://www.gentlequest.app'
             ],
         }
     }
@@ -732,6 +735,19 @@ def _setup_session(app: Flask) -> None:
 
     Session(app)
 
+def _rate_limit_key():
+    """Prefer per-session limiting; fall back to client IP.
+    This reduces false-positive 429s when many clients share an IP (e.g., behind proxies).
+    """
+    try:
+        sid = request.headers.get('X-Session-ID')
+        if sid and sid.strip():
+            return f"sid:{sid.strip()}"
+    except Exception:
+        # Fall back safely to remote address
+        pass
+    return get_remote_address()
+
 def _setup_rate_limiter(app: Flask) -> Limiter:
     """Configure rate limiting"""
     # Choose storage based on Redis availability to avoid blocking when Redis is down
@@ -743,9 +759,9 @@ def _setup_rate_limiter(app: Flask) -> Limiter:
         pass
 
     return Limiter(
-        key_func=get_remote_address,
+        key_func=_rate_limit_key,
         app=app,
-        default_limits=["500 per day", "100 per hour"],
+        default_limits=["5000 per day", "1000 per hour"],
         storage_uri=storage_uri
     )
 
@@ -863,7 +879,9 @@ def _register_routes(app: Flask) -> None:
                     "/api/mood_history",
                     "/api/mood_entry",
                     "/api/self_assessment",
-                    "/api/analytics/log"
+                    "/api/analytics/log",
+                    "/api/metrics",
+                    "/api/deploy-test"
                 ]
             }
             try:
@@ -877,6 +895,16 @@ def _register_routes(app: Flask) -> None:
         except Exception as e:
             app.logger.error(f"Health check failed: {e}")
             return jsonify({"status": "unhealthy", "error": str(e)}), 500
+
+    @app.route("/api/deploy-test", methods=["GET"])
+    @app.limiter.exempt
+    def deploy_test():
+        """Simple deploy verification endpoint"""
+        return jsonify({
+            "ok": True,
+            "version": app.config.get("VERSION"),
+            "environment": app.config.get("ENVIRONMENT")
+        }), 200
 
     @app.route("/api/chat", methods=["POST"])
     @app.limiter.limit("30 per minute")
@@ -1303,7 +1331,7 @@ def _get_fallback_html(app: Flask) -> str:
     <!DOCTYPE html>
     <html>
     <head>
-        <title>AI Mental Health Assistant</title>
+        <title>GentleQuest – AI Mental Health Assistant</title>
         <style>
             body {{ font-family: Arial, sans-serif; margin: 40px; }}
             .container {{ max-width: 600px; margin: 0 auto; }}
@@ -1327,7 +1355,7 @@ def _get_fallback_html(app: Flask) -> str:
             <p>The Flutter web app is not available. Here are the API endpoints:</p>
             <a href="/api/health" class="api-link">Health Check</a>
             <a href="/api/deploy-test" class="api-link">Deploy Test</a>
-            <a href="/api/stats" class="api-link">Statistics</a>
+            <a href="/api/metrics" class="api-link">Metrics</a>
         </div>
     </body>
     </html>
@@ -1798,6 +1826,7 @@ def _register_additional_routes(app: Flask) -> None:
         return jsonify({'session_id': session_id})
 
     @app.route('/api/chat_history', methods=['GET'])
+    @app.limiter.limit("120 per minute")
     def get_chat_history():
         """Get chat history for the current session"""
         try:
@@ -1832,7 +1861,7 @@ def _register_additional_routes(app: Flask) -> None:
             return jsonify({'error': 'Failed to get chat history'}), 500
 
     @app.route('/api/mood_history', methods=['GET'])
-    @app.limiter.limit("30 per minute")
+    @app.limiter.limit("120 per minute")
     def get_mood_history():
         """Get mood history for the current session"""
         try:
@@ -1867,7 +1896,7 @@ def _register_additional_routes(app: Flask) -> None:
             return jsonify({'error': 'Failed to get mood history'}), 500
 
     @app.route('/api/mood_entry', methods=['POST'])
-    @app.limiter.limit("30 per minute")
+    @app.limiter.limit("120 per minute")
     def add_mood_entry():
         """Add a new mood entry"""
         try:

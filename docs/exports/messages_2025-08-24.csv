@@ -1,0 +1,15 @@
+id,session_id,is_user,content,risk_level,resources,timestamp
+1,dd845cc0-ee9e-43cd-aba2-d5617944286c,true,"hi",none,,2025-07-29T09:32:12.143933Z
+2,dd845cc0-ee9e-43cd-aba2-d5617944286c,false,"Hi there! How are you doing today? 😊",none,,2025-07-29T09:32:12.143937Z
+3,dd845cc0-ee9e-43cd-aba2-d5617944286c,true,"good",none,,2025-07-29T09:32:17.713549Z
+4,dd845cc0-ee9e-43cd-aba2-d5617944286c,false,"That's great to hear! Is there anything on your mind you'd like to talk about? I'm here to listen.",none,,2025-07-29T09:32:17.713553Z
+5,dd845cc0-ee9e-43cd-aba2-d5617944286c,true,"hi",none,,2025-07-29T09:34:33.920123Z
+6,dd845cc0-ee9e-43cd-aba2-d5617944286c,false,"Hi again! It's good to hear from you. How are you feeling today? 😊",none,,2025-07-29T09:34:33.920127Z
+7,dd845cc0-ee9e-43cd-aba2-d5617944286c,true,"good",none,,2025-07-29T09:34:37.418418Z
+8,dd845cc0-ee9e-43cd-aba2-d5617944286c,false,"That's wonderful! It's always nice to hear when someone is doing well. Is there anything specific that's making you feel good today, or just a general sense of well-being? I'm happy to chat about whatever's on your mind!",none,,2025-07-29T09:34:37.418425Z
+9,dd845cc0-ee9e-43cd-aba2-d5617944286c,true,"good",none,,2025-07-29T09:35:17.423754Z
+10,dd845cc0-ee9e-43cd-aba2-d5617944286c,false,"That's fantastic! I'm really glad you're feeling good. If anything comes up later, or if you just want to share more, I'm here. 😊",none,,2025-07-29T09:35:17.423758Z
+11,dd845cc0-ee9e-43cd-aba2-d5617944286c,true,"hi",none,,2025-07-29T10:32:01.381091Z
+12,dd845cc0-ee9e-43cd-aba2-d5617944286c,false,"Hi there! How are you doing today? 😊",none,,2025-07-29T10:32:01.381096Z
+13,dd845cc0-ee9e-43cd-aba2-d5617944286c,true,"hi",none,,2025-07-29T10:32:06.054994Z
+14,dd845cc0-ee9e-43cd-aba2-d5617944286c,false,"Hi again! It's good to hear from you. Is there anything on your mind today? 😊",none,,2025-07-29T10:32:06.054997Z

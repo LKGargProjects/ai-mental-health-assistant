@@ -15,6 +15,7 @@ import '../core/utils/size_utils.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/keyboard_dismissible_scaffold.dart';
 import '../widgets/safety_legal_sheet.dart';
+import '../widgets/crisis_resources.dart';
 
 class InteractiveChatScreen extends StatefulWidget {
   final bool showBottomNav;
@@ -37,6 +38,11 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
   static const _prefsLegalAckV1 = 'legal_ack_v1';
   // Global in-flight guard to prevent duplicate Safety & Legal sheet
   static bool _legalSheetShowing = false;
+  // Chat disclaimer cadence: show small top notice for first few sessions
+  static const _prefsDisclaimerSeenCount = 'chat_disclaimer_seen_count_v1';
+  static const _maxDisclaimerSessions = 3;
+  int _disclaimerSeenCount = 0;
+  bool _showTopDisclaimer = false;
 
   Future<void> _ensureLegalAck() async {
     try {
@@ -57,7 +63,37 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
       if (kDebugMode) debugPrint('Safety & Legal ack check failed: $e');
     }
   }
-  
+
+  Future<void> _loadDisclaimerPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getInt(_prefsDisclaimerSeenCount) ?? 0;
+      if (!mounted) return;
+      setState(() {
+        _disclaimerSeenCount = seen;
+        _showTopDisclaimer = seen < _maxDisclaimerSessions;
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('Disclaimer prefs read failed: $e');
+    }
+  }
+
+  Future<void> _dismissTopDisclaimer({bool increment = true}) async {
+    if (mounted) {
+      setState(() => _showTopDisclaimer = false);
+    }
+    if (!increment) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final next = (_disclaimerSeenCount + 1).clamp(0, _maxDisclaimerSessions);
+      await prefs.setInt(_prefsDisclaimerSeenCount, next);
+      if (!mounted) return;
+      setState(() => _disclaimerSeenCount = next);
+    } catch (e) {
+      if (kDebugMode) debugPrint('Disclaimer prefs write failed: $e');
+    }
+  }
+
   void _onReselect() {
     // On re-tap, bring the latest messages into view
     _scrollToBottom();
@@ -197,6 +233,71 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
     );
   }
 
+  Future<void> _showHelpSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16.0,
+              right: 16.0,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16.0,
+              top: 12.0,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Need help now?',
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.of(ctx).maybePop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'If you are in immediate danger, call your local emergency number.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+                  ),
+                  const SizedBox(height: 12),
+                  const CrisisResourcesWidget(riskLevel: RiskLevel.high),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        Navigator.of(ctx).maybePop();
+                        await showSafetyLegalSheet(context);
+                      },
+                      icon: const Icon(Icons.shield_outlined),
+                      label: const Text('Safety & Legal'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -210,6 +311,8 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
       _scrollToBottom();
       // One-time Safety & Legal acknowledgment
       _ensureLegalAck();
+      // Load disclaimer cadence and decide whether to show top notice
+      _loadDisclaimerPrefs();
     });
     // Listen for tab reselect events
     widget.reselect?.addListener(_onReselect);
@@ -348,12 +451,19 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                           tooltip: 'More',
                           onSelected: (value) async {
                             switch (value) {
+                              case 'help':
+                                await _showHelpSheet();
+                                break;
                               case 'safety':
                                 await showSafetyLegalSheet(context);
                                 break;
                             }
                           },
                           itemBuilder: (context) => [
+                            const PopupMenuItem<String>(
+                              value: 'help',
+                              child: Text('Help'),
+                            ),
                             const PopupMenuItem<String>(
                               value: 'safety',
                               child: Text('Safety & Legal'),
@@ -369,6 +479,43 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                   height: 8.h,
                   color: appTheme.colorFFF3F4,
                 ),
+                // Ephemeral top disclaimer (first few sessions only)
+                Builder(builder: (ctx) {
+                  final isKb = MediaQuery.viewInsetsOf(ctx).bottom > 0;
+                  if (!_showTopDisclaimer || isKb) return const SizedBox.shrink();
+                  return Semantics(
+                    label: 'Wellness disclaimer',
+                    child: Container(
+                      width: double.infinity,
+                      color: Colors.amber.shade50,
+                      padding: EdgeInsets.fromLTRB(12.h, 8.h, 4.h, 8.h),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.info_outline, size: 18.0, color: Colors.black54),
+                          SizedBox(width: 8.h),
+                          Expanded(
+                            child: Text.rich(
+                              TextSpan(
+                                style: const TextStyle(fontSize: 12.0, color: Colors.black87, height: 1.2),
+                                children: const [
+                                  TextSpan(text: 'Not medical care. For crisis, call local emergency.'),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Dismiss',
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => _dismissTopDisclaimer(increment: true),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
                 // Chat Messages
                 Expanded(
                   child: Consumer<ChatProvider>(
@@ -404,69 +551,75 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                   bottom: true,
                   left: false,
                   right: false,
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: appTheme.colorFFF3F4,
-                            borderRadius: BorderRadius.circular(24.h),
-                          ),
-                          child: TextField(
-                            controller: _messageController,
-                            focusNode: _inputFocus,
-                            decoration: InputDecoration(
-                              hintText: 'Type your message...',
-                              hintStyle: TextStyle(
-                                fontSize: 16.0, // iOS standard input text size
-                                color: Colors.grey[600],
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16.h,
-                                vertical: 10.h,
-                              ),
-                            ),
-                            style: TextStyle(
-                              fontSize: 16.0, // iOS standard input text size
-                              color: Colors.black87,
-                            ),
-                            onSubmitted: (_) {
-                              // Match the send button exactly: send without dismissing the keyboard
-                              _sendMessage();
-                              // Reassert focus to keep iOS keyboard open
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (mounted) _inputFocus.requestFocus();
-                              });
-                            },
-                            // Prevent the default editing-complete behavior from unfocusing on iOS
-                            onEditingComplete: () {},
-                            textInputAction: TextInputAction.send,
-                            keyboardType: TextInputType.multiline,
-                            maxLines: null,
-                            minLines: 1,
-                          ),
-                        ), // end Container
-                      ), // end Expanded
-                      SizedBox(
-                        width: 74.h,
-                        child: Center(
-                          child: GestureDetector(
-                            onTap: _sendMessage,
+                      Row(
+                        children: [
+                          Expanded(
                             child: Container(
-                              padding: EdgeInsets.all(10.h),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).primaryColor,
-                                shape: BoxShape.circle,
+                                color: appTheme.colorFFF3F4,
+                                borderRadius: BorderRadius.circular(24.h),
                               ),
-                              child: Icon(
-                                Icons.send,
-                                color: Colors.white,
-                                size: 32.h,
+                              child: TextField(
+                                controller: _messageController,
+                                focusNode: _inputFocus,
+                                decoration: InputDecoration(
+                                  hintText: 'Type your message...',
+                                  hintStyle: TextStyle(
+                                    fontSize: 16.0, // iOS standard input text size
+                                    color: Colors.grey[600],
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16.h,
+                                    vertical: 10.h,
+                                  ),
+                                ),
+                                style: TextStyle(
+                                  fontSize: 16.0, // iOS standard input text size
+                                  color: Colors.black87,
+                                ),
+                                onSubmitted: (_) {
+                                  // Match the send button exactly: send without dismissing the keyboard
+                                  _sendMessage();
+                                  // Reassert focus to keep iOS keyboard open
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted) _inputFocus.requestFocus();
+                                  });
+                                },
+                                // Prevent the default editing-complete behavior from unfocusing on iOS
+                                onEditingComplete: () {},
+                                textInputAction: TextInputAction.send,
+                                keyboardType: TextInputType.multiline,
+                                maxLines: null,
+                                minLines: 1,
+                              ),
+                            ), // end Container
+                          ), // end Expanded
+                          SizedBox(width: 8.h),
+                          SizedBox(
+                            width: 74.h,
+                            child: Center(
+                              child: GestureDetector(
+                                onTap: _sendMessage,
+                                child: Container(
+                                  padding: EdgeInsets.all(10.h),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.send,
+                                    color: Colors.white,
+                                    size: 32.h,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),

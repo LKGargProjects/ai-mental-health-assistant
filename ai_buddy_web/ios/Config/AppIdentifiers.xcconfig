@@ -1,6 +1,6 @@
 // Central place to define the iOS bundle identifier
 // Default value; override in local-overrides.xcconfig (not committed) if needed
-APP_BUNDLE_ID = app.mhb.preview
+APP_BUNDLE_ID = app.gentlequest.www
 
 // Apple Developer Team ID (can be overridden in local-overrides.xcconfig)
 DEVELOPMENT_TEAM = 828Q2S3G4Q

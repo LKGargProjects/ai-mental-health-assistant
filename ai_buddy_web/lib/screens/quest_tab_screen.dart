@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'quest_screen.dart';
 import '../dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
-import '../dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
+import '../dhiwise/core/utils/size_utils.dart' as dhiwise_sizer;
 import '../widgets/app_back_button.dart';
 import '../theme/text_style_helper.dart';
 import '../theme/theme_helper.dart';
@@ -10,7 +10,7 @@ class QuestTabScreen extends StatefulWidget {
   const QuestTabScreen({super.key});
 
   @override
-  _QuestTabScreenState createState() => _QuestTabScreenState();
+  State<QuestTabScreen> createState() => _QuestTabScreenState();
 }
 
 class _QuestTabScreenState extends State<QuestTabScreen>
@@ -81,7 +81,7 @@ class _QuestTabScreenState extends State<QuestTabScreen>
         controller: _tabController,
         children: [
           const QuestScreen(),
-          DhiwiseSizer.Sizer(
+          dhiwise_sizer.Sizer(
             builder: (context, orientation, deviceType) =>
                 WellnessDashboardScreen(),
           ),

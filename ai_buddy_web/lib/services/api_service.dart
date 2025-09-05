@@ -427,7 +427,29 @@ class ApiService {
           throw _createUserFriendlyError(e);
         }
 
-        // Exponential backoff
+        // If rate-limited, honor Retry-After header when provided
+        final status = e.response?.statusCode;
+        if (status == 429) {
+          final headers = e.response?.headers.map ?? const <String, List<String>>{};
+          final retryVals = headers.entries
+              .firstWhere(
+                (kv) => kv.key.toLowerCase() == 'retry-after',
+                orElse: () => const MapEntry<String, List<String>>('', <String>[]),
+              )
+              .value;
+          Duration wait = const Duration(seconds: 1);
+          if (retryVals.isNotEmpty) {
+            final raw = retryVals.first.trim();
+            final secs = int.tryParse(raw);
+            if (secs != null && secs >= 0 && secs <= 300) {
+              wait = Duration(seconds: secs);
+            }
+          }
+          await Future.delayed(wait);
+          continue;
+        }
+
+        // Default exponential backoff for transient network errors
         await Future.delayed(delay);
         delay *= 2;
       } catch (e) {

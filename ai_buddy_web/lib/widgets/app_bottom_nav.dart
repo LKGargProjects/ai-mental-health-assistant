@@ -68,8 +68,8 @@ class AppBottomNav extends StatelessWidget {
         Navigator.pushReplacementNamed(context, '/home', arguments: tab);
       },
       borderRadius: BorderRadius.circular(12),
-      focusColor: Colors.blue.withOpacity(0.10),
-      hoverColor: Colors.blue.withOpacity(0.06),
+      focusColor: Colors.blue.withValues(alpha: 0.10),
+      hoverColor: Colors.blue.withValues(alpha: 0.06),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
         child: Column(

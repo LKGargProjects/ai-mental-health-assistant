@@ -123,7 +123,6 @@ class CustomButton extends StatelessWidget {
           effectiveWidth,
         );
       case CustomButtonType.elevated:
-      default:
         return _buildElevatedButton(
           effectiveBackgroundColor,
           effectiveTextColor,

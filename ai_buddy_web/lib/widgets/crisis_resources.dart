@@ -213,6 +213,8 @@ class CrisisResourcesWidget extends StatelessWidget {
 
   Future<void> _launchUrl(BuildContext context, String url, {String? label}) async {
     final uri = Uri.parse(url);
+    // Cache messenger to avoid using BuildContext across async gaps.
+    final messenger = ScaffoldMessenger.maybeOf(context);
     try {
       final launched = await canLaunchUrl(uri) && await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (launched) return;
@@ -225,7 +227,7 @@ class CrisisResourcesWidget extends StatelessWidget {
       final number = uri.path; // after tel:
       await Clipboard.setData(ClipboardData(text: number));
       if (!kIsWeb) return; // On mobile, if we reach here copy is enough silently
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger?.showSnackBar(
         SnackBar(content: Text('Phone number copied: $number')),
       );
       return;
@@ -235,7 +237,7 @@ class CrisisResourcesWidget extends StatelessWidget {
       await Clipboard.setData(ClipboardData(text: number));
       if (!kIsWeb) return;
       final res = (label != null && label.isNotEmpty) ? ' for $label' : '';
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger?.showSnackBar(
         SnackBar(content: Text('SMS number$res copied: $number')),
       );
       return;
@@ -244,7 +246,7 @@ class CrisisResourcesWidget extends StatelessWidget {
     // Generic URL fallback: copy URL
     await Clipboard.setData(ClipboardData(text: url));
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger?.showSnackBar(
         SnackBar(content: Text('Link copied: $url')),
       );
     }

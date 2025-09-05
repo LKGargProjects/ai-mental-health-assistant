@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import './self_assessment_widget.dart';
 import '../dhiwise/core/app_export.dart';
-import '../theme/text_style_helper.dart' as CoreTextStyles;
+import '../theme/text_style_helper.dart' as core_text_styles;
 import './app_back_button.dart';
 
 class AssessmentSplash extends StatelessWidget {
@@ -43,7 +43,7 @@ class AssessmentSplash extends StatelessWidget {
                           'Quick check-in',
                           style: TextStyleHelper.instance.headline24Bold.copyWith(
                             color: const Color(0xFF555F6D),
-                            fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                            fontFamily: core_text_styles.TextStyleHelper.instance.headline24Bold.fontFamily,
                           ),
                         ),
                       ),
@@ -65,7 +65,7 @@ class AssessmentSplash extends StatelessWidget {
                     'Takes about 2 minutes',
                     style: TextStyleHelper.instance.headline21Inter.copyWith(
                       color: const Color(0xFF8C9CAA),
-                      fontFamily: CoreTextStyles.TextStyleHelper.instance.headline24Bold.fontFamily,
+                      fontFamily: core_text_styles.TextStyleHelper.instance.headline24Bold.fontFamily,
                     ),
                   ),
                   const SizedBox(height: 12),

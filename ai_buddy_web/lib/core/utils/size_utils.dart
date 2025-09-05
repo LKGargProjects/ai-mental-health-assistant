@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart'; // These are the Viewport values of your Figma Design.
+// ignore_for_file: constant_identifier_names
 
 // These are used in the code as a reference to create your UI Responsively.
 const num FIGMA_DESIGN_WIDTH = 635;

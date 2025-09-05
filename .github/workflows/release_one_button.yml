@@ -1,0 +1,122 @@
+name: One-Button Release (Beta)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-button-release-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "Release notes/changelog (optional)"
+        required: false
+        default: ""
+      build_number:
+        description: "Unified build number for both platforms (optional). Defaults to run number if empty."
+        required: false
+        default: ""
+
+jobs:
+  android:
+    name: Android job
+    uses: ./.github/workflows/android_release.yml
+    secrets: inherit
+    with:
+      app_id: app.mhb.preview
+      package_name: app.mhb.preview
+      track: internal
+      build_number: ${{ inputs.build_number }}
+      release_notes: ${{ inputs.release_notes }}
+      upload: 'true'
+      preflight: 'false'
+      environment: beta
+      sentry_upload: 'false'
+      sentry_org: ''
+      sentry_project: ''
+      sentry_release: ''
+      crashlytics_upload: 'false'
+
+  ios:
+    name: iOS job
+    uses: ./.github/workflows/ios_release.yml
+    secrets: inherit
+    with:
+      bundle_id: app.mhb.preview
+      scheme: Runner
+      export_method: app-store
+      build_number: ${{ inputs.build_number }}
+      release_notes: ${{ inputs.release_notes }}
+      upload: 'true'
+      preflight: 'false'
+      environment: beta
+      sentry_upload: 'false'
+      sentry_org: ''
+      sentry_project: ''
+      sentry_release: ''
+      crashlytics_upload: 'false'
+
+  release_notify:
+    name: Release and Notify
+    runs-on: ubuntu-latest
+    needs: [android, ios]
+    env:
+      DO_GH_RELEASE: ${{ vars.DO_GH_RELEASE || 'false' }}
+      DO_SLACK_NOTIFY: ${{ vars.DO_SLACK_NOTIFY || 'false' }}
+      TAG_PREFIX: ${{ vars.TAG_PREFIX || 'mobile-v' }}
+    steps:
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab
+          path: dist
+        continue-on-error: true
+
+      - name: Download iOS IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: dist
+        continue-on-error: true
+
+      - name: Compose tag and body
+        id: meta
+        shell: bash
+        env:
+          BN: ${{ inputs.build_number }}
+          RN: ${{ inputs.release_notes }}
+        run: |
+          set -e
+          BNV="$BN"; [ -z "$BNV" ] && BNV="$GITHUB_RUN_NUMBER"
+          TAG="${TAG_PREFIX}${BNV}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "$RN" > RELEASE_BODY.txt
+          echo "body_path=$PWD/RELEASE_BODY.txt" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: ${{ env.DO_GH_RELEASE == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          body_path: ${{ steps.meta.outputs.body_path }}
+          files: |
+            dist/*.aab
+            dist/*.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Slack notify
+        if: ${{ env.DO_SLACK_NOTIFY == 'true' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -e
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then echo "::warning::SLACK_WEBHOOK_URL not set, skipping"; exit 0; fi
+          ANDROID_PRESENT=$(ls dist/*.aab 2>/dev/null | wc -l | xargs)
+          IOS_PRESENT=$(ls dist/*.ipa 2>/dev/null | wc -l | xargs)
+          MSG="Mobile build completed. Android artifact: $ANDROID_PRESENT, iOS artifact: $IOS_PRESENT. Tag: ${{ steps.meta.outputs.tag }}"
+          PAYLOAD=$(printf '{"text":"%s"}' "${MSG//"/\"}")
+          curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"

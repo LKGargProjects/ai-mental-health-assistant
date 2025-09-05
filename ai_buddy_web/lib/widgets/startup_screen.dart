@@ -7,7 +7,7 @@ class StartupScreen extends StatefulWidget {
   const StartupScreen({super.key, required this.onBackendReady});
 
   @override
-  _StartupScreenState createState() => _StartupScreenState();
+  State<StartupScreen> createState() => _StartupScreenState();
 }
 
 class _StartupScreenState extends State<StartupScreen> {
@@ -84,7 +84,7 @@ class _StartupScreenState extends State<StartupScreen> {
 
               // App Title
               Text(
-                'AI Mental Health Buddy',
+                'GentleQuest',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Colors.grey[800],
@@ -112,7 +112,7 @@ class _StartupScreenState extends State<StartupScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
+                      color: Colors.grey.withValues(alpha: 0.1),
                       spreadRadius: 1,
                       blurRadius: 10,
                       offset: const Offset(0, 2),

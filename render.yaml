@@ -16,7 +16,7 @@ services:
       - key: AI_PROVIDER
         value: gemini
       - key: CORS_ORIGINS
-        value: "https://ai-mental-health-backend-3w4b.onrender.com,https://gentlequest.com,https://www.gentlequest.com,https://gentlequest.app,https://www.gentlequest.app"
+        value: "https://gentlequest.onrender.com,https://gentlequest.com,https://www.gentlequest.com,https://gentlequest.app,https://www.gentlequest.app"
 
       # Database: set in dashboard with External Connection String
       # (Blueprints only support `connectionString`, which is private network only)

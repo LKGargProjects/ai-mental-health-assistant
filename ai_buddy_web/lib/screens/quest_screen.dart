@@ -10,7 +10,7 @@ class QuestScreen extends StatefulWidget {
   const QuestScreen({super.key});
 
   @override
-  _QuestScreenState createState() => _QuestScreenState();
+  State<QuestScreen> createState() => _QuestScreenState();
 }
 
 class _QuestScreenState extends State<QuestScreen>

@@ -6,7 +6,7 @@
 echo "🧪 Comprehensive Feature Testing..."
 echo "=================================="
 
-PRODUCTION_URL="https://ai-mental-health-assistant-tddc.onrender.com"
+PRODUCTION_URL="https://gentlequest.onrender.com"
 
 echo "📋 Testing All Features from Existing Checklists..."
 echo ""

@@ -2,10 +2,10 @@ import 'package:ai_buddy_web/screens/dhiwise_chat_screen.dart';
 import 'package:ai_buddy_web/screens/interactive_chat_screen.dart';
 import 'package:ai_buddy_web/screens/quest_preview_screen.dart';
 import 'package:ai_buddy_web/dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart'
-    as DhiwiseWellness;
-import 'dhiwise/core/utils/size_utils.dart' as DhiwiseSizer;
+    as dhiwise_wellness;
+import 'dhiwise/core/utils/size_utils.dart' as dhiwise_sizer;
 import 'package:ai_buddy_web/dhiwise/presentation/quest_screen/quest_screen.dart'
-    as DhiwiseQuest;
+    as dhiwise_quest;
 
 import 'package:flutter/material.dart';
 import 'dart:async';
@@ -114,9 +114,7 @@ Future<void> main() async {
   NotificationService.onSelectNotification = (payload) {
     _handleNotificationPayload(payload);
   };
-  // Initialize local notifications (no-op on web). This will also
-  // deliver any launch-from-notification payload via the handler above.
-  await NotificationService.init();
+  // Defer local notifications init until after first frame to mitigate iOS cold-start stalls.
   runApp(const MyApp());
 }
 
@@ -131,8 +129,12 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Fire a minimal 'app_open' event (respects consent in ApiService)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Initialize notifications and then perform post-start tasks after first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Initialize local notifications post-frame; forward any launch-from-notification payload.
+      await NotificationService.init();
+
+      // Fire a minimal 'app_open' event (respects consent in ApiService)
       logAnalyticsEvent(
         'app_open',
         metadata: {'action': 'app_open', 'source': 'app'},
@@ -140,6 +142,7 @@ class _MyAppState extends State<MyApp> {
       // Handle simple deep link for web hash route: #/home/quest
       final fragment = Uri.base.fragment; // e.g., '/home/quest'
       if (fragment == '/home/quest') {
+        if (!mounted) return;
         Navigator.of(context).pushReplacementNamed('/home/quest');
       }
       // Debug 12s auto-scheduling: disabled per current plan.
@@ -160,11 +163,11 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => ProgressProvider()),
         ChangeNotifierProvider(create: (_) => QuestProvider()..loadQuests()),
       ],
-      child: DhiwiseSizer.Sizer(
+      child: dhiwise_sizer.Sizer(
         builder: (context, o, d) => Sizer(
           builder: (context, orientation, deviceType) {
             return MaterialApp(
-              title: 'AI Mental Health Buddy',
+              title: 'Progress Without Pressure',
               debugShowCheckedModeBanner: false,
               theme: ThemeData(
                 colorScheme: ColorScheme.fromSeed(
@@ -190,11 +193,11 @@ class _MyAppState extends State<MyApp> {
                 '/preview-quest': (context) => const QuestPreviewScreen(),
                 '/interactive-chat': (context) => const InteractiveChatScreen(),
                 // New direct routes for clarity
-                '/wellness-dashboard': (context) => DhiwiseSizer.Sizer(
+                '/wellness-dashboard': (context) => dhiwise_sizer.Sizer(
                   builder: (context, orientation, deviceType) =>
-                      DhiwiseWellness.WellnessDashboardScreen(),
+                      dhiwise_wellness.WellnessDashboardScreen(),
                 ),
-                '/quests-list': (context) => const DhiwiseQuest.QuestScreen(),
+                '/quests-list': (context) => const dhiwise_quest.QuestScreen(),
               },
             );
           },

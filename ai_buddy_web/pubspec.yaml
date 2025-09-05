@@ -60,6 +60,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -115,3 +116,15 @@ flutter:
           weight: 500
         - asset: assets/fonts/InterBold.ttf
           weight: 700
+
+# Launcher icons configuration
+flutter_launcher_icons:
+  android: true
+  ios: true
+  # Base image used when a specific platform image is not provided
+  image_path: assets/brand/icon_v1/gentlequest_ios_1024.png
+  # Android adaptive layers
+  adaptive_icon_foreground: assets/brand/icon_v1/gentlequest_android_fg_1024.png
+  adaptive_icon_background: assets/brand/icon_v1/gentlequest_android_bg_1024.png
+  remove_alpha_ios: true
+  min_sdk_android: 21

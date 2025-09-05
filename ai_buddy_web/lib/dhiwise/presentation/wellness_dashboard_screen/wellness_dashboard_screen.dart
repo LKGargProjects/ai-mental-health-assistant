@@ -2842,8 +2842,11 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
     final double _xpBlur = _narrow ? 10 : 12;
     final double _xpAlpha = _narrow ? 0.14 : 0.18;
 
+    // Responsive horizontal padding: tighter on narrow screens
+    final double hp = _w >= 900 ? 70.h : 16.h;
+
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 70.h).copyWith(top: 48.h, bottom: 32.h),
+      padding: EdgeInsets.symmetric(horizontal: hp).copyWith(top: 48.h, bottom: 32.h),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // Category chips + compact metrics on the same row
         Builder(builder: (context) {
@@ -2887,108 +2890,116 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
               ),
               SizedBox(width: groupGap),
               // Right: compact metrics (Energy, Streak, +XP)
-              Wrap(
-                spacing: wrapSpacing,
-                runSpacing: wrapSpacing,
-                alignment: WrapAlignment.end,
-                children: [
-                  // Standardize chip height to avoid mismatched sizes across metrics
-                  // and ensure internal text never wraps.
-                  // Keep this in sync with chip padding and font sizes.
-                  // Narrow: slightly smaller height.
-                  
-                  // Energy: flash + 3/3
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: chipHPad, vertical: chipVPad),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18.h),
-                      border: Border.all(color: const Color(0xFFE0E6EE)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: _whiteAlpha),
-                          blurRadius: _whiteBlur,
-                          offset: const Offset(0, 4),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: Wrap(
+                    spacing: wrapSpacing,
+                    runSpacing: wrapSpacing,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      // Standardize chip height to avoid mismatched sizes across metrics
+                      // and ensure internal text never wraps.
+                      // Keep this in sync with chip padding and font sizes.
+                      // Narrow: slightly smaller height.
+
+                      // Energy: flash + 3/3
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: chipHPad, vertical: chipVPad),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18.h),
+                          border: Border.all(color: const Color(0xFFE0E6EE)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: _whiteAlpha),
+                              blurRadius: _whiteBlur,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    constraints: BoxConstraints(minHeight: _narrow ? 30.h : 34.h),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.flash_on_outlined, size: iconSize, color: energyFg),
-                      SizedBox(width: iconGap),
-                      Text(
-                        '$energyLeft/$energyLimit',
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyleHelper.instance.titleMediumInter.copyWith(color: energyFg, fontWeight: FontWeight.w700),
+                        constraints: BoxConstraints(minHeight: _narrow ? 30.h : 34.h),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.flash_on_outlined, size: iconSize, color: energyFg),
+                          SizedBox(width: iconGap),
+                          Flexible(
+                            child: Text(
+                              '$energyLeft/$energyLimit',
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyleHelper.instance.titleMediumInter.copyWith(color: energyFg, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ]),
                       ),
-                    ]),
-                  ),
-                  // Streak: flame + 2d
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: chipHPad, vertical: chipVPad),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18.h),
-                      border: Border.all(color: const Color(0xFFE0E6EE)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: _whiteAlpha),
-                          blurRadius: _whiteBlur,
-                          offset: const Offset(0, 4),
+                      // Streak: flame + 2d
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: chipHPad, vertical: chipVPad),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18.h),
+                          border: Border.all(color: const Color(0xFFE0E6EE)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: _whiteAlpha),
+                              blurRadius: _whiteBlur,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    constraints: BoxConstraints(
-                      minHeight: _narrow ? 30.h : 34.h,
-                      minWidth: _narrow ? 64.h : 72.h,
-                      maxWidth: _narrow ? 64.h : 72.h,
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.local_fire_department_outlined, size: iconSize, color: Theme.of(context).colorScheme.primary),
-                      SizedBox(width: iconGap),
-                      Text(
-                        '${streakDays}d',
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyleHelper.instance.titleMediumInter.copyWith(color: const Color(0xFF47505E), fontWeight: FontWeight.w700),
-                      ),
-                    ]),
-                  ),
-                  // XP: star + "+today • lifetime XP total"
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: chipHPad, vertical: chipVPad),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(18.h),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: _xpAlpha),
-                          blurRadius: _xpBlur,
-                          offset: const Offset(0, 6),
+                        constraints: BoxConstraints(
+                          minHeight: _narrow ? 30.h : 34.h,
                         ),
-                      ],
-                    ),
-                    constraints: BoxConstraints(
-                      minHeight: _narrow ? 30.h : 34.h,
-                      minWidth: _narrow ? 64.h : 72.h,
-                      maxWidth: _narrow ? 64.h : 72.h,
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.star_rounded, color: Colors.white, size: iconSize),
-                      SizedBox(width: iconGap),
-                      Text(
-                        '+$xpToday',
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyleHelper.instance.titleMediumInter.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.local_fire_department_outlined, size: iconSize, color: Theme.of(context).colorScheme.primary),
+                          SizedBox(width: iconGap),
+                          Flexible(
+                            child: Text(
+                              '${streakDays}d',
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyleHelper.instance.titleMediumInter.copyWith(color: const Color(0xFF47505E), fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ]),
                       ),
-                    ]),
+                      // XP: star + "+today" (chip flexes to content; wraps with others when needed)
+                      Container(
+                        key: _xpCardKey,
+                        padding: EdgeInsets.symmetric(horizontal: chipHPad, vertical: chipVPad),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(18.h),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: _xpAlpha),
+                              blurRadius: _xpBlur,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        constraints: BoxConstraints(
+                          minHeight: _narrow ? 30.h : 34.h,
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.star_rounded, color: Colors.white, size: iconSize),
+                          SizedBox(width: iconGap),
+                          Flexible(
+                            child: Text(
+                              '+$xpToday',
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyleHelper.instance.titleMediumInter.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           );

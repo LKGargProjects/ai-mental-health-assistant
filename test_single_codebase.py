@@ -129,7 +129,7 @@ def main():
     
     # Determine base URL based on environment
     if environment == 'production':
-        base_url = "https://ai-mental-health-backend.onrender.com"
+        base_url = "https://gentlequest.onrender.com"
     elif environment == 'docker':
         base_url = "http://localhost:5055"
     else:
