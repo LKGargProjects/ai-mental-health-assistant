@@ -133,17 +133,21 @@ jobs:
 
       - name: Restore keystore from secret
         shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           set -e
+          echo "ANDROID_KEYSTORE_BASE64 is ${#ANDROID_KEYSTORE_BASE64} characters long"
           if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "::warning::ANDROID_KEYSTORE_BASE64 not set. Build will fall back to debug signing (not Play-ready)."
-          else
-            mkdir -p ai_buddy_web/android/app
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > ai_buddy_web/android/app/upload-keystore.jks
-            ls -lh ai_buddy_web/android/app/upload-keystore.jks
+            echo "::error::ANDROID_KEYSTORE_BASE64 is empty. Please check your repository secrets."
+            exit 1
           fi
+          mkdir -p ai_buddy_web/android/app
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > ai_buddy_web/android/app/upload-keystore.jks
+          echo "Keystore created at:"
+          ls -lh ai_buddy_web/android/app/upload-keystore.jks
+          echo "First 100 chars of keystore (for verification):"
+          head -c 100 ai_buddy_web/android/app/upload-keystore.jks | xxd -p
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
       - name: Install Flutter deps
         working-directory: ai_buddy_web
@@ -186,14 +190,18 @@ jobs:
         env:
           # Map repo secrets to our build.gradle env overrides
           STORE_FILE: ${{ github.workspace }}/ai_buddy_web/android/app/upload-keystore.jks
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           # Version code for Gradle (exposed as project property VERSION_CODE)
-          ORG_GRADLE_PROJECT_VERSION_CODE: ${{ inputs.build_number || github.event.inputs.build_number || github.run_number }}
+          VERSION_CODE: ${{ inputs.build_number || github.event.inputs.build_number || github.run_number }}
           # Enable Gradle debug logging
           ORG_GRADLE_LOGGING_LEVEL: debug
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.debug=false
+          # Pass through all required secrets
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -ex
           echo "=== Build Environment ==="
