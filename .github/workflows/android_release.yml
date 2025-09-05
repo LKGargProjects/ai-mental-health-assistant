@@ -107,7 +107,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Setup Java 21
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -212,13 +212,10 @@ jobs:
           echo "=== Gradle Wrapper Info ==="
           ./gradlew --version || true
           
-          # List tasks to verify build.gradle is valid
-          echo "=== Available Gradle Tasks ==="
-          ./gradlew tasks --all || true
-          
           # Run with debug and stacktrace
-          echo "=== Starting Build with Debug Info ==="
-          ./gradlew assembleRelease --stacktrace --info --scan
+          echo "=== Starting Build with Debug Info (bundleRelease) ==="
+          # Build the Android App Bundle (AAB). Avoid --scan to prevent CI interactivity/hangs.
+          ./gradlew bundleRelease --stacktrace --info
 
       - name: Upload ProGuard mapping to Sentry (optional)
         if: ${{ (inputs.sentry_upload || github.event.inputs.sentry_upload) == 'true' }}

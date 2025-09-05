@@ -56,7 +56,6 @@ def appId = project.hasProperty('APP_ID') ? APP_ID : 'app.gentlequest.www'
 android {
     namespace 'com.example.ai_buddy_web'
     compileSdkVersion 35
-    ndkVersion '27.0.12077973'
 
     defaultConfig {
         applicationId appId
@@ -114,7 +113,7 @@ android {
 
 dependencies {
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0"
+    // Kotlin stdlib is provided by the Kotlin Gradle plugin; avoid pinning a version here
 }
 
 flutter {
