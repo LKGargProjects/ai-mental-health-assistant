@@ -111,7 +111,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '17'
 
       - name: Setup Flutter SDK + Android SDK
         uses: subosito/flutter-action@v2
@@ -218,9 +218,7 @@ jobs:
           
           # Run with debug and stacktrace
           echo "=== Starting Build with Debug Info ==="
-          ./gradlew clean assembleRelease --stacktrace --info --scan --no-daemon || \
-            (echo "=== Build failed, running with --debug for more info ===" && \
-             ./gradlew clean assembleRelease --debug --stacktrace --info --scan --no-daemon)
+          ./gradlew assembleRelease --stacktrace --info --scan
 
       - name: Upload ProGuard mapping to Sentry (optional)
         if: ${{ (inputs.sentry_upload || github.event.inputs.sentry_upload) == 'true' }}

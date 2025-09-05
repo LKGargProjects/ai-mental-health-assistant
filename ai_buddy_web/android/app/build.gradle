@@ -55,25 +55,25 @@ def appId = project.hasProperty('APP_ID') ? APP_ID : 'app.gentlequest.www'
 
 android {
     namespace 'com.example.ai_buddy_web'
-    compileSdkVersion 36
+    compileSdkVersion 34
     ndkVersion '27.0.12077973'
 
     defaultConfig {
         applicationId appId
         minSdkVersion flutter.minSdkVersion
-        targetSdkVersion 36
+        targetSdkVersion 34
         versionCode ciVersionCode.toInteger()
         versionName ciVersionName
     }
 
     compileOptions {
         coreLibraryDesugaringEnabled true
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = '17'
     }
 
     sourceSets {
