@@ -181,22 +181,25 @@ jobs:
             echo "No tests/ directory found. Skipping flutter test."
           fi
 
-      - name: Build signed AAB via Flutter
-        working-directory: ai_buddy_web
+      - name: Build signed AAB via Gradle
+        working-directory: ai_buddy_web/android
         env:
           # Map repo secrets to our build.gradle env overrides
           STORE_FILE: ${{ github.workspace }}/ai_buddy_web/android/app/upload-keystore.jks
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          # Version code for Gradle
+          # Version code for Gradle (exposed as project property VERSION_CODE)
           ORG_GRADLE_PROJECT_VERSION_CODE: ${{ inputs.build_number || github.event.inputs.build_number }}
         run: |
           set -e
           BN="${{ inputs.build_number || github.event.inputs.build_number }}"
           if [ -z "$BN" ]; then BN="$GITHUB_RUN_NUMBER"; fi
           echo "Using build number: $BN"
-          ./android/gradlew bundleRelease --stacktrace --info
+          # Ensure wrapper is executable on Linux runners
+          chmod +x ./gradlew || true
+          # Build the release bundle using the module task name
+          ./gradlew app:bundleRelease --no-daemon --stacktrace --info
 
       - name: Upload ProGuard mapping to Sentry (optional)
         if: ${{ (inputs.sentry_upload || github.event.inputs.sentry_upload) == 'true' }}
