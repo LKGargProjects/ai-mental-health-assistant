@@ -196,7 +196,7 @@ jobs:
           BN="${{ inputs.build_number || github.event.inputs.build_number }}"
           if [ -z "$BN" ]; then BN="$GITHUB_RUN_NUMBER"; fi
           echo "Using build number: $BN"
-          flutter build appbundle --release --no-tree-shake-icons --build-number "$BN"
+          ./android/gradlew bundleRelease --stacktrace --info
 
       - name: Upload ProGuard mapping to Sentry (optional)
         if: ${{ (inputs.sentry_upload || github.event.inputs.sentry_upload) == 'true' }}
