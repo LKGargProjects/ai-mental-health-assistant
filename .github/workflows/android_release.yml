@@ -118,7 +118,6 @@ jobs:
         with:
           channel: stable
           flutter-version: '3.32.8'
-          android: true
 
       - name: Flutter version
         run: flutter --version
