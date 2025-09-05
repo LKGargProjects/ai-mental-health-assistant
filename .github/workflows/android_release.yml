@@ -191,12 +191,15 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           # Version code for Gradle (exposed as project property VERSION_CODE)
           ORG_GRADLE_PROJECT_VERSION_CODE: ${{ inputs.build_number || github.event.inputs.build_number || github.run_number }}
+          # Enable Gradle debug logging
+          ORG_GRADLE_LOGGING_LEVEL: debug
+          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.debug=false
         run: |
           set -ex
           echo "=== Build Environment ==="
           echo "Working directory: $(pwd)"
           echo "Java version: $(java -version 2>&1 | head -n 1)"
-          echo "Gradle version: $(./gradlew --version 2>&1 | grep Gradle || echo 'Gradle not found')"
+          echo "Gradle version: $(./gradlew --version 2>&1 | head -n 1 || echo 'Gradle not found')"
           
           BN="${{ inputs.build_number || github.event.inputs.build_number || github.run_number }}"
           echo "Using build number: $BN"
@@ -205,11 +208,19 @@ jobs:
           chmod +x ./gradlew
           ls -la ./
           
-          # Clean and build with full stacktrace and debug info
-          ./gradlew clean
-          ./gradlew assembleRelease --stacktrace --info --scan || \
+          # Verify Gradle wrapper is working
+          echo "=== Gradle Wrapper Info ==="
+          ./gradlew --version || true
+          
+          # List tasks to verify build.gradle is valid
+          echo "=== Available Gradle Tasks ==="
+          ./gradlew tasks --all || true
+          
+          # Run with debug and stacktrace
+          echo "=== Starting Build with Debug Info ==="
+          ./gradlew clean assembleRelease --stacktrace --info --scan --no-daemon || \
             (echo "=== Build failed, running with --debug for more info ===" && \
-             ./gradlew assembleRelease --debug)
+             ./gradlew clean assembleRelease --debug --stacktrace --info --scan --no-daemon)
 
       - name: Upload ProGuard mapping to Sentry (optional)
         if: ${{ (inputs.sentry_upload || github.event.inputs.sentry_upload) == 'true' }}
