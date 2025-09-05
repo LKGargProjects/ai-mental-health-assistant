@@ -145,6 +145,52 @@ jobs:
             ls -lh ai_buddy_web/android/app/upload-keystore.jks
           fi
 
+      - name: List keystore aliases (masked)
+        shell: bash
+        env:
+          STORE_FILE: ${{ github.workspace }}/ai_buddy_web/android/app/upload-keystore.jks
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -e
+          if [ -f "$STORE_FILE" ]; then
+            echo "Listing keystore aliases..."
+            keytool -list -keystore "$STORE_FILE" -storepass "$STORE_PASSWORD" | grep -E '^Alias name:' | sed 's/Alias name:/Alias:/' || echo "Failed to list aliases"
+          else
+            echo "Keystore file not found"
+          fi
+
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          missing=0
+          if [ -z "$STORE_PASSWORD" ]; then echo "::error::Missing secret ANDROID_KEYSTORE_PASSWORD (STORE_PASSWORD)"; missing=1; fi
+          if [ -z "$KEY_ALIAS" ]; then echo "::error::Missing secret ANDROID_KEY_ALIAS (KEY_ALIAS)"; missing=1; fi
+          if [ -z "$KEY_PASSWORD" ]; then echo "::error::Missing secret ANDROID_KEY_PASSWORD (KEY_PASSWORD)"; missing=1; fi
+          if [ "$missing" -eq 1 ]; then exit 1; fi
+
+      - name: Verify keystore and alias
+        if: ${{ always() }}
+        shell: bash
+        env:
+          STORE_FILE: ${{ github.workspace }}/ai_buddy_web/android/app/upload-keystore.jks
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          if [ ! -f "$STORE_FILE" ]; then
+            echo "::error::Keystore file not found at $STORE_FILE. Ensure ANDROID_KEYSTORE_BASE64 is set and decoded."; exit 1;
+          fi
+          echo "Listing aliases to verify keystore readability..."
+          keytool -list -keystore "$STORE_FILE" -storepass "$STORE_PASSWORD" >/dev/null 2>&1 || { echo "::error::Unable to open keystore with provided store password"; exit 1; }
+          echo "Verifying alias exists and key password works..."
+          keytool -list -keystore "$STORE_FILE" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" -keypass "$KEY_PASSWORD" >/dev/null 2>&1 || { echo "::error::Alias '$KEY_ALIAS' not found or key password incorrect"; exit 1; }
+
       - name: Install Flutter deps
         working-directory: ai_buddy_web
         run: flutter pub get
