@@ -55,13 +55,13 @@ def appId = project.hasProperty('APP_ID') ? APP_ID : 'app.gentlequest.www'
 
 android {
     namespace 'com.example.ai_buddy_web'
-    compileSdkVersion 34
+    compileSdkVersion 35
     ndkVersion '27.0.12077973'
 
     defaultConfig {
         applicationId appId
         minSdkVersion flutter.minSdkVersion
-        targetSdkVersion 34
+        targetSdkVersion 35
         versionCode ciVersionCode.toInteger()
         versionName ciVersionName
     }
