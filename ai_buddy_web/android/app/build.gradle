@@ -10,14 +10,8 @@ if (localPropertiesFile.exists()) {
         localProperties.load(reader)
     }
 }
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-if (flutterVersionCode == null || flutterVersionCode.trim().isEmpty()) {
-    flutterVersionCode = '1'
-}
-def flutterVersionName = localProperties.getProperty('flutter.versionName')
-if (flutterVersionName == null || flutterVersionName.trim().isEmpty()) {
-    flutterVersionName = '1.0'
-}
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')?.takeIf { it.trim() } ?: '1'
+def flutterVersionName = localProperties.getProperty('flutter.versionName')?.takeIf { it.trim() } ?: '1.0'
 
 // Load keystore properties for release signing if available
 def keystoreProperties = new Properties()
