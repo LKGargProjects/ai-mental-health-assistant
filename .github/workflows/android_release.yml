@@ -190,16 +190,26 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           # Version code for Gradle (exposed as project property VERSION_CODE)
-          ORG_GRADLE_PROJECT_VERSION_CODE: ${{ inputs.build_number || github.event.inputs.build_number }}
+          ORG_GRADLE_PROJECT_VERSION_CODE: ${{ inputs.build_number || github.event.inputs.build_number || github.run_number }}
         run: |
-          set -e
-          BN="${{ inputs.build_number || github.event.inputs.build_number }}"
-          if [ -z "$BN" ]; then BN="$GITHUB_RUN_NUMBER"; fi
+          set -ex
+          echo "=== Build Environment ==="
+          echo "Working directory: $(pwd)"
+          echo "Java version: $(java -version 2>&1 | head -n 1)"
+          echo "Gradle version: $(./gradlew --version 2>&1 | grep Gradle || echo 'Gradle not found')"
+          
+          BN="${{ inputs.build_number || github.event.inputs.build_number || github.run_number }}"
           echo "Using build number: $BN"
-          # Ensure wrapper is executable on Linux runners
-          chmod +x ./gradlew || true
-          # Build the release bundle using the module task name
-          ./gradlew app:bundleRelease --no-daemon --stacktrace --info
+          
+          # Make gradlew executable and verify
+          chmod +x ./gradlew
+          ls -la ./
+          
+          # Clean and build with full stacktrace and debug info
+          ./gradlew clean
+          ./gradlew assembleRelease --stacktrace --info --scan || \
+            (echo "=== Build failed, running with --debug for more info ===" && \
+             ./gradlew assembleRelease --debug)
 
       - name: Upload ProGuard mapping to Sentry (optional)
         if: ${{ (inputs.sentry_upload || github.event.inputs.sentry_upload) == 'true' }}
