@@ -896,6 +896,18 @@ def _register_routes(app: Flask) -> None:
             app.logger.error(f"Health check failed: {e}")
             return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
+    @app.route("/api/ping", methods=["GET", "HEAD"])
+    @app.limiter.exempt
+    def ping():
+        """Ultra-lightweight keep-alive endpoint. Does not touch DB or Redis."""
+        try:
+            resp = jsonify({"ok": True, "ts": datetime.utcnow().isoformat()})
+            resp.headers["Cache-Control"] = "no-store"
+            return resp, 200
+        except Exception:
+            # Always return 200 to avoid failing external pingers
+            return jsonify({"ok": False}), 200
+
     @app.route("/api/deploy-test", methods=["GET"])
     @app.limiter.exempt
     def deploy_test():

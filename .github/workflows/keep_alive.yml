@@ -1,0 +1,24 @@
+name: Keep GentleQuest Warm
+
+on:
+  schedule:
+    # Every 13 minutes to avoid Render free-tier idle sleep (~15 min)
+    - cron: "*/13 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add small jitter to distribute load
+        run: |
+          JITTER=$(( RANDOM % 60 ))  # 0-59 seconds
+          echo "Sleeping for $JITTER seconds to add jitter..."
+          sleep $JITTER
+      - name: Ping /api/ping (HEAD) with fallback to /api/health (GET)
+        run: |
+          set -euxo pipefail
+          URL="https://gentlequest.onrender.com/api/ping"
+          # Try a HEAD request first (lightweight), fallback to GET /api/health
+          (curl -fsSI --max-time 5 -H "User-Agent: gentlequest-keepalive/1.0" "$URL" || \
+           curl -fsS  --max-time 5 -H "User-Agent: gentlequest-keepalive/1.0" "https://gentlequest.onrender.com/api/health") || true
