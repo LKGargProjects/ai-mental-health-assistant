@@ -66,7 +66,9 @@ RUN pip install -U python-dotenv gunicorn
 COPY app.py .
 COPY models.py .
 COPY crisis_detection.py .
+COPY community.py .
 COPY providers/ ./providers/
+COPY data/ ./data/
 
 # Stage 3: Final production image
 FROM python:3.11-slim

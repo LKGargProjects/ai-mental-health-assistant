@@ -66,6 +66,19 @@ services:
         value: render
       - key: PYTHON_VERSION
         value: "3.9.6"
+      # Community v0 feature flags and rate limits
+      - key: COMMUNITY_ENABLED
+        value: true
+      - key: COMMUNITY_POSTING_ENABLED
+        value: false
+      - key: TEMPLATES_ONLY
+        value: true
+      - key: RATE_LIMITS_COMMUNITY_FEED
+        value: "120 per minute"
+      - key: RATE_LIMITS_REACTION
+        value: "20 per minute; 200 per day"
+      - key: RATE_LIMITS_REPORT
+        value: "10 per minute; 100 per day"
 
   - type: web
     name: GentleQuest
@@ -82,7 +95,7 @@ services:
       - key: AI_PROVIDER
         value: gemini
       - key: CORS_ORIGINS
-        value: "https://gentlequest.com,https://www.gentlequest.com,https://gentlequest.app,https://www.gentlequest.app,https://*.onrender.com"
+        value: "https://gentlequest.com,https://www.gentlequest.com,https://gentlequest.app,https://www.gentlequest.app"
 
       - key: DATABASE_URL
         sync: false

@@ -12,6 +12,9 @@
 !crisis_detection.py
 !providers/
 !providers/**
+!community.py
+!data/
+!data/**
 !start.sh
 !nginx.conf
 

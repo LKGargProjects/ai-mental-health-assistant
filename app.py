@@ -34,6 +34,7 @@ from providers.openai import get_openai_response
 from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
 from crisis_detection import detect_crisis_level
 import requests
+from community import register_community_routes
 try:
     import sentry_sdk
     from sentry_sdk.integrations.flask import FlaskIntegration
@@ -291,7 +292,15 @@ class Config:
     # Version and build info
     VERSION = os.getenv('VERSION', '1.0.0')
     BUILD_TIME = os.getenv('BUILD_TIME', 'unknown')
-    
+
+    # Community feature flags and limits
+    COMMUNITY_ENABLED = os.getenv('COMMUNITY_ENABLED', 'true')
+    COMMUNITY_POSTING_ENABLED = os.getenv('COMMUNITY_POSTING_ENABLED', 'false')
+    TEMPLATES_ONLY = os.getenv('TEMPLATES_ONLY', 'true')
+    RATE_LIMITS_COMMUNITY_FEED = os.getenv('RATE_LIMITS_COMMUNITY_FEED', '120 per minute')
+    RATE_LIMITS_REACTION = os.getenv('RATE_LIMITS_REACTION', '20 per minute; 200 per day')
+    RATE_LIMITS_REPORT = os.getenv('RATE_LIMITS_REPORT', '10 per minute; 100 per day')
+
     # Retention policy (days)
     MESSAGE_RETENTION_DAYS = int(os.getenv('MESSAGE_RETENTION_DAYS', 30))
     SESSION_RETENTION_DAYS = int(os.getenv('SESSION_RETENTION_DAYS', 14))
@@ -461,6 +470,12 @@ def create_app() -> Flask:
     # Register routes
     _register_routes(app)
     _register_additional_routes(app)
+    # Register Community (Phase 0) routes
+    try:
+        register_community_routes(app)
+        app.logger.info("Community routes registered")
+    except Exception as e:
+        app.logger.warning(f"Community routes failed to register: {e}")
     
     # Attach a request ID to each request and response for traceability
     @app.before_request

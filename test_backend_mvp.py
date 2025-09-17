@@ -267,6 +267,102 @@ def test_analytics_log_quest_event() -> bool:
         return False
 
 
+def test_community_feed() -> bool:
+    print_info("Testing /api/community/feed ...")
+    try:
+        r = requests.get(f"{BASE_URL}/api/community/feed", params={"limit": 5}, timeout=8)
+        if r.status_code != 200:
+            print_fail(f"/api/community/feed HTTP {r.status_code}")
+            return False
+        data = r.json()
+        items = data.get('items', [])
+        if not isinstance(items, list):
+            print_fail("/api/community/feed items is not a list")
+            return False
+        if not items:
+            print_fail("/api/community/feed returned empty items (seed missing?)")
+            return False
+        first = items[0]
+        required = ["id", "topic", "body", "reactions"]
+        missing = [k for k in required if k not in first]
+        if missing:
+            print_fail(f"/api/community/feed item missing keys: {missing}")
+            return False
+        print_ok("/api/community/feed returned curated posts")
+        return True
+    except Exception as e:
+        print_fail(f"/api/community/feed error: {e}")
+        return False
+
+
+def test_community_reaction_and_report() -> bool:
+    print_info("Testing /api/community/reaction and /api/community/report ...")
+    try:
+        # Fetch a post
+        r = requests.get(f"{BASE_URL}/api/community/feed", params={"limit": 1}, timeout=8)
+        if r.status_code != 200:
+            print_fail(f"/api/community/feed HTTP {r.status_code}")
+            return False
+        data = r.json()
+        items = data.get('items', [])
+        if not items:
+            print_fail("No posts available for reaction test")
+            return False
+        post = items[0]
+        pid = post['id']
+        prev_helped = int((post.get('reactions') or {}).get('helped', 0))
+
+        # React: helped
+        r2 = requests.post(
+            f"{BASE_URL}/api/community/reaction",
+            json={"post_id": pid, "kind": "helped"},
+            headers={"X-Session-ID": str(uuid.uuid4())},
+            timeout=8,
+        )
+        if r2.status_code != 201:
+            print_fail(f"/api/community/reaction expected 201, got {r2.status_code}")
+            try:
+                print_info(f"Body: {r2.text}")
+            except Exception:
+                pass
+            return False
+
+        # Verify increment
+        r3 = requests.get(f"{BASE_URL}/api/community/feed", params={"limit": 1}, timeout=8)
+        if r3.status_code != 200:
+            print_fail(f"/api/community/feed (post-reaction) HTTP {r3.status_code}")
+            return False
+        items2 = r3.json().get('items', [])
+        if not items2:
+            print_fail("/api/community/feed returned no items after reaction")
+            return False
+        post2 = items2[0]
+        new_helped = int((post2.get('reactions') or {}).get('helped', 0))
+        if new_helped != prev_helped + 1:
+            print_fail(f"Reaction count did not increment (was {prev_helped}, now {new_helped})")
+            return False
+
+        # Report
+        r4 = requests.post(
+            f"{BASE_URL}/api/community/report",
+            json={"target_type": "post", "target_id": pid, "reason": "harm", "notes": "Contains http://example.com email a@b.com"},
+            timeout=8,
+        )
+        if r4.status_code != 201:
+            print_fail(f"/api/community/report expected 201, got {r4.status_code}")
+            try:
+                print_info(f"Body: {r4.text}")
+            except Exception:
+                pass
+            return False
+
+        print_ok("Community reaction incremented and report accepted")
+        return True
+    except Exception as e:
+        print_fail(f"Community reaction/report error: {e}")
+        return False
+
+
 def main() -> int:
     print("🚀 Backend MVP Readiness Test")
     print("=" * 50)
@@ -278,6 +374,9 @@ def main() -> int:
     results.append(("/api/chat_stream SSE", test_chat_stream_sse()))
     results.append(("/api/analytics/log without consent", test_analytics_log_requires_consent()))
     results.append(("/api/analytics/log quest_start", test_analytics_log_quest_event()))
+    # Community Phase 0
+    results.append(("/api/community/feed", test_community_feed()))
+    results.append(("/api/community reaction+report", test_community_reaction_and_report()))
 
     print("\n📊 Summary")
     print("=" * 50)
