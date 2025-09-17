@@ -68,7 +68,9 @@ COPY models.py .
 COPY crisis_detection.py .
 COPY community.py .
 COPY providers/ ./providers/
-COPY data/ ./data/
+# Ensure data directory exists then copy the seed file
+RUN mkdir -p /app/data
+COPY data/community_seed.json ./data/community_seed.json
 
 # Stage 3: Final production image
 FROM python:3.11-slim
