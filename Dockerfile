@@ -3,33 +3,12 @@
 # =============================================================================
 # Multi-stage build for Flask backend + Flutter web in single container
 
-# Stage 1: Flutter web build
-FROM debian:latest AS flutter-builder
+##########
+# Stage 1: Flutter web build (stable, preinstalled SDK)
+##########
+FROM ghcr.io/cirruslabs/flutter:stable AS flutter-builder
 
-# Install Flutter dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    git \
-    unzip \
-    xz-utils \
-    zip \
-    libglu1-mesa \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Flutter
-ENV FLUTTER_HOME="/flutter"
-ENV FLUTTER_VERSION="3.32.8"
-RUN git clone https://github.com/flutter/flutter.git $FLUTTER_HOME
-WORKDIR $FLUTTER_HOME
-RUN git fetch && git checkout $FLUTTER_VERSION
-
-# Add Flutter to PATH
-ENV PATH="$FLUTTER_HOME/bin:$PATH"
-
-# Avoid tar trying to preserve file ownership inside container (fixes gradle-wrapper extraction)
-ENV TAR_OPTIONS=--no-same-owner
-
-# Enable web support
+# Enable web support explicitly (no-op if already enabled)
 RUN flutter config --enable-web
 
 # Copy Flutter app and build web version (cache-friendly)
@@ -41,8 +20,7 @@ RUN flutter pub get
 COPY ai_buddy_web/lib ./lib
 COPY ai_buddy_web/assets ./assets
 COPY ai_buddy_web/web ./web
-# Build Flutter web once; disable PWA service worker to avoid stale cached UI on Render
-# This ensures fresh assets are fetched after each deploy
+# Build Flutter web; disable PWA service worker to avoid stale cached UI on Render
 RUN flutter build web --release --pwa-strategy=none
 
 # Stage 2: Python backend build
