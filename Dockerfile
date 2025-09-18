@@ -21,7 +21,8 @@ COPY ai_buddy_web/lib ./lib
 COPY ai_buddy_web/assets ./assets
 COPY ai_buddy_web/web ./web
 # Build Flutter web; disable PWA service worker to avoid stale cached UI on Render
-RUN flutter build web --release --pwa-strategy=none
+# Add -v for verbose logs to surface exact compile errors from Dart/Flutter
+RUN flutter build web --release --pwa-strategy=none -v
 
 # Stage 2: Python backend build
 FROM python:3.11-slim AS python-builder
