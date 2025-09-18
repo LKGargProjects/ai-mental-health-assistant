@@ -4,6 +4,7 @@ import '../widgets/app_bottom_nav.dart';
 import '../screens/interactive_chat_screen.dart';
 import '../screens/mood_tracker_screen.dart';
 import 'package:ai_buddy_web/dhiwise/presentation/wellness_dashboard_screen/wellness_dashboard_screen.dart';
+import '../widgets/community_feed_screen.dart';
 
 import '../widgets/crisis_resources.dart';
 import '../models/message.dart';
@@ -211,7 +212,7 @@ class _HomeShellState extends State<HomeShell> {
       buildTabNavigator(
         key: _communityNavKey,
         active: _index == 3,
-        builder: (_) => const _CommunityComingSoon(),
+        builder: (_) => const CommunityFeedScreen(),
       ),
     ];
 
@@ -276,11 +277,3 @@ class _HomeShellState extends State<HomeShell> {
 
 }
 
-class _CommunityComingSoon extends StatelessWidget {
-  const _CommunityComingSoon();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Community coming soon!'));
-  }
-}
