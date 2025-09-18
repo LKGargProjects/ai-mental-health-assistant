@@ -1,15 +1,13 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
 import '../config/api_config.dart';
+import 'storage/kv_storage.dart';
 
 /// Centralized session ID coordinator to deduplicate network calls to
 /// `/api/get_or_create_session` across services.
 class SessionManager {
   static const String _sessionKey = 'session_id';
-  static final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static String? _sessionId;
   static Completer<String>? _inflight;
 
@@ -19,9 +17,9 @@ class SessionManager {
     // Fast path: in-memory
     if (_sessionId != null && _sessionId!.trim().isNotEmpty) return _sessionId!;
 
-    // Try secure storage
+    // Try persisted storage
     try {
-      final existing = await _storage.read(key: _sessionKey);
+      final existing = await KvStorage.read(_sessionKey);
       if (existing != null && existing.trim().isNotEmpty) {
         _sessionId = existing;
         return _sessionId!;
@@ -56,7 +54,7 @@ class SessionManager {
           ? sid
           : _fallbackSessionId();
       try {
-        await _storage.write(key: _sessionKey, value: _sessionId);
+        await KvStorage.write(_sessionKey, _sessionId);
       } catch (e) {
         if (kDebugMode) debugPrint('SessionManager: storage write error: $e');
       }
@@ -78,7 +76,7 @@ class SessionManager {
   static Future<void> clear() async {
     _sessionId = null;
     try {
-      await _storage.delete(key: _sessionKey);
+      await KvStorage.delete(_sessionKey);
     } catch (e) {
       if (kDebugMode) debugPrint('SessionManager: clear error: $e');
     }
