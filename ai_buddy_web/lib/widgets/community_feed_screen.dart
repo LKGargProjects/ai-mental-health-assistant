@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/community_provider.dart';
 import './app_back_button.dart';
 import '../services/analytics_service.dart' show logAnalyticsEvent;
+import '../core/utils/size_utils.dart';
+import '../theme/theme_helper.dart';
+import '../theme/text_style_helper.dart';
 
 class CommunityFeedScreen extends StatefulWidget {
   const CommunityFeedScreen({super.key});
@@ -64,9 +67,35 @@ class _PinnedCrisisResourcesCard extends StatelessWidget {
 }
 
 class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
-  static const List<String> _topics = <String>[
+  // Full topic set (used by picker)
+  static const List<String> _topicsFull = <String>[
     'All', 'Anxiety', 'Sleep', 'Mood', 'Grounding', 'Journaling', 'Routines', 'Gratitude'
   ];
+
+  final Set<int> _expandedPosts = <int>{};
+
+  void _toggleExpanded(int id) {
+    setState(() {
+      if (_expandedPosts.contains(id)) {
+        _expandedPosts.remove(id);
+      } else {
+        _expandedPosts.add(id);
+      }
+    });
+  }
+
+  String _relativeTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    final weeks = (diff.inDays / 7).floor();
+    if (weeks < 4) return '${weeks}w ago';
+    final months = (diff.inDays / 30).floor();
+    return '${months}mo ago';
+  }
 
   @override
   void initState() {
@@ -92,6 +121,45 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
       'surface': 'community_tab',
       'ts': DateTime.now().millisecondsSinceEpoch,
     });
+  }
+
+  Future<void> _showTopicPicker() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16.h,
+              right: 16.h,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16.h,
+              top: 12.h,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Choose a topic', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                ..._topicsFull.map((t) => ListTile(
+                      dense: true,
+                      title: Text(t),
+                      onTap: () => Navigator.of(ctx).pop(t),
+                    )),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked != null) {
+      _onSelectTopic(picked);
+    }
   }
 
   Future<void> _showReportDialog({required int postId}) async {
@@ -191,37 +259,63 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Community'),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 1,
-        automaticallyImplyLeading: false,
-        leading: Builder(
-          builder: (ctx) {
-            final canPop = Navigator.of(ctx).canPop();
-            final route = ModalRoute.of(ctx);
-            final isModal = route is PageRoute && route.fullscreenDialog == true;
-            if (canPop) {
-              return AppBackButton(isModal: isModal);
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-      ),
       body: Column(
         children: [
-          // Topic filter chips
+          // Header (matches other tabs)
+          Container(
+            color: appTheme.whiteCustom,
+            padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
+            child: SafeArea(
+              top: true,
+              bottom: false,
+              child: Row(
+                children: [
+                  Builder(
+                    builder: (ctx) {
+                      final canPop = Navigator.of(ctx).canPop();
+                      final route = ModalRoute.of(ctx);
+                      final isModal = route is PageRoute && route.fullscreenDialog == true;
+                      if (canPop) {
+                        return AppBackButton(isModal: isModal);
+                      }
+                      return SizedBox(width: 44.h); // balance left when no back
+                    },
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Community',
+                      textAlign: TextAlign.center,
+                      style: TextStyleHelper.instance.headline24Bold,
+                    ),
+                  ),
+                  SizedBox(width: 44.h), // balance right
+                ],
+              ),
+            ),
+          ),
+          // Divider under header
+          Container(height: 8.h, color: appTheme.colorFFF3F4),
+          // Topic filter chips (compact with 'More')
           SizedBox(
             height: 52,
             child: Consumer<CommunityProvider>(
               builder: (context, cp, _) {
                 final sel = cp.selectedTopic ?? 'All';
+                const visibleTopics = <String>['All', 'Anxiety', 'Sleep', 'Mood', 'Grounding', 'More'];
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   scrollDirection: Axis.horizontal,
                   itemBuilder: (ctx, i) {
-                    final t = _topics[i];
+                    final t = visibleTopics[i];
+                    if (t == 'More') {
+                      return ChoiceChip(
+                        label: const Text('More'),
+                        selected: false,
+                        onSelected: (_) => _showTopicPicker(),
+                        selectedColor: color.primary.withOpacity(0.12),
+                        labelStyle: TextStyle(color: color.onSurface),
+                      );
+                    }
                     final bool active = (t == sel);
                     return ChoiceChip(
                       label: Text(t),
@@ -234,7 +328,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     );
                   },
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemCount: _topics.length,
+                  itemCount: visibleTopics.length,
                 );
               },
             ),
@@ -290,24 +384,57 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: color.primary.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Text(p.topic, style: TextStyle(color: color.primary, fontSize: 12)),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 8, height: 8,
+                                        decoration: BoxDecoration(color: color.primary, shape: BoxShape.circle),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(p.topic, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      if (p.createdAt != null) ...[
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '•  ' + _relativeTime(p.createdAt!),
+                                          style: const TextStyle(fontSize: 11, color: Colors.black54),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   const Spacer(),
-                                  IconButton(
-                                    tooltip: 'Report',
-                                    icon: const Icon(Icons.flag_outlined, size: 20),
-                                    onPressed: () => _showReportDialog(postId: p.id),
+                                  PopupMenuButton<String>(
+                                    tooltip: 'More',
+                                    icon: const Icon(Icons.more_horiz, size: 20, color: Colors.black54),
+                                    onSelected: (v) {
+                                      if (v == 'report') _showReportDialog(postId: p.id);
+                                    },
+                                    itemBuilder: (ctx) => const [
+                                      PopupMenuItem<String>(value: 'report', child: Text('Report')),
+                                    ],
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Text(p.body),
+                              Builder(builder: (_) {
+                                final expanded = _expandedPosts.contains(p.id);
+                                final shouldTruncate = p.body.length > 180;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.body,
+                                      maxLines: expanded ? null : 4,
+                                      overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                                    ),
+                                    if (shouldTruncate)
+                                      TextButton(
+                                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+                                        onPressed: () => _toggleExpanded(p.id),
+                                        child: Text(expanded ? 'Show less' : 'Read more'),
+                                      ),
+                                  ],
+                                );
+                              }),
                               const SizedBox(height: 12),
                               Row(
                                 children: [
@@ -327,36 +454,37 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                     },
                                   ),
                                   const SizedBox(width: 8),
-                                  _ReactionChip(
-                                    icon: Icons.thumb_up_outlined,
-                                    label: 'This helped',
-                                    count: p.helped,
-                                    onTap: () {
-                                      context.read<CommunityProvider>().react(p.id, 'helped');
-                                      logAnalyticsEvent('community_reaction_add', metadata: {
-                                        'post_id': p.id,
-                                        'kind': 'helped',
-                                        'topic': p.topic,
-                                        'surface': 'community_tab',
-                                        'ts': DateTime.now().millisecondsSinceEpoch,
-                                      });
+                                  PopupMenuButton<String>(
+                                    tooltip: 'More actions',
+                                    icon: const Icon(Icons.more_horiz, size: 20, color: Colors.black54),
+                                    onSelected: (v) {
+                                      switch (v) {
+                                        case 'helped':
+                                          context.read<CommunityProvider>().react(p.id, 'helped');
+                                          logAnalyticsEvent('community_reaction_add', metadata: {
+                                            'post_id': p.id,
+                                            'kind': 'helped',
+                                            'topic': p.topic,
+                                            'surface': 'community_tab',
+                                            'ts': DateTime.now().millisecondsSinceEpoch,
+                                          });
+                                          break;
+                                        case 'strength':
+                                          context.read<CommunityProvider>().react(p.id, 'strength');
+                                          logAnalyticsEvent('community_reaction_add', metadata: {
+                                            'post_id': p.id,
+                                            'kind': 'strength',
+                                            'topic': p.topic,
+                                            'surface': 'community_tab',
+                                            'ts': DateTime.now().millisecondsSinceEpoch,
+                                          });
+                                          break;
+                                      }
                                     },
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _ReactionChip(
-                                    icon: Icons.favorite_outline,
-                                    label: 'Strength',
-                                    count: p.strength,
-                                    onTap: () {
-                                      context.read<CommunityProvider>().react(p.id, 'strength');
-                                      logAnalyticsEvent('community_reaction_add', metadata: {
-                                        'post_id': p.id,
-                                        'kind': 'strength',
-                                        'topic': p.topic,
-                                        'surface': 'community_tab',
-                                        'ts': DateTime.now().millisecondsSinceEpoch,
-                                      });
-                                    },
+                                    itemBuilder: (ctx) => const [
+                                      PopupMenuItem<String>(value: 'helped', child: Text('This helped')),
+                                      PopupMenuItem<String>(value: 'strength', child: Text('Strength')),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -398,7 +526,7 @@ class _ReactionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: color.primary.withOpacity(0.06),
+          color: color.primary.withOpacity(0.05),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFE0E6EE)),
         ),
@@ -408,8 +536,10 @@ class _ReactionChip extends StatelessWidget {
             Icon(icon, size: 16, color: color.primary),
             const SizedBox(width: 6),
             Text(label, style: TextStyle(color: color.primary)),
-            const SizedBox(width: 6),
-            Text('$count', style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Text('$count', style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
           ],
         ),
       ),
