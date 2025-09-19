@@ -319,6 +319,22 @@ def register_community_routes(app: Flask) -> None:
                 pass
             return jsonify({'error': 'Failed to submit report'}), 500
 
+    @app.route('/api/community/flags', methods=['GET'])
+    @app.limiter.limit(limits_feed)
+    def community_flags():
+        try:
+            return jsonify({
+                'enabled': _enabled(),
+                'posting_enabled': _posting_enabled(),
+                'templates_only': str(app.config.get('TEMPLATES_ONLY', 'false')).lower() == 'true',
+            }), 200
+        except Exception as e:
+            try:
+                app.logger.warning(f"Community flags error: {e}")
+            except Exception:
+                pass
+            return jsonify({'enabled': False, 'posting_enabled': False, 'templates_only': False}), 200
+
     @app.route('/api/community/post', methods=['POST'])
     @app.limiter.limit(limits_post)
     def community_post():

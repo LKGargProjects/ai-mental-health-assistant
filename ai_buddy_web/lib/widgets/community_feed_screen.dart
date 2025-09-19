@@ -146,6 +146,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     // Defer load to next microtask to avoid context issues
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<CommunityProvider>();
+      // Fetch server-driven feature flags (posting enabled?)
+      provider.fetchFlags();
       provider.loadFeed();
       // Log feed view
       logAnalyticsEvent('community_feed_view', metadata: {
@@ -207,7 +209,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: (selectedTopic == null || selectedTopic == 'All')
+                    initialValue: (selectedTopic == null || selectedTopic == 'All')
                         ? null
                         : selectedTopic,
                     items: _topicsFull
@@ -260,11 +262,12 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                 setLocal(() => posting = true);
                                 final created = await cp.compose(
                                     body: body, topic: selectedTopic);
-                                if (!mounted) return;
+                                if (!ctx.mounted) return;
                                 setLocal(() => posting = false);
                                 if (created != null) {
                                   Navigator.of(ctx).maybePop();
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  if (!ctx.mounted) return;
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
                                     const SnackBar(content: Text('Posted')),
                                   );
                                   // Analytics: post submitted successfully
@@ -275,7 +278,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                     'ts': DateTime.now().millisecondsSinceEpoch,
                                   });
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  if (!ctx.mounted) return;
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
                                     SnackBar(
                                         content: Text(
                                             cp.error ?? 'Failed to post')),
@@ -418,10 +422,11 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                         'surface': 'community_tab',
                         'ts': DateTime.now().millisecondsSinceEpoch,
                       });
-                      if (mounted) Navigator.pop(ctx);
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx);
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Thanks for your report')), 
+                        const SnackBar(content: Text('Thanks for your report')),
                       );
                     },
                     child: const Text('Submit'),
@@ -440,10 +445,15 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openComposeSheet,
-        icon: const Icon(Icons.edit),
-        label: const Text('Compose'),
+      floatingActionButton: Consumer<CommunityProvider>(
+        builder: (context, cp, _) {
+          if (!cp.postingEnabled) return const SizedBox.shrink();
+          return FloatingActionButton.extended(
+            onPressed: _openComposeSheet,
+            icon: const Icon(Icons.edit),
+            label: const Text('Compose'),
+          );
+        },
       ),
       body: Column(
         children: [
@@ -597,7 +607,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                       if (p.createdAt != null) ...[
                                         const SizedBox(width: 8),
                                         Text(
-                                          '•  ' + _relativeTime(p.createdAt!),
+                                          '•  ${_relativeTime(p.createdAt!)}',
                                           style: const TextStyle(fontSize: 11, color: Colors.black54),
                                         ),
                                       ],

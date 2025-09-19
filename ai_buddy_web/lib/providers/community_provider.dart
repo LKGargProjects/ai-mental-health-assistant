@@ -11,18 +11,41 @@ class CommunityProvider extends ChangeNotifier {
   String? _selectedTopic; // null => All
   final List<CommunityPost> _posts = [];
   DateTime? _lastPostAt; // client-side cooldown anchor
+  // Feature flags
+  bool _communityEnabled = true;
+  bool _postingEnabled = true;
+  bool _templatesOnly = false;
 
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasLoaded => _hasLoaded;
   String? get selectedTopic => _selectedTopic;
   List<CommunityPost> get posts => List.unmodifiable(_posts);
+  bool get communityEnabled => _communityEnabled;
+  bool get postingEnabled => _postingEnabled;
+  bool get templatesOnly => _templatesOnly;
 
   int get composeCooldownSecondsRemaining {
     if (_lastPostAt == null) return 0;
     final elapsed = DateTime.now().difference(_lastPostAt!).inSeconds;
     const cooldown = 30; // guardrail; server rate limit is 6/min
     return elapsed >= cooldown ? 0 : (cooldown - elapsed);
+  }
+
+  Future<void> fetchFlags() async {
+    try {
+      final data = await _api.getCommunityFlags();
+      _communityEnabled = (data['enabled'] == true);
+      _postingEnabled = (data['posting_enabled'] == true);
+      _templatesOnly = (data['templates_only'] == true);
+      notifyListeners();
+    } catch (e) {
+      // Keep defaults on error; do not block UI
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('Community flags fetch error: $e');
+      }
+    }
   }
 
   Future<void> loadFeed({String? topic}) async {

@@ -25,6 +25,16 @@ class ApiService {
     _setupInterceptors();
   }
 
+  /// Community: fetch feature flags (enabled/posting_enabled/templates_only)
+  Future<Map<String, dynamic>> getCommunityFlags() async {
+    return _retryOperation(() async {
+      await _getSessionId();
+      final response = await _dio.get('/api/community/flags');
+      final data = response.data as Map<String, dynamic>;
+      return data;
+    });
+  }
+
   /// Best-effort country inference from device/browser locale (e.g., en_US -> US)
   String? _deriveCountry() {
     try {
