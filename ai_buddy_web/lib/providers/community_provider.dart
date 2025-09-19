@@ -10,12 +10,20 @@ class CommunityProvider extends ChangeNotifier {
   bool _hasLoaded = false;
   String? _selectedTopic; // null => All
   final List<CommunityPost> _posts = [];
+  DateTime? _lastPostAt; // client-side cooldown anchor
 
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasLoaded => _hasLoaded;
   String? get selectedTopic => _selectedTopic;
   List<CommunityPost> get posts => List.unmodifiable(_posts);
+
+  int get composeCooldownSecondsRemaining {
+    if (_lastPostAt == null) return 0;
+    final elapsed = DateTime.now().difference(_lastPostAt!).inSeconds;
+    const cooldown = 30; // guardrail; server rate limit is 6/min
+    return elapsed >= cooldown ? 0 : (cooldown - elapsed);
+  }
 
   Future<void> loadFeed({String? topic}) async {
     if (_isLoading) return;
@@ -39,6 +47,43 @@ class CommunityProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<CommunityPost?> compose({required String body, String? topic}) async {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      _error = 'Post cannot be empty';
+      notifyListeners();
+      return null;
+    }
+    final remain = composeCooldownSecondsRemaining;
+    if (remain > 0) {
+      _error = 'Please wait ${remain}s before posting again';
+      notifyListeners();
+      return null;
+    }
+    try {
+      final created = await _api.createCommunityPost(body: trimmed, topic: topic);
+      // Insert optimistically at top if current filter matches
+      final matchesFilter = (_selectedTopic == null) ||
+          (_selectedTopic != null && created.topic.toLowerCase() == _selectedTopic!.toLowerCase());
+      if (matchesFilter) {
+        _posts.insert(0, created);
+        _hasLoaded = true;
+        notifyListeners();
+      }
+      _lastPostAt = DateTime.now();
+      _error = null;
+      return created;
+    } catch (e) {
+      _error = 'Failed to create post';
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('Community compose error: $e');
+      }
+      notifyListeners();
+      return null;
     }
   }
 

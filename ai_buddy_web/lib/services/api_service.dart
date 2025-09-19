@@ -218,6 +218,20 @@ class ApiService {
     });
   }
 
+  /// Community: create a post
+  Future<CommunityPost> createCommunityPost({required String body, String? topic}) async {
+    return _retryOperation(() async {
+      await _getSessionId();
+      final payload = <String, dynamic>{'body': body.trim()};
+      if (topic != null && topic.trim().isNotEmpty) {
+        payload['topic'] = topic.trim();
+      }
+      final response = await _dio.post('/api/community/post', data: payload);
+      final data = response.data as Map<String, dynamic>;
+      return CommunityPost.fromJson(Map<String, dynamic>.from(data));
+    });
+  }
+
   /// Open a streaming chat connection (SSE) when enabled and supported (web).
   /// Returns null if streaming is disabled or not supported; caller should fall back.
   Future<sse.SseHandle?> streamMessage(

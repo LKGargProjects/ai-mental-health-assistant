@@ -184,6 +184,7 @@ def register_community_routes(app: Flask) -> None:
     limits_feed = str(app.config.get('RATE_LIMITS_COMMUNITY_FEED', '120 per minute'))
     limits_reaction = str(app.config.get('RATE_LIMITS_REACTION', '20 per minute; 200 per day'))
     limits_report = str(app.config.get('RATE_LIMITS_REPORT', '10 per minute; 100 per day'))
+    limits_post = str(app.config.get('RATE_LIMITS_COMMUNITY_POST', '6 per minute; 60 per day'))
 
     @app.route('/api/community/feed', methods=['GET'])
     @app.limiter.limit(limits_feed)
@@ -308,3 +309,72 @@ def register_community_routes(app: Flask) -> None:
             except Exception:
                 pass
             return jsonify({'error': 'Failed to submit report'}), 500
+
+    @app.route('/api/community/post', methods=['POST'])
+    @app.limiter.limit(limits_post)
+    def community_post():
+        if not _enabled():
+            return jsonify({"error": "Community disabled"}), 403
+        try:
+            data = request.get_json(silent=True) or {}
+            topic = (data.get('topic') or '').strip()[:64]
+            body_raw = (data.get('body') or '').strip()
+            if not body_raw:
+                return jsonify({'error': 'Body is required'}), 400
+            if len(body_raw) > 2000:
+                # Hard stop on extremely long bodies (frontend uses 280 char soft limit)
+                return jsonify({'error': 'Body too long'}), 400
+
+            body = _pii_redact(body_raw)
+            d = _dialect()
+            created_at: Optional[datetime] = None
+            new_id: Optional[int] = None
+
+            if d == 'sqlite':
+                db.session.execute(text(
+                    """
+                    INSERT INTO community_posts (topic, body_redacted, is_curated)
+                    VALUES (:topic, :body, :is_curated)
+                    """
+                ), {"topic": topic or 'general', "body": body, "is_curated": False})
+                # Fetch last inserted id and created_at
+                new_id = db.session.execute(text("SELECT last_insert_rowid()")).scalar()
+                created_at = db.session.execute(text("SELECT created_at FROM community_posts WHERE id = :id"), {"id": new_id}).scalar()
+            else:
+                res = db.session.execute(text(
+                    """
+                    INSERT INTO community_posts (topic, body_redacted, is_curated)
+                    VALUES (:topic, :body, :is_curated)
+                    RETURNING id, created_at
+                    """
+                ), {"topic": topic or 'general', "body": body, "is_curated": False})
+                row = res.first()
+                if row is not None:
+                    new_id = row.id
+                    created_at = row.created_at
+
+            db.session.commit()
+
+            created_iso: Optional[str] = None
+            try:
+                created_iso = created_at.isoformat() if isinstance(created_at, datetime) else (created_at or None)
+            except Exception:
+                created_iso = None
+
+            return jsonify({
+                'id': new_id,
+                'topic': topic or 'general',
+                'body': body,
+                'created_at': created_iso,
+                'reactions': {'relate': 0, 'helped': 0, 'strength': 0},
+            }), 201
+        except Exception as e:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            try:
+                app.logger.error(f"Community post error: {e}")
+            except Exception:
+                pass
+            return jsonify({'error': 'Failed to create post'}), 500

@@ -66,6 +66,49 @@ class _PinnedCrisisResourcesCard extends StatelessWidget {
   }
 }
 
+class _FeedSkeleton extends StatelessWidget {
+  const _FeedSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0xFFE0E6EE)),
+          ),
+          elevation: 0,
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(height: 10, width: 80, color: Colors.black12.withOpacity(0.08)),
+                const SizedBox(height: 10),
+                Container(height: 12, width: double.infinity, color: Colors.black12.withOpacity(0.08)),
+                const SizedBox(height: 6),
+                Container(height: 12, width: double.infinity, color: Colors.black12.withOpacity(0.08)),
+                const SizedBox(height: 6),
+                Container(height: 12, width: MediaQuery.of(context).size.width * 0.6, color: Colors.black12.withOpacity(0.08)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(height: 28, width: 90, decoration: BoxDecoration(color: Colors.black12.withOpacity(0.06), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE0E6EE)))),
+                  ],
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   // Full topic set (used by picker)
   static const List<String> _topicsFull = <String>[
@@ -111,6 +154,130 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
         'ts': DateTime.now().millisecondsSinceEpoch,
       });
     });
+  }
+
+  Future<void> _openComposeSheet() async {
+    final cp = context.read<CommunityProvider>();
+    String? selectedTopic = cp.selectedTopic; // inherit filter by default
+    final TextEditingController textCtrl = TextEditingController();
+    int remaining = 280;
+    bool posting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setLocal) {
+          final kb = MediaQuery.of(ctx).viewInsets.bottom;
+          final cooldown = cp.composeCooldownSecondsRemaining;
+          return SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16.h, 12.h, 16.h, kb + 16.h),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Share a gentle reflection',
+                          style: Theme.of(ctx)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(ctx).maybePop(),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: (selectedTopic == null || selectedTopic == 'All')
+                        ? null
+                        : selectedTopic,
+                    items: _topicsFull
+                        .where((t) => t != 'All')
+                        .map((t) => DropdownMenuItem<String>(
+                              value: t,
+                              child: Text(t),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setLocal(() => selectedTopic = v),
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Topic (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: textCtrl,
+                    maxLines: null,
+                    minLines: 3,
+                    maxLength: 280,
+                    decoration: const InputDecoration(
+                      hintText: 'What would you like to share?',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (_) =>
+                        setLocal(() => remaining = 280 - textCtrl.text.length),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        '${remaining.clamp(-999, 999)} characters left',
+                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.send),
+                        label: Text(
+                          posting
+                              ? 'Posting…'
+                              : (cooldown > 0 ? 'Wait ${cooldown}s' : 'Post'),
+                        ),
+                        onPressed: (posting || cooldown > 0)
+                            ? null
+                            : () async {
+                                final body = textCtrl.text.trim();
+                                if (body.isEmpty) return;
+                                setLocal(() => posting = true);
+                                final created = await cp.compose(
+                                    body: body, topic: selectedTopic);
+                                if (!mounted) return;
+                                setLocal(() => posting = false);
+                                if (created != null) {
+                                  Navigator.of(ctx).maybePop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Posted')),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content: Text(
+                                            cp.error ?? 'Failed to post')),
+                                  );
+                                }
+                              },
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          );
+        });
+      },
+    );
   }
 
   void _onSelectTopic(String topic) {
@@ -259,6 +426,11 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openComposeSheet,
+        icon: const Icon(Icons.edit),
+        label: const Text('Compose'),
+      ),
       body: Column(
         children: [
           // Header (matches other tabs)
@@ -302,6 +474,22 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
               builder: (context, cp, _) {
                 final sel = cp.selectedTopic ?? 'All';
                 const visibleTopics = <String>['All', 'Anxiety', 'Sleep', 'Mood', 'Grounding', 'More'];
+                if (cp.isLoading && !cp.hasLoaded) {
+                  return ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    scrollDirection: Axis.horizontal,
+                    itemBuilder: (_, i) => Container(
+                      width: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.black12.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE0E6EE)),
+                      ),
+                    ),
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemCount: 6,
+                  );
+                }
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   scrollDirection: Axis.horizontal,
@@ -338,7 +526,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
             child: Consumer<CommunityProvider>(
               builder: (context, cp, _) {
                 if (cp.isLoading && !cp.hasLoaded) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const _FeedSkeleton();
                 }
                 if (cp.error != null) {
                   return Center(
