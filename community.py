@@ -180,6 +180,15 @@ def register_community_routes(app: Flask) -> None:
         except Exception:
             return True
 
+    def _posting_enabled() -> bool:
+        """Posting is enabled only when COMMUNITY_POSTING_ENABLED=true and TEMPLATES_ONLY!=true"""
+        try:
+            posting_flag = str(app.config.get('COMMUNITY_POSTING_ENABLED', 'false')).lower() == 'true'
+            templates_only = str(app.config.get('TEMPLATES_ONLY', 'false')).lower() == 'true'
+            return posting_flag and not templates_only
+        except Exception:
+            return False
+
     # Rate limits (can be overridden via env -> app.config)
     limits_feed = str(app.config.get('RATE_LIMITS_COMMUNITY_FEED', '120 per minute'))
     limits_reaction = str(app.config.get('RATE_LIMITS_REACTION', '20 per minute; 200 per day'))
@@ -315,6 +324,8 @@ def register_community_routes(app: Flask) -> None:
     def community_post():
         if not _enabled():
             return jsonify({"error": "Community disabled"}), 403
+        if not _posting_enabled():
+            return jsonify({"error": "Community posting disabled"}), 403
         try:
             data = request.get_json(silent=True) or {}
             topic = (data.get('topic') or '').strip()[:64]
