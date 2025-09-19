@@ -61,7 +61,7 @@ class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
           onTap: widget.onTap,
           onHighlightChanged: (v) => setState(() => _pressed = v),
           borderRadius: radius,
-          splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
+          splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.10),
           highlightColor: Colors.transparent,
           child: AnimatedScale(
             scale: _pressed ? 0.985 : (_hover ? 1.005 : 1.0),
@@ -77,7 +77,7 @@ class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
                 boxShadow: (_hover || _pressed)
                     ? [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
+                          color: Colors.black.withOpacity(0.06),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -150,7 +150,7 @@ class _RecommendationCardWidgetState extends State<RecommendationCardWidget> {
                                 border: Border.all(color: Colors.white, width: 3),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
+                                    color: Colors.black.withOpacity(0.08),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),

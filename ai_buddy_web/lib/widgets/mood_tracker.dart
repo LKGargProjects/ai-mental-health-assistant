@@ -58,7 +58,7 @@ class _MoodTrackerWidgetState extends State<MoodTrackerWidget> {
                                 .textTheme
                                 .bodySmall
                                 ?.color
-                                ?.withValues(alpha: 0.7),
+                                ?.withOpacity(0.7),
                             fontFamily: 'Inter',
                           ),
                     ),
@@ -81,9 +81,9 @@ class _MoodTrackerWidgetState extends State<MoodTrackerWidget> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.08),
+        color: Theme.of(context).colorScheme.error.withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.35)),
+        border: Border.all(color: Theme.of(context).colorScheme.error.withOpacity(0.35)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -124,7 +124,7 @@ class _MoodTrackerWidgetState extends State<MoodTrackerWidget> {
                 Icon(
                   Icons.show_chart_outlined,
                   size: 40,
-                  color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                  color: theme.colorScheme.primary.withOpacity(0.4),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -135,7 +135,7 @@ class _MoodTrackerWidgetState extends State<MoodTrackerWidget> {
                 Text(
                   "Log today's mood to see your trend",
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
                     fontFamily: 'Inter',
                   ),
                 ),
@@ -197,7 +197,7 @@ class _MoodTrackerWidgetState extends State<MoodTrackerWidget> {
         borderRadius: BorderRadius.circular(8),
         selectedBorderColor: Theme.of(context).colorScheme.primary,
         selectedColor: Theme.of(context).colorScheme.primary,
-        fillColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+        fillColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
         children: const [
           Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Text('Daily')),
           Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Text('All')),
@@ -365,7 +365,7 @@ class _MoodTrackerWidgetState extends State<MoodTrackerWidget> {
                   dotData: const FlDotData(show: true),
                   belowBarData: BarAreaData(
                     show: spots.length > 1,
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   ),
                 ),
               ],

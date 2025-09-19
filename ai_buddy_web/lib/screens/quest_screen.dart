@@ -150,8 +150,8 @@ class _QuestScreenState extends State<QuestScreen>
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: quest.status == QuestStatus.completed
-              ? Colors.green.withValues(alpha: 0.5)
-              : Colors.grey.withValues(alpha: 0.2),
+              ? Colors.green.withOpacity(0.5)
+              : Colors.grey.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -170,7 +170,7 @@ class _QuestScreenState extends State<QuestScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: quest.categoryColor.withValues(alpha: 0.1),
+                      color: quest.categoryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -344,7 +344,7 @@ class _QuestScreenState extends State<QuestScreen>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _getCategoryColor(category).withValues(alpha: 0.1),
+                      color: _getCategoryColor(category).withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -445,7 +445,7 @@ class _QuestScreenState extends State<QuestScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: quest.categoryColor.withValues(alpha: 0.1),
+                  color: quest.categoryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(quest.icon, color: quest.categoryColor, size: 32),
@@ -469,7 +469,7 @@ class _QuestScreenState extends State<QuestScreen>
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: quest.categoryColor.withValues(alpha: 0.1),
+                        color: quest.categoryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(

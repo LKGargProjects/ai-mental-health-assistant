@@ -18,6 +18,7 @@ import 'providers/assessment_provider.dart';
 import 'providers/task_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/quest_provider.dart';
+import 'providers/community_provider.dart';
 import 'navigation/route_observer.dart';
 import 'navigation/home_shell.dart';
 import 'widgets/app_bottom_nav.dart' show AppTab;
@@ -162,6 +163,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => TaskProvider()),
         ChangeNotifierProvider(create: (_) => ProgressProvider()),
         ChangeNotifierProvider(create: (_) => QuestProvider()..loadQuests()),
+        ChangeNotifierProvider(create: (_) => CommunityProvider()),
       ],
       child: dhiwise_sizer.Sizer(
         builder: (context, o, d) => Sizer(

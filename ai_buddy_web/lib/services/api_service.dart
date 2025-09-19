@@ -7,6 +7,7 @@ import '../config/feature_flags.dart';
 import 'streaming/streaming_sse.dart' as sse;
 import '../models/message.dart';
 import '../models/mood_entry.dart';
+import '../models/community_post.dart';
 import '../config/api_config.dart';
 import 'session_manager.dart';
 
@@ -175,6 +176,45 @@ class ApiService {
     return _retryOperation(() async {
       final response = await _dio.get('/api/health');
       return response.data as Map<String, dynamic>;
+    });
+  }
+
+  /// Community: fetch curated feed (read-only Phase 0)
+  Future<List<CommunityPost>> getCommunityFeed({String? topic, int limit = 20}) async {
+    return _retryOperation(() async {
+      await _getSessionId();
+      final params = <String, dynamic>{'limit': limit};
+      if (topic != null && topic.trim().isNotEmpty) {
+        params['topic'] = topic.trim();
+      }
+      final response = await _dio.get('/api/community/feed', queryParameters: params);
+      final data = response.data as Map<String, dynamic>;
+      final List<dynamic> items = (data['items'] as List<dynamic>? ?? const []);
+      return items.map((e) => CommunityPost.fromJson(Map<String, dynamic>.from(e))).toList();
+    });
+  }
+
+  /// Community: add a reaction to a post
+  Future<void> addCommunityReaction({required int postId, required String kind}) async {
+    return _retryOperation(() async {
+      await _getSessionId();
+      await _dio.post('/api/community/reaction', data: {
+        'post_id': postId,
+        'kind': kind,
+      });
+    });
+  }
+
+  /// Community: report a post
+  Future<void> reportCommunityPost({required int postId, required String reason, String? notes}) async {
+    return _retryOperation(() async {
+      await _getSessionId();
+      await _dio.post('/api/community/report', data: {
+        'target_type': 'post',
+        'target_id': postId,
+        'reason': reason,
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      });
     });
   }
 

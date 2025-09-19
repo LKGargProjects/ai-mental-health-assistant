@@ -54,7 +54,7 @@ class _ProgressCardWidgetState extends State<ProgressCardWidget> {
               boxShadow: (_hover || _pressed)
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
+                        color: Colors.black.withOpacity(0.05),
                         blurRadius: 14,
                         offset: const Offset(0, 6),
                       ),

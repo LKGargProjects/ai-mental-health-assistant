@@ -61,7 +61,7 @@ class _RingPainter extends CustomPainter {
     final radius = 46.0;
     final rect = Rect.fromCircle(center: center, radius: radius);
     final bg = Paint()
-      ..color = color.withValues(alpha: 0.12)
+      ..color = color.withOpacity(0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0
       ..strokeCap = StrokeCap.round;
@@ -103,10 +103,10 @@ class _RipplePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final effectiveOpacity = opacity.clamp(0.0, 1.0);
     final fill = Paint()
-      ..color = color.withValues(alpha: 0.10 * (1.0 - effectiveOpacity))
+      ..color = color.withOpacity(0.10 * (1.0 - effectiveOpacity))
       ..style = PaintingStyle.fill;
     final stroke = Paint()
-      ..color = color.withValues(alpha: 0.35 * (1.0 - effectiveOpacity))
+      ..color = color.withOpacity(0.35 * (1.0 - effectiveOpacity))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
@@ -1122,7 +1122,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                 color: bg,
                 shape: const StadiumBorder(),
                 elevation: 3,
-                shadowColor: Colors.black.withValues(alpha: 0.2),
+                shadowColor: Colors.black.withOpacity(0.2),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   child: Text(
@@ -1572,7 +1572,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   border: Border.all(color: Colors.white, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: primary.withValues(alpha: 0.22),
+                      color: primary.withOpacity(0.22),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1966,7 +1966,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                           child: Container(
                             padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 4.h),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(12.h),
                             ),
                             child: Text(
@@ -1988,7 +1988,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                 Container(
                                   width: double.infinity,
                                   height: double.infinity,
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
+                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.18),
                                 ),
                                 // Animated fill + knob
                                 TweenAnimationBuilder<double>(
@@ -2008,7 +2008,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                             gradient: LinearGradient(
                                               colors: [
                                                 primary,
-                                                primary.withValues(alpha: 0.85),
+                                                primary.withOpacity(0.85),
                                               ],
                                             ),
                                           ),
@@ -2026,13 +2026,13 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                               const BoxShadow(color: Color(0x1A000000), blurRadius: 4, offset: Offset(0, 2)),
                                               if (nearLevelUp)
                                                 BoxShadow(
-                                                  color: primary.withValues(alpha: 0.30),
+                                                  color: primary.withOpacity(0.30),
                                                   blurRadius: 14,
                                                   spreadRadius: 1.0,
                                                 ),
                                               if (flash)
                                                 BoxShadow(
-                                                  color: primary.withValues(alpha: 0.55),
+                                                  color: primary.withOpacity(0.55),
                                                   blurRadius: 22,
                                                   spreadRadius: 2.0,
                                                 ),
@@ -2411,7 +2411,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                   boxShadow: _reminderOn
                       ? [
                           BoxShadow(
-                            color: primary.withValues(alpha: 0.12),
+                            color: primary.withOpacity(0.12),
                             blurRadius: 18,
                             offset: const Offset(0, 8),
                           ),
@@ -2480,7 +2480,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                                       boxShadow: _reminderOn
                                           ? [
                                               BoxShadow(
-                                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
+                                                color: Theme.of(context).colorScheme.primary.withOpacity(0.35),
                                                 blurRadius: 14,
                                                 spreadRadius: 1,
                                                 offset: const Offset(0, 3),
@@ -2785,7 +2785,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: primary.withValues(alpha: 0.18),
+                      color: primary.withOpacity(0.18),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     )
@@ -2912,7 +2912,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                           border: Border.all(color: const Color(0xFFE0E6EE)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: _whiteAlpha),
+                              color: Colors.black.withOpacity(_whiteAlpha),
                               blurRadius: _whiteBlur,
                               offset: const Offset(0, 4),
                             ),
@@ -2942,7 +2942,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                           border: Border.all(color: const Color(0xFFE0E6EE)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: _whiteAlpha),
+                              color: Colors.black.withOpacity(_whiteAlpha),
                               blurRadius: _whiteBlur,
                               offset: const Offset(0, 4),
                             ),
@@ -2974,7 +2974,7 @@ class _WellnessDashboardScreenState extends State<WellnessDashboardScreen>
                           borderRadius: BorderRadius.circular(18.h),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: _xpAlpha),
+                              color: Theme.of(context).colorScheme.primary.withOpacity(_xpAlpha),
                               blurRadius: _xpBlur,
                               offset: const Offset(0, 6),
                             ),

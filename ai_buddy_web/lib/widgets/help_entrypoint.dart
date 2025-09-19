@@ -54,7 +54,7 @@ class _HelpIconButton extends StatelessWidget {
       child: Tooltip(
         message: 'Help & Crisis resources',
         child: Material(
-          color: theme.colorScheme.surface.withValues(alpha: 0.9),
+          color: theme.colorScheme.surface.withOpacity(0.9),
           shape: const CircleBorder(),
           elevation: 1,
           child: IconButton(
@@ -76,7 +76,7 @@ class _HelpFloatingIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     // Static styling: no risk-based color or animation
-    final Color fill = theme.colorScheme.surface.withValues(alpha: 0.9);
+    final Color fill = theme.colorScheme.surface.withOpacity(0.9);
     final Color iconColor = theme.colorScheme.primary;
     return Semantics(
       button: true,
