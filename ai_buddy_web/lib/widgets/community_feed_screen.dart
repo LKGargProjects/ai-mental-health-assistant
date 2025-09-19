@@ -163,6 +163,13 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     int remaining = 280;
     bool posting = false;
 
+    // Analytics: user opened composer
+    logAnalyticsEvent('community_compose_open', metadata: {
+      'topic': selectedTopic ?? 'All',
+      'surface': 'community_tab',
+      'ts': DateTime.now().millisecondsSinceEpoch,
+    });
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -260,6 +267,13 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text('Posted')),
                                   );
+                                  // Analytics: post submitted successfully
+                                  logAnalyticsEvent('community_compose_submit', metadata: {
+                                    'post_id': created.id,
+                                    'topic': created.topic,
+                                    'surface': 'community_tab',
+                                    'ts': DateTime.now().millisecondsSinceEpoch,
+                                  });
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(

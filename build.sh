@@ -58,8 +58,8 @@ echo "Getting Flutter dependencies..."
 flutter pub get
 
 # Build with error handling and validation
-echo "Building Flutter web app with release configuration..."
-if flutter build web --release; then
+echo "Building Flutter web app with release configuration (no PWA SW cache)..."
+if flutter build web --release --pwa-strategy=none; then
     echo "✅ Flutter build completed successfully!"
     
     # Verify build output
