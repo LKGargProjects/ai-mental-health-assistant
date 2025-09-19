@@ -6,21 +6,26 @@ class CommunityProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
 
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   String? _error;
   bool _hasLoaded = false;
   String? _selectedTopic; // null => All
   final List<CommunityPost> _posts = [];
   DateTime? _lastPostAt; // client-side cooldown anchor
+  Map<String, dynamic>? _nextCursor;
+  bool _hasMore = true;
   // Feature flags
   bool _communityEnabled = true;
   bool _postingEnabled = true;
   bool _templatesOnly = false;
 
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   String? get error => _error;
   bool get hasLoaded => _hasLoaded;
   String? get selectedTopic => _selectedTopic;
   List<CommunityPost> get posts => List.unmodifiable(_posts);
+  bool get hasMore => _hasMore;
   bool get communityEnabled => _communityEnabled;
   bool get postingEnabled => _postingEnabled;
   bool get templatesOnly => _templatesOnly;
@@ -56,10 +61,12 @@ class CommunityProvider extends ChangeNotifier {
 
     try {
       _selectedTopic = (topic != null && topic.trim().isNotEmpty) ? topic.trim() : null;
-      final items = await _api.getCommunityFeed(topic: _selectedTopic, limit: 20);
+      final page = await _api.getCommunityFeedPage(topic: _selectedTopic, limit: 20);
       _posts
         ..clear()
-        ..addAll(items);
+        ..addAll(page.items);
+      _nextCursor = page.nextCursor;
+      _hasMore = page.nextCursor != null && page.items.isNotEmpty;
       _hasLoaded = true;
     } catch (e) {
       _error = 'Failed to load community feed';
@@ -69,6 +76,32 @@ class CommunityProvider extends ChangeNotifier {
       }
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchMore() async {
+    if (_isLoading || _isLoadingMore || !_hasMore) return;
+    _isLoadingMore = true;
+    notifyListeners();
+    try {
+      final page = await _api.getCommunityFeedPage(
+        topic: _selectedTopic,
+        limit: 20,
+        cursor: _nextCursor,
+      );
+      if (page.items.isNotEmpty) {
+        _posts.addAll(page.items);
+      }
+      _nextCursor = page.nextCursor;
+      _hasMore = page.nextCursor != null && page.items.isNotEmpty;
+    } catch (e) {
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('Community load more error: $e');
+      }
+    } finally {
+      _isLoadingMore = false;
       notifyListeners();
     }
   }

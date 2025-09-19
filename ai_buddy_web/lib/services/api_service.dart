@@ -191,16 +191,42 @@ class ApiService {
 
   /// Community: fetch curated feed (read-only Phase 0)
   Future<List<CommunityPost>> getCommunityFeed({String? topic, int limit = 20}) async {
+    final page = await getCommunityFeedPage(topic: topic, limit: limit);
+    return page.items;
+  }
+
+  /// Community: paginated feed with cursor
+  Future<CommunityFeedPage> getCommunityFeedPage({
+    String? topic,
+    int limit = 20,
+    Map<String, dynamic>? cursor,
+  }) async {
     return _retryOperation(() async {
       await _getSessionId();
       final params = <String, dynamic>{'limit': limit};
       if (topic != null && topic.trim().isNotEmpty) {
         params['topic'] = topic.trim();
       }
+      if (cursor != null) {
+        if (cursor['before_created_at'] != null) {
+          params['before_created_at'] = cursor['before_created_at'];
+        }
+        if (cursor['before_id'] != null) {
+          params['before_id'] = cursor['before_id'];
+        }
+      }
       final response = await _dio.get('/api/community/feed', queryParameters: params);
       final data = response.data as Map<String, dynamic>;
       final List<dynamic> items = (data['items'] as List<dynamic>? ?? const []);
-      return items.map((e) => CommunityPost.fromJson(Map<String, dynamic>.from(e))).toList();
+      final nextCursor = data['next_cursor'] == null
+          ? null
+          : Map<String, dynamic>.from(data['next_cursor'] as Map);
+      return CommunityFeedPage(
+        items: items
+            .map((e) => CommunityPost.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+        nextCursor: nextCursor,
+      );
     });
   }
 
@@ -577,4 +603,12 @@ class ApiService {
   void dispose() {
     _dio.close();
   }
+}
+
+/// Community feed page with cursor
+class CommunityFeedPage {
+  final List<CommunityPost> items;
+  final Map<String, dynamic>? nextCursor;
+
+  CommunityFeedPage({required this.items, this.nextCursor});
 }

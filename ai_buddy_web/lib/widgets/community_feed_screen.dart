@@ -571,82 +571,98 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                       'ts': DateTime.now().millisecondsSinceEpoch,
                     });
                   },
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(top: 8, bottom: 16),
-                    itemCount: cp.posts.length + 2, // +2 pinned cards
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return _PinnedGuidelinesCard();
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notif) {
+                      if (notif is ScrollUpdateNotification) {
+                        final metrics = notif.metrics;
+                        if (metrics.pixels >= metrics.maxScrollExtent - 300) {
+                          if (cp.hasMore && !cp.isLoadingMore) {
+                            context.read<CommunityProvider>().fetchMore();
+                          }
+                        }
                       }
-                      if (index == 1) {
-                        return _PinnedCrisisResourcesCard();
-                      }
-                      final p = cp.posts[index - 2];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: const Color(0xFFE0E6EE)),
-                        ),
-                        elevation: 0,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 8, height: 8,
-                                        decoration: BoxDecoration(color: color.primary, shape: BoxShape.circle),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(p.topic, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                      if (p.createdAt != null) ...[
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          '•  ${_relativeTime(p.createdAt!)}',
-                                          style: const TextStyle(fontSize: 11, color: Colors.black54),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  const Spacer(),
-                                  PopupMenuButton<String>(
-                                    tooltip: 'More',
-                                    icon: const Icon(Icons.more_horiz, size: 20, color: Colors.black54),
-                                    onSelected: (v) {
-                                      if (v == 'report') _showReportDialog(postId: p.id);
-                                    },
-                                    itemBuilder: (ctx) => const [
-                                      PopupMenuItem<String>(value: 'report', child: Text('Report')),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Builder(builder: (_) {
-                                final expanded = _expandedPosts.contains(p.id);
-                                final shouldTruncate = p.body.length > 180;
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                      return false;
+                    },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(top: 8, bottom: 16),
+                      itemCount: cp.posts.length + 2 + (cp.hasMore ? 1 : 0), // +2 pinned, +1 loading/footer when hasMore
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return _PinnedGuidelinesCard();
+                        }
+                        if (index == 1) {
+                          return _PinnedCrisisResourcesCard();
+                        }
+                        final postsCountWithPinned = cp.posts.length + 2;
+                        if (index >= postsCountWithPinned) {
+                          return const _LoadingFooter();
+                        }
+                        final p = cp.posts[index - 2];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: const Color(0xFFE0E6EE)),
+                          ),
+                          elevation: 0,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    Text(
-                                      p.body,
-                                      maxLines: expanded ? null : 4,
-                                      overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 8, height: 8,
+                                          decoration: BoxDecoration(color: color.primary, shape: BoxShape.circle),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(p.topic, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                        if (p.createdAt != null) ...[
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '•  ${_relativeTime(p.createdAt!)}',
+                                            style: const TextStyle(fontSize: 11, color: Colors.black54),
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                    if (shouldTruncate)
-                                      TextButton(
-                                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
-                                        onPressed: () => _toggleExpanded(p.id),
-                                        child: Text(expanded ? 'Show less' : 'Read more'),
-                                      ),
+                                    const Spacer(),
+                                    PopupMenuButton<String>(
+                                      tooltip: 'More',
+                                      icon: const Icon(Icons.more_horiz, size: 20, color: Colors.black54),
+                                      onSelected: (v) {
+                                        if (v == 'report') _showReportDialog(postId: p.id);
+                                      },
+                                      itemBuilder: (ctx) => const [
+                                        PopupMenuItem<String>(value: 'report', child: Text('Report')),
+                                      ],
+                                    ),
                                   ],
-                                );
-                              }),
+                                ),
+                                const SizedBox(height: 8),
+                                Builder(builder: (_) {
+                                  final expanded = _expandedPosts.contains(p.id);
+                                  final shouldTruncate = p.body.length > 180;
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p.body,
+                                        maxLines: expanded ? null : 4,
+                                        overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                                      ),
+                                      if (shouldTruncate)
+                                        TextButton(
+                                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+                                          onPressed: () => _toggleExpanded(p.id),
+                                          child: Text(expanded ? 'Show less' : 'Read more'),
+                                        ),
+                                    ],
+                                  );
+                                }),
                               const SizedBox(height: 12),
                               Row(
                                 children: [
@@ -704,7 +720,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                           ),
                         ),
                       );
-                    },
+                      },
+                    ),
                   ),
                 );
               },
@@ -754,6 +771,24 @@ class _ReactionChip extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LoadingFooter extends StatelessWidget {
+  const _LoadingFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final cp = context.watch<CommunityProvider>();
+    if (!cp.hasMore && !cp.isLoadingMore) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Center(
+        child: cp.isLoadingMore
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+            : const SizedBox.shrink(),
       ),
     );
   }

@@ -208,11 +208,39 @@ def register_community_routes(app: Flask) -> None:
                 limit = 20
             limit = max(1, min(limit, 50))
 
+            # Keyset cursor for infinite scroll
+            before_created_at_raw = (request.args.get('before_created_at') or '').strip()
+            before_id_raw = (request.args.get('before_id') or '').strip()
+            before_created_at: Optional[datetime] = None
+            before_id: Optional[int] = None
+            if before_created_at_raw:
+                try:
+                    # Accept isoformat; if parse fails, ignore cursor
+                    before_created_at = datetime.fromisoformat(before_created_at_raw)
+                except Exception:
+                    before_created_at = None
+            if before_id_raw:
+                try:
+                    before_id = int(before_id_raw)
+                except Exception:
+                    before_id = None
+
             q = "SELECT id, topic, body_redacted, created_at, reactions_relate, reactions_helped, reactions_strength FROM community_posts"
             params: Dict[str, Any] = {}
+            where_clauses: List[str] = []
             if topic:
-                q += " WHERE topic = :topic"
+                where_clauses.append("topic = :topic")
                 params['topic'] = topic
+
+            # Apply keyset cursor: fetch items strictly older than (created_at, id)
+            if before_created_at is not None and before_id is not None:
+                where_clauses.append("(created_at < :bts OR (created_at = :bts AND id < :bid))")
+                params['bts'] = before_created_at
+                params['bid'] = before_id
+
+            if where_clauses:
+                q += " WHERE " + " AND ".join(where_clauses)
+
             q += " ORDER BY created_at DESC, id DESC LIMIT :limit"
             params['limit'] = limit
 
@@ -231,7 +259,16 @@ def register_community_routes(app: Flask) -> None:
                         'strength': r.reactions_strength or 0,
                     }
                 })
-            return jsonify({'items': items, 'count': len(items)}), 200
+            # Prepare next cursor from the last item (if any)
+            next_cursor: Optional[Dict[str, Any]] = None
+            if len(items) == limit:
+                last = items[-1]
+                if last.get('created_at') is not None and last.get('id') is not None:
+                    next_cursor = {
+                        'before_created_at': last['created_at'],
+                        'before_id': last['id'],
+                    }
+            return jsonify({'items': items, 'count': len(items), 'next_cursor': next_cursor}), 200
         except Exception as e:
             try:
                 app.logger.error(f"Community feed error: {e}")
