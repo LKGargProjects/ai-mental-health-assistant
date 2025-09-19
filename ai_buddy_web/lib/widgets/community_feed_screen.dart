@@ -448,10 +448,14 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
       floatingActionButton: Consumer<CommunityProvider>(
         builder: (context, cp, _) {
           if (!cp.postingEnabled) return const SizedBox.shrink();
-          return FloatingActionButton.extended(
-            onPressed: _openComposeSheet,
-            icon: const Icon(Icons.edit),
-            label: const Text('Compose'),
+          return Semantics(
+            button: true,
+            label: 'Compose a new community post',
+            child: FloatingActionButton.extended(
+              onPressed: _openComposeSheet,
+              icon: const Icon(Icons.edit),
+              label: const Text('Compose'),
+            ),
           );
         },
       ),
@@ -530,7 +534,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     }
                     final bool active = (t == sel);
                     return ChoiceChip(
-                      label: Text(t),
+                      label: Text(t, semanticsLabel: 'Topic: $t'),
                       selected: active,
                       onSelected: (_) => _onSelectTopic(t),
                       selectedColor: color.primary.withOpacity(0.15),
@@ -749,33 +753,36 @@ class _ReactionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.primary.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE0E6EE)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: color.primary),
-            const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: color.primary)),
-            if (count > 0) ...[
+    return Semantics(
+      button: true,
+      label: count > 0 ? '$label, $count' : label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.primary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE0E6EE)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color.primary),
               const SizedBox(width: 6),
-              Text('$count', style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(label, style: TextStyle(color: color.primary)),
+              if (count > 0) ...[
+                const SizedBox(width: 6),
+                Text('$count', style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 }
-
 class _LoadingFooter extends StatelessWidget {
   const _LoadingFooter();
 

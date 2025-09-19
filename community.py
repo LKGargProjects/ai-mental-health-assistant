@@ -72,6 +72,7 @@ def _ensure_tables() -> None:
                     topic VARCHAR(64),
                     body_redacted TEXT NOT NULL,
                     is_curated BOOLEAN DEFAULT TRUE,
+                    is_hidden BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     reactions_relate INTEGER DEFAULT 0,
                     reactions_helped INTEGER DEFAULT 0,
@@ -102,7 +103,23 @@ def _ensure_tables() -> None:
                 )
                 """
             ))
-        db.session.commit()
+        # Attempt to add is_hidden column for sqlite if missing
+        try:
+            d = _dialect()
+            if d == "sqlite":
+                # SQLite: naive attempt to add column; ignore if exists
+                try:
+                    db.session.execute(text("ALTER TABLE community_posts ADD COLUMN is_hidden INTEGER DEFAULT 0"))
+                except Exception:
+                    pass
+            elif d not in {"unknown"}:
+                # Postgres: ensure column exists (IF NOT EXISTS is supported)
+                try:
+                    db.session.execute(text("ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT FALSE"))
+                except Exception:
+                    pass
+        finally:
+            db.session.commit()
     except Exception:
         try:
             db.session.rollback()
@@ -228,6 +245,8 @@ def register_community_routes(app: Flask) -> None:
             q = "SELECT id, topic, body_redacted, created_at, reactions_relate, reactions_helped, reactions_strength FROM community_posts"
             params: Dict[str, Any] = {}
             where_clauses: List[str] = []
+            # Always exclude hidden posts
+            where_clauses.append("COALESCE(is_hidden, FALSE) = FALSE")
             if topic:
                 where_clauses.append("topic = :topic")
                 params['topic'] = topic
@@ -275,6 +294,85 @@ def register_community_routes(app: Flask) -> None:
             except Exception:
                 pass
             return jsonify({'error': 'Failed to fetch feed'}), 500
+
+    def _check_admin() -> bool:
+        try:
+            token = (request.headers.get('X-Admin-Token') or '').strip()
+            expected = str(app.config.get('ADMIN_TOKEN') or '').strip()
+            return bool(token) and expected and token == expected
+        except Exception:
+            return False
+
+    @app.route('/api/community/reports', methods=['GET'])
+    def community_reports_list():
+        if not _enabled():
+            return jsonify({"error": "Community disabled"}), 403
+        if not _check_admin():
+            return jsonify({"error": "Unauthorized"}), 401
+        try:
+            try:
+                limit = int(request.args.get('limit', '100'))
+            except Exception:
+                limit = 100
+            limit = max(1, min(limit, 500))
+            rows = db.session.execute(text(
+                """
+                SELECT id, target_type, target_id, reason, notes, created_at
+                FROM community_reports
+                ORDER BY created_at DESC, id DESC
+                LIMIT :limit
+                """
+            ), {"limit": limit}).fetchall()
+            items = []
+            for r in rows:
+                items.append({
+                    'id': r.id,
+                    'target_type': r.target_type,
+                    'target_id': r.target_id,
+                    'reason': r.reason,
+                    'notes': r.notes,
+                    'created_at': r.created_at.isoformat() if getattr(r, 'created_at', None) else None,
+                })
+            return jsonify({'items': items, 'count': len(items)}), 200
+        except Exception as e:
+            try:
+                app.logger.error(f"Community reports list error: {e}")
+            except Exception:
+                pass
+            return jsonify({'error': 'Failed to fetch reports'}), 500
+
+    @app.route('/api/community/moderate', methods=['POST'])
+    def community_moderate():
+        if not _enabled():
+            return jsonify({"error": "Community disabled"}), 403
+        if not _check_admin():
+            return jsonify({"error": "Unauthorized"}), 401
+        try:
+            data = request.get_json(silent=True) or {}
+            action = (data.get('action') or '').strip().lower()
+            post_id = data.get('post_id')
+            if not post_id or action not in {'hide', 'unhide', 'curate'}:
+                return jsonify({'error': 'Invalid moderation action or post_id'}), 400
+
+            if action == 'hide':
+                db.session.execute(text("UPDATE community_posts SET is_hidden = TRUE WHERE id = :pid"), {'pid': post_id})
+            elif action == 'unhide':
+                db.session.execute(text("UPDATE community_posts SET is_hidden = FALSE WHERE id = :pid"), {'pid': post_id})
+            elif action == 'curate':
+                db.session.execute(text("UPDATE community_posts SET is_curated = TRUE WHERE id = :pid"), {'pid': post_id})
+
+            db.session.commit()
+            return jsonify({'ok': True}), 200
+        except Exception as e:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            try:
+                app.logger.error(f"Community moderation error: {e}")
+            except Exception:
+                pass
+            return jsonify({'error': 'Failed to apply moderation action'}), 500
 
     @app.route('/api/community/reaction', methods=['POST'])
     @app.limiter.limit(limits_reaction)
