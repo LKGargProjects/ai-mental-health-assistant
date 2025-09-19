@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -46,12 +46,7 @@ class NotificationService {
       // Optionally handle taps by reading payload in app code if needed later
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         // Forward tap payload to app layer for routing.
-        if (kDebugMode) {
-          try {
-            // ignore: avoid_print
-            print('[Notifications] onTap actionId=${response.actionId} payload=${response.payload}');
-          } catch (_) {}
-        }
+        // Handle notification tap silently
         try {
           onSelectNotification?.call(response.payload);
         } catch (_) {}
@@ -75,11 +70,6 @@ class NotificationService {
     try {
       final launchDetails = await _plugin.getNotificationAppLaunchDetails();
       if ((launchDetails?.didNotificationLaunchApp ?? false)) {
-        if (kDebugMode) {
-          // ignore: avoid_print
-          print('[Notifications] launchedFromNotification payload='
-              '${launchDetails?.notificationResponse?.payload}');
-        }
         onSelectNotification?.call(launchDetails?.notificationResponse?.payload);
       }
     } catch (_) {}
@@ -143,13 +133,7 @@ class NotificationService {
     final tz.TZDateTime tzTarget = tz.TZDateTime.from(target, tz.local);
 
     // Debug logging for scheduling
-    if (kDebugMode) {
-      try {
-        // ignore: avoid_print
-        print('[Notifications][schedule] id='
-            '$id when=${target.toIso8601String()} payload=$payload tag=$debugTag');
-      } catch (_) {}
-    }
+    // Schedule notification silently
 
     await _plugin.zonedSchedule(
       id,

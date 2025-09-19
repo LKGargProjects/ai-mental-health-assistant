@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'loading_footer.dart';
 import '../providers/community_provider.dart';
 import './app_back_button.dart';
 import '../services/analytics_service.dart' show logAnalyticsEvent;
@@ -17,24 +19,28 @@ class CommunityFeedScreen extends StatefulWidget {
 class _PinnedGuidelinesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE0E6EE)),
-      ),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Community Guidelines', style: TextStyle(fontWeight: FontWeight.w600)),
-            SizedBox(height: 8),
-            Text('• Be kind and respectful'),
-            Text('• No personal info (we redact PII)'),
-            Text('• If you see something worrying, report it'),
-          ],
+    return Semantics(
+      container: true,
+      label: 'Community guidelines. Be kind and respectful. No personal info. Report concerning content.',
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFE0E6EE)),
+        ),
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('Community Guidelines', style: TextStyle(fontWeight: FontWeight.w600)),
+              SizedBox(height: 8),
+              Text('• Be kind and respectful'),
+              Text('• No personal info (we redact PII)'),
+              Text('• If you see something worrying, report it'),
+            ],
+          ),
         ),
       ),
     );
@@ -44,22 +50,26 @@ class _PinnedGuidelinesCard extends StatelessWidget {
 class _PinnedCrisisResourcesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE0E6EE)),
-      ),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Need help right now?', style: TextStyle(fontWeight: FontWeight.w600)),
-            SizedBox(height: 8),
-            Text('If you are in immediate danger or thinking about self-harm, please reach out to local emergency services or crisis hotlines.'),
-          ],
+    return Semantics(
+      container: true,
+      label: 'Crisis resources. If you are in immediate danger or thinking about self-harm, please reach out to local emergency services or crisis hotlines.',
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFE0E6EE)),
+        ),
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('Need help right now?', style: TextStyle(fontWeight: FontWeight.w600)),
+              SizedBox(height: 8),
+              Text('If you are in immediate danger or thinking about self-harm, please reach out to local emergency services or crisis hotlines.'),
+            ],
+          ),
         ),
       ),
     );
@@ -306,6 +316,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
       'surface': 'community_tab',
       'ts': DateTime.now().millisecondsSinceEpoch,
     });
+    // Move focus to the first post after topic change for screen readers
+    FocusScope.of(context).requestFocus(FocusNode());
   }
 
   Future<void> _showTopicPicker() async {
@@ -316,27 +328,39 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
       backgroundColor: Colors.white,
       builder: (ctx) {
         final theme = Theme.of(ctx);
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 16.h,
-              right: 16.h,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16.h,
-              top: 12.h,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Choose a topic', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                ..._topicsFull.map((t) => ListTile(
+        return Semantics(
+          explicitChildNodes: true,
+          label: 'Topic picker dialog',
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16.h,
+                right: 16.h,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16.h,
+                top: 12.h,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text('Choose a topic', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._topicsFull.map((t) => Semantics(
+                    button: true,
+                    child: ListTile(
                       dense: true,
                       title: Text(t),
                       onTap: () => Navigator.of(ctx).pop(t),
-                    )),
-              ],
+                      // Add focus node for better keyboard navigation
+                      focusNode: FocusNode(),
+                    ),
+                  )),
+                ],
+              ),
             ),
           ),
         );
@@ -350,6 +374,14 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   Future<void> _showReportDialog({required int postId}) async {
     String reason = 'harm';
     final notesController = TextEditingController();
+    // Using a FocusNode for better keyboard navigation in the report dialog
+    final FocusNode notesFocusNode = FocusNode();
+    
+    // Helper function to clean up resources
+    void cleanup() {
+      notesController.dispose();
+      notesFocusNode.dispose();
+    }
 
     await showModalBottomSheet(
       context: context,
@@ -359,83 +391,111 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            left: 16, right: 16, top: 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Report post', style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              ...[
-                {'key': 'harm', 'label': 'Harmful content'},
-                {'key': 'pii', 'label': 'Personal information'},
-                {'key': 'bullying', 'label': 'Bullying or harassment'},
-                {'key': 'misinformation', 'label': 'Misinformation'},
-                {'key': 'other', 'label': 'Other'},
-              ].map((opt) => RadioListTile<String>(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    value: opt['key']!,
-                    groupValue: reason,
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() => reason = v);
-                      }
-                    },
-                    title: Text(opt['label']!),
-                  )),
-              const SizedBox(height: 8),
-              TextField(
-                controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  border: OutlineInputBorder(),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Semantics(
+              explicitChildNodes: true,
+              label: 'Report post dialog',
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                  left: 16, 
+                  right: 16, 
+                  top: 16,
                 ),
-                minLines: 2,
-                maxLines: 4,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        'Report post', 
+                        style: Theme.of(ctx).textTheme.titleMedium,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...[
+                      {'key': 'harm', 'label': 'Harmful content'},
+                      {'key': 'pii', 'label': 'Personal information'},
+                      {'key': 'bullying', 'label': 'Bullying or harassment'},
+                      {'key': 'misinformation', 'label': 'Misinformation'},
+                      {'key': 'other', 'label': 'Other'},
+                    ].map((opt) => RadioListTile<String>(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          value: opt['key']!,
+                          groupValue: reason,
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => reason = v);
+                            }
+                          },
+                          title: Text(opt['label']!),
+                        )),
+                    const SizedBox(height: 8),
+                    Semantics(
+                      textField: true,
+                      hint: 'Additional details (optional)',
+                      child: TextField(
+                        controller: notesController,
+                        focusNode: notesFocusNode,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          hintText: 'Additional details (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Semantics(
+                          button: true,
+                          child: TextButton(
+                            onPressed: () {
+                              cleanup();
+                              Navigator.of(ctx).pop();
+                            },
+                            child: const Text('CANCEL'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Semantics(
+                          button: true,
+                          child: ElevatedButton(
+                            autofocus: true, // Focus submit button by default
+                            onPressed: () {
+                              // Report the post
+                              context.read<CommunityProvider>().report(
+                                postId,
+                                reason,
+                                notes: notesController.text,
+                              );
+                              cleanup();
+                              Navigator.of(ctx).pop();
+                              
+                              // Show confirmation message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Report submitted. Thank you!'),
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                            },
+                            child: const Text('SUBMIT'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () async {
-                      await context.read<CommunityProvider>().report(
-                            postId,
-                            reason,
-                            notes: notesController.text.trim().isEmpty
-                                ? null
-                                : notesController.text.trim(),
-                          );
-                      logAnalyticsEvent('community_report_submit', metadata: {
-                        'post_id': postId,
-                        'reason': reason,
-                        'surface': 'community_tab',
-                        'ts': DateTime.now().millisecondsSinceEpoch,
-                      });
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Thanks for your report')),
-                      );
-                    },
-                    child: const Text('Submit'),
-                  )
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -599,7 +659,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                         }
                         final postsCountWithPinned = cp.posts.length + 2;
                         if (index >= postsCountWithPinned) {
-                          return const _LoadingFooter();
+                          return const LoadingFooter();
                         }
                         final p = cp.posts[index - 2];
                         return Card(
@@ -737,7 +797,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   }
 }
 
-class _ReactionChip extends StatelessWidget {
+class _ReactionChip extends StatefulWidget {
   final IconData icon;
   final String label;
   final int count;
@@ -751,53 +811,100 @@ class _ReactionChip extends StatelessWidget {
   });
 
   @override
+  _ReactionChipState createState() => _ReactionChipState();
+}
+
+class _ReactionChipState extends State<_ReactionChip> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
-    return Semantics(
-      button: true,
-      label: count > 0 ? '$label, $count' : label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: color.primary.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE0E6EE)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: color.primary),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(color: color.primary)),
-              if (count > 0) ...[
-                const SizedBox(width: 6),
-                Text('$count', style: const TextStyle(fontWeight: FontWeight.w600)),
-              ],
-            ],
+    
+    return Focus(
+      focusNode: _focusNode,
+      onFocusChange: (hasFocus) {
+        setState(() => _isFocused = hasFocus);
+      },
+      onKey: (node, event) {
+        if (event is RawKeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Semantics(
+            button: true,
+            label: widget.count > 0
+                ? '${widget.label}, ${widget.count}'
+                : widget.label,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _isFocused
+                    ? color.primary.withOpacity(0.1)
+                    : color.primary.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _isFocused ? color.primary : const Color(0xFFE0E6EE),
+                  width: _isFocused ? 2.0 : 1.0,
+                ),
+                boxShadow: _isFocused
+                    ? [
+                        BoxShadow(
+                          color: color.primary.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(widget.icon, size: 16, color: color.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: color.primary,
+                      fontWeight: _isFocused ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                  if (widget.count > 0) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '${widget.count}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: _isFocused ? color.primary : null,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 }
-class _LoadingFooter extends StatelessWidget {
-  const _LoadingFooter();
 
-  @override
-  Widget build(BuildContext context) {
-    final cp = context.watch<CommunityProvider>();
-    if (!cp.hasMore && !cp.isLoadingMore) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Center(
-        child: cp.isLoadingMore
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-            : const SizedBox.shrink(),
-      ),
-    );
-  }
-}
+// Loading footer has been moved to a separate file for better testability
+// See: lib/widgets/loading_footer.dart
  

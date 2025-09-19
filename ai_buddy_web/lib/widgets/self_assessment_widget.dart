@@ -102,7 +102,8 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
       final int xpAwarded = ((response['xp_awarded']) is num)
           ? (response['xp_awarded'] as num).toInt()
           : 0;
-      final bool alreadyCompletedToday = response['already_completed_today'] == true;
+      final bool alreadyCompletedToday =
+          response['already_completed_today'] == true;
 
       // Apply XP to progress provider
       if (xpAwarded > 0 && mounted) {
@@ -116,9 +117,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
             : (xpAwarded > 0
                 ? 'Assessment submitted! +$xpAwarded XP'
                 : 'Assessment submitted successfully.');
-        final color = alreadyCompletedToday
-            ? Colors.orange
-            : Colors.green;
+        final color = alreadyCompletedToday ? Colors.orange : Colors.green;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(snackText),
@@ -185,8 +184,8 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
             int cols = w > 400
                 ? 6
                 : w > 350
-                ? 5
-                : 4;
+                    ? 5
+                    : 4;
 
             return GridView.builder(
               shrinkWrap: true,
@@ -325,9 +324,8 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               width: double.infinity,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: _selectedCrisisLevel.isEmpty
-                    ? null
-                    : _selectedCrisisLevel,
+                initialValue:
+                    _selectedCrisisLevel.isEmpty ? null : _selectedCrisisLevel,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: 'Select crisis level (if applicable)',
@@ -367,7 +365,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               width: double.infinity,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: _selectedAnxietyLevel.isEmpty
+                initialValue: _selectedAnxietyLevel.isEmpty
                     ? null
                     : _selectedAnxietyLevel,
                 decoration: const InputDecoration(

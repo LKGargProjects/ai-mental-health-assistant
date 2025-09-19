@@ -7,6 +7,7 @@ class CommunityProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   bool _isLoadingMore = false;
+  bool _loadMoreError = false;
   String? _error;
   bool _hasLoaded = false;
   String? _selectedTopic; // null => All
@@ -21,6 +22,7 @@ class CommunityProvider extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
   bool get isLoadingMore => _isLoadingMore;
+  bool get loadMoreError => _loadMoreError;
   String? get error => _error;
   bool get hasLoaded => _hasLoaded;
   String? get selectedTopic => _selectedTopic;
@@ -46,16 +48,13 @@ class CommunityProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       // Keep defaults on error; do not block UI
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('Community flags fetch error: $e');
-      }
     }
   }
 
   Future<void> loadFeed({String? topic}) async {
     if (_isLoading) return;
     _isLoading = true;
+    _loadMoreError = false;
     _error = null;
     notifyListeners();
 
@@ -68,12 +67,9 @@ class CommunityProvider extends ChangeNotifier {
       _nextCursor = page.nextCursor;
       _hasMore = page.nextCursor != null && page.items.isNotEmpty;
       _hasLoaded = true;
+      _loadMoreError = false;
     } catch (e) {
       _error = 'Failed to load community feed';
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('Community load error: $e');
-      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -83,6 +79,7 @@ class CommunityProvider extends ChangeNotifier {
   Future<void> fetchMore() async {
     if (_isLoading || _isLoadingMore || !_hasMore) return;
     _isLoadingMore = true;
+    _loadMoreError = false;
     notifyListeners();
     try {
       final page = await _api.getCommunityFeedPage(
@@ -95,11 +92,9 @@ class CommunityProvider extends ChangeNotifier {
       }
       _nextCursor = page.nextCursor;
       _hasMore = page.nextCursor != null && page.items.isNotEmpty;
+      _loadMoreError = false;
     } catch (e) {
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('Community load more error: $e');
-      }
+      _loadMoreError = true;
     } finally {
       _isLoadingMore = false;
       notifyListeners();
@@ -134,10 +129,6 @@ class CommunityProvider extends ChangeNotifier {
       return created;
     } catch (e) {
       _error = 'Failed to create post';
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('Community compose error: $e');
-      }
       notifyListeners();
       return null;
     }
@@ -161,10 +152,7 @@ class CommunityProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('Community react error: $e');
-      }
+      // Handle error silently
     }
   }
 
@@ -172,10 +160,7 @@ class CommunityProvider extends ChangeNotifier {
     try {
       await _api.reportCommunityPost(postId: postId, reason: reason, notes: notes);
     } catch (e) {
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('Community report error: $e');
-      }
+      // Handle error silently
     }
   }
 }
