@@ -457,6 +457,9 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                               case 'safety':
                                 await showSafetyLegalSheet(context);
                                 break;
+                              case 'settings':
+                                Navigator.of(context).pushNamed('/settings');
+                                break;
                             }
                           },
                           itemBuilder: (context) => [
@@ -467,6 +470,10 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                             const PopupMenuItem<String>(
                               value: 'safety',
                               child: Text('Safety & Legal'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'settings',
+                              child: Text('Settings'),
                             ),
                           ],
                         ),
@@ -602,18 +609,22 @@ class _InteractiveChatScreenState extends State<InteractiveChatScreen> {
                           SizedBox(
                             width: 74.h,
                             child: Center(
-                              child: GestureDetector(
-                                onTap: _sendMessage,
-                                child: Container(
-                                  padding: EdgeInsets.all(10.h),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).primaryColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.send,
-                                    color: Colors.white,
-                                    size: 32.h,
+                              child: Semantics(
+                                button: true,
+                                label: 'Send message',
+                                child: GestureDetector(
+                                  onTap: _sendMessage,
+                                  child: Container(
+                                    padding: EdgeInsets.all(10.h),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).primaryColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.send,
+                                      color: Colors.white,
+                                      size: 32.h,
+                                    ),
                                   ),
                                 ),
                               ),

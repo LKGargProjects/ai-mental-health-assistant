@@ -23,6 +23,7 @@ import 'navigation/route_observer.dart';
 import 'navigation/home_shell.dart';
 import 'widgets/app_bottom_nav.dart' show AppTab;
 import 'services/analytics_service.dart' show logAnalyticsEvent;
+import 'screens/settings_screen.dart';
 import 'services/notification_service.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 
@@ -200,6 +201,7 @@ class _MyAppState extends State<MyApp> {
                       dhiwise_wellness.WellnessDashboardScreen(),
                 ),
                 '/quests-list': (context) => const dhiwise_quest.QuestScreen(),
+                '/settings': (context) => const SettingsScreen(),
               },
             );
           },
