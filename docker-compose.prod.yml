@@ -1,0 +1,293 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # PRODUCTION STACK FOR GENTLEQUEST
+  # =============================================================================
+  
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: gentlequest_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/cache:/var/cache/nginx
+      - ./build/web:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    networks:
+      - gentlequest-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend API Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_ENV=production
+    container_name: gentlequest_backend
+    environment:
+      - ENVIRONMENT=production
+      - RENDER=false
+      - DOCKER_ENV=true
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PPLX_API_KEY=${PPLX_API_KEY}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - ADMIN_API_TOKEN=${ADMIN_API_TOKEN}
+      - MESSAGE_RETENTION_DAYS=${MESSAGE_RETENTION_DAYS:-30}
+      - SESSION_RETENTION_DAYS=${SESSION_RETENTION_DAYS:-14}
+      - ANALYTICS_RETENTION_DAYS=${ANALYTICS_RETENTION_DAYS:-90}
+      - SENTRY_DSN_BACKEND=${SENTRY_DSN_BACKEND}
+      - COMMUNITY_ENABLED=true
+      - COMMUNITY_POSTING_ENABLED=${COMMUNITY_POSTING_ENABLED:-false}
+    volumes:
+      - ./instance:/app/instance
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    depends_on:
+      - db
+      - redis
+    networks:
+      - gentlequest-network
+    restart: always
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: gentlequest_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gentlequest}
+      POSTGRES_USER: ${POSTGRES_USER:-gentlequest}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./backups/postgres:/backups
+    networks:
+      - gentlequest-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gentlequest} -d ${POSTGRES_DB:-gentlequest}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=1310kB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=4
+      -c max_parallel_workers_per_gather=2
+      -c max_parallel_workers=4
+      -c max_parallel_maintenance_workers=2
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gentlequest_redis
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --appendonly yes
+      --appendfsync everysec
+      --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - gentlequest-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: gentlequest_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - gentlequest-network
+    restart: always
+    depends_on:
+      - backend
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: gentlequest_grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=redis-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - gentlequest-network
+    restart: always
+    depends_on:
+      - prometheus
+
+  # Log Aggregation - Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: gentlequest_loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - gentlequest-network
+    restart: always
+
+  # Log Shipper - Promtail
+  promtail:
+    image: grafana/promtail:latest
+    container_name: gentlequest_promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - ./logs:/var/log/gentlequest:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - gentlequest-network
+    restart: always
+    depends_on:
+      - loki
+
+  # Backup Service
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: gentlequest_backup
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET}
+      - BACKUP_ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-"0 3 * * *"}
+    volumes:
+      - ./backups:/app/backups
+      - ./scripts:/app/scripts:ro
+    networks:
+      - gentlequest-network
+    restart: always
+    depends_on:
+      - db
+
+  # Health Check Dashboard
+  healthcheck:
+    image: willfarrell/autoheal:latest
+    container_name: gentlequest_autoheal
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=30
+      - AUTOHEAL_START_DELAY=60
+      - DOCKER_SOCK=/var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - gentlequest-network
+    restart: always
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+
+networks:
+  gentlequest-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: br-gentlequest

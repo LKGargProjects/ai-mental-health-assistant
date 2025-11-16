@@ -4,25 +4,26 @@ Optimized for single codebase usage across development, Docker, and Render produ
 """
 
 import os
-import json
-import uuid
+import socket
 import re
 import logging
+import json
+import random
 import redis
+import requests
+import time
+import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, Tuple, List
-
-from flask import Flask, request, jsonify, session, send_from_directory, Response, g
+from typing import Dict, Optional, List, Any, Tuple
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from flask import Flask, request, jsonify, send_from_directory, g, session, Response
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
 from flask_session import Session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_cors import CORS
+from sqlalchemy import text, func
 from dotenv import load_dotenv
-import socket
-import time
-from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
 # Load environment variables
 load_dotenv()
@@ -33,8 +34,17 @@ from providers.perplexity import get_perplexity_response
 from providers.openai import get_openai_response
 from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
 from crisis_detection import detect_crisis_level
-import requests
+from crisis_resources import get_crisis_response_and_resources, get_country_from_request
 from community import register_community_routes
+
+# Import enterprise integration
+try:
+    from integrations import integrate_with_app, process_chat_with_enterprise
+    ENTERPRISE_FEATURES = True
+except ImportError as e:
+    ENTERPRISE_FEATURES = False
+    print(f"Enterprise features not available: {e}")
+
 try:
     import sentry_sdk
     from sentry_sdk.integrations.flask import FlaskIntegration
@@ -476,6 +486,16 @@ def create_app() -> Flask:
         app.logger.info("Community routes registered")
     except Exception as e:
         app.logger.warning(f"Community routes failed to register: {e}")
+    
+    # Initialize Enterprise Features
+    if ENTERPRISE_FEATURES:
+        try:
+            integrate_with_app(app)
+            app.logger.info("✅ Enterprise features integrated successfully")
+        except Exception as e:
+            app.logger.warning(f"⚠️ Enterprise features integration failed: {e}")
+    else:
+        app.logger.info("ℹ️ Enterprise features not enabled")
     
     # Attach a request ID to each request and response for traceability
     @app.before_request
