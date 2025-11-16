@@ -12,7 +12,7 @@ from typing import Optional, Dict, Tuple, Any
 from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 import json
 
@@ -42,7 +42,7 @@ class SecurityManager:
         
     def _derive_key(self, master_key: str, purpose: bytes) -> bytes:
         """Derive a purpose-specific key from master key"""
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=purpose,
@@ -50,7 +50,7 @@ class SecurityManager:
             backend=default_backend()
         )
         key = base64.urlsafe_b64encode(kdf.derive(master_key.encode()))
-        return key
+        return key[:32]
         
     def encrypt_conversation(self, message: str) -> str:
         """Encrypt conversation messages"""

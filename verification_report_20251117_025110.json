@@ -1,0 +1,31 @@
+{
+  "timestamp": "2025-11-17T02:51:10.807844",
+  "score": "1/30",
+  "percentage": 3.3333333333333335,
+  "status": "NEEDS WORK",
+  "results": {
+    "ai_optimization": {
+      "module_import": false,
+      "score": "0/5 for this section"
+    },
+    "clinical_crisis": {
+      "module_import": false,
+      "score": "0/5"
+    },
+    "revenue": {
+      "module_import": false,
+      "score": "0/5"
+    },
+    "scaling": {
+      "module_import": false,
+      "score": "0/5"
+    },
+    "security": {
+      "module_import": false,
+      "score": "0/5"
+    },
+    "integration": {
+      "score": "1/5"
+    }
+  }
+}
