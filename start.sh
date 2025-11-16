@@ -31,20 +31,26 @@ sleep 2
 # Start Flask application with Gunicorn (backend listens on 5055; nginx proxies /api to it)
 echo "Starting Flask application..."
 # Wait for dependencies (Postgres, Redis) to be ready
-DB_HOST="db"
-DB_USER="${POSTGRES_USER:-ai_buddy}"
-DB_NAME="${POSTGRES_DB:-ai_buddy}"
-REDIS_HOST="redis"
+# Skip PostgreSQL wait if DATABASE_URL is set (production mode with external DB)
+if [ -n "${DATABASE_URL:-}" ]; then
+  echo "Using external DATABASE_URL - skipping local PostgreSQL wait"
+else
+  DB_HOST="db"
+  DB_USER="${POSTGRES_USER:-ai_buddy}"
+  DB_NAME="${POSTGRES_DB:-ai_buddy}"
+  
+  echo "Waiting for PostgreSQL at ${DB_HOST} (db=${DB_NAME} user=${DB_USER})..."
+  for i in $(seq 1 60); do
+    if pg_isready -h "${DB_HOST}" -U "${DB_USER}" -d "${DB_NAME}" -t 1 >/dev/null 2>&1; then
+      echo "PostgreSQL is ready."
+      break
+    fi
+    echo "PostgreSQL not ready yet (attempt $i/60)..."
+    sleep 1
+  done
+fi
 
-echo "Waiting for PostgreSQL at ${DB_HOST} (db=${DB_NAME} user=${DB_USER})..."
-for i in $(seq 1 60); do
-  if pg_isready -h "${DB_HOST}" -U "${DB_USER}" -d "${DB_NAME}" -t 1 >/dev/null 2>&1; then
-    echo "PostgreSQL is ready."
-    break
-  fi
-  echo "PostgreSQL not ready yet (attempt $i/60)..."
-  sleep 1
-done
+REDIS_HOST="redis"
 
 echo "Waiting for Redis at ${REDIS_HOST}..."
 for i in $(seq 1 60); do
