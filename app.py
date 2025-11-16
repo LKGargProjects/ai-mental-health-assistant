@@ -34,7 +34,7 @@ from providers.perplexity import get_perplexity_response
 from providers.openai import get_openai_response
 from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
 from crisis_detection import detect_crisis_level
-from crisis_resources import get_crisis_response_and_resources, get_country_from_request
+# from crisis_resources import get_crisis_response_and_resources, get_country_from_request  # Removed: using internal definitions in this module
 from community import register_community_routes
 
 # Import enterprise integration
@@ -1611,7 +1611,6 @@ def _get_crisis_resources(risk_level: str) -> Dict[str, Any]:
     }
     return resources.get(risk_level, resources['low'])
 
-
 def _get_personalized_recommendations(avg_mood: float, recent_entries: List) -> List[Dict[str, Any]]:
     """Get personalized wellness recommendations based on mood"""
     recommendations = []
@@ -2071,7 +2070,6 @@ def _register_additional_routes(app: Flask) -> None:
 
             # Calculate analytics
             mood_levels = [entry.mood_level for entry in entries]
-            average_mood = sum(mood_levels) / len(mood_levels)
             
             # Mood trend calculation
             recent_moods = mood_levels[:7] if len(mood_levels) >= 7 else mood_levels
@@ -2102,7 +2100,7 @@ def _register_additional_routes(app: Flask) -> None:
 
             return jsonify({
                 'analytics': {
-                    'average_mood': round(average_mood, 2),
+                    'average_mood': round(sum(mood_levels) / len(mood_levels), 2),
                     'mood_trend': trend,
                     'total_entries': len(entries),
                     'weekly_average': round(weekly_average, 2),
