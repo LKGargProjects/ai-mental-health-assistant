@@ -48,13 +48,16 @@ COPY crisis_detection.py .
 COPY community.py .
 COPY providers/ ./providers/
 
-# Copy enterprise modules
+# Copy enterprise integration file
 COPY integrations.py .
-COPY ai_optimization ./ai_optimization
-COPY crisis_v2 ./crisis_v2
-COPY revenue ./revenue
-COPY scale ./scale
-COPY security ./security
+
+# Create enterprise module directories and copy files
+RUN mkdir -p ai_optimization crisis_v2 revenue scale security
+COPY ai_optimization/*.py ./ai_optimization/
+COPY crisis_v2/*.py ./crisis_v2/
+COPY revenue/*.py ./revenue/
+COPY scale/*.py ./scale/
+COPY security/*.py ./security/
 
 # Ensure data directory exists then copy the seed file
 RUN mkdir -p /app/data
