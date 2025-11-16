@@ -47,6 +47,15 @@ COPY models.py .
 COPY crisis_detection.py .
 COPY community.py .
 COPY providers/ ./providers/
+
+# Copy enterprise modules
+COPY integrations.py .
+COPY ai_optimization/ ./ai_optimization/
+COPY crisis_v2/ ./crisis_v2/
+COPY revenue/ ./revenue/
+COPY scale/ ./scale/
+COPY security/ ./security/
+
 # Ensure data directory exists then copy the seed file
 RUN mkdir -p /app/data
 COPY data/community_seed.json ./data/community_seed.json
