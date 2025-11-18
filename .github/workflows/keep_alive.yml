@@ -2,8 +2,9 @@ name: Keep GentleQuest Warm
 
 on:
   schedule:
-    # Every 13 minutes to avoid Render free-tier idle sleep (~15 min)
-    - cron: "*/13 * * * *"
+    # Every 10 minutes to avoid Render free-tier idle sleep (15 min)
+    # Changed from */13 to */10 for safer margin
+    - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -12,7 +13,7 @@ jobs:
     steps:
       - name: Add small jitter to distribute load
         run: |
-          JITTER=$(( RANDOM % 60 ))  # 0-59 seconds
+          JITTER=$(( RANDOM % 30 ))  # 0-29 seconds (reduced from 60)
           echo "Sleeping for $JITTER seconds to add jitter..."
           sleep $JITTER
       - name: Ping /api/ping (HEAD) with fallback to /api/health (GET)
