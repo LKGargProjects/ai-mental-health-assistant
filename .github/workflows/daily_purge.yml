@@ -1,0 +1,26 @@
+name: Purge Old Data (Retention)
+
+on:
+  schedule:
+    # Daily at 02:15 UTC (adjust as needed)
+    - cron: "15 2 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/admin/purge to enforce retention
+        env:
+          ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+        run: |
+          if [ -z "$ADMIN_API_TOKEN" ]; then
+            echo "ADMIN_API_TOKEN is not set in GitHub secrets; configure it in the repo settings."
+            exit 1
+          fi
+
+          set -euxo pipefail
+          curl -fsS -X POST \
+            -H "X-Admin-Token: $ADMIN_API_TOKEN" \
+            -H "User-Agent: gentlequest-retention/1.0" \
+            "https://gentlequest.onrender.com/api/admin/purge"

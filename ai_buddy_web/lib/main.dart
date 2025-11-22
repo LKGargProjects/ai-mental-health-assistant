@@ -24,7 +24,11 @@ import 'navigation/home_shell.dart';
 import 'widgets/app_bottom_nav.dart' show AppTab;
 import 'services/analytics_service.dart' show logAnalyticsEvent;
 import 'services/notification_service.dart';
+import 'screens/legal/legal_screen.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:ai_buddy_web/services/firebase_service.dart';
+import 'package:ai_buddy_web/services/app_rating_service.dart';
+import 'package:upgrader/upgrader.dart';
 
 // Root navigator key to support global routing from notification taps
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -37,7 +41,9 @@ String? _lastDeepLinkPayload;
 void _handleNotificationPayload(String? payload) {
   if (payload == null) return;
   if (kDebugMode) {
-    try { debugPrint('[DeepLink] payload received: $payload'); } catch (_) {}
+    try {
+      debugPrint('[DeepLink] payload received: $payload');
+    } catch (_) {}
   }
   // Deduplicate identical payloads fired in quick succession (e.g., resume + tap)
   final now = DateTime.now();
@@ -45,7 +51,9 @@ void _handleNotificationPayload(String? payload) {
     final diffMs = now.difference(_lastDeepLinkAt!).inMilliseconds;
     if (diffMs < 2000) {
       if (kDebugMode) {
-        try { debugPrint('[DeepLink] duplicate ignored (${diffMs}ms)'); } catch (_) {}
+        try {
+          debugPrint('[DeepLink] duplicate ignored (${diffMs}ms)');
+        } catch (_) {}
       }
       return;
     }
@@ -62,11 +70,13 @@ void _handleNotificationPayload(String? payload) {
     final nav = rootNavigatorKey.currentState;
     if (nav == null) {
       // Try after first frame if navigator not ready yet
-      WidgetsBinding.instance.addPostFrameCallback((_) => _handleNotificationPayload(payload));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _handleNotificationPayload(payload));
       return;
     }
     // Ensure a HomeShell is the root and open with Quest tab
-    nav.pushNamedAndRemoveUntil('/home', (route) => false, arguments: AppTab.quest);
+    nav.pushNamedAndRemoveUntil('/home', (route) => false,
+        arguments: AppTab.quest);
   }
   if (payload == 'open_mood') {
     try {
@@ -74,10 +84,12 @@ void _handleNotificationPayload(String? payload) {
     } catch (_) {}
     final nav = rootNavigatorKey.currentState;
     if (nav == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _handleNotificationPayload(payload));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _handleNotificationPayload(payload));
       return;
     }
-    nav.pushNamedAndRemoveUntil('/home', (route) => false, arguments: AppTab.mood);
+    nav.pushNamedAndRemoveUntil('/home', (route) => false,
+        arguments: AppTab.mood);
   }
   if (payload == 'open_talk') {
     try {
@@ -85,15 +97,21 @@ void _handleNotificationPayload(String? payload) {
     } catch (_) {}
     final nav = rootNavigatorKey.currentState;
     if (nav == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _handleNotificationPayload(payload));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _handleNotificationPayload(payload));
       return;
     }
-    nav.pushNamedAndRemoveUntil('/home', (route) => false, arguments: AppTab.talk);
+    nav.pushNamedAndRemoveUntil('/home', (route) => false,
+        arguments: AppTab.talk);
   }
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase (handles analytics & crashlytics)
+  await FirebaseService().initialize();
+
   const dsn = String.fromEnvironment('SENTRY_DSN_FRONTEND', defaultValue: '');
   const env = String.fromEnvironment('SENTRY_ENV', defaultValue: 'local');
   const version = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
@@ -116,42 +134,14 @@ Future<void> main() async {
     _handleNotificationPayload(payload);
   };
   // Defer local notifications init until after first frame to mitigate iOS cold-start stalls.
-  runApp(const MyApp());
+  // Initialize app rating service
+  await AppRatingService().incrementSessionCount();
+
+  runApp(MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    // Initialize notifications and then perform post-start tasks after first frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Initialize local notifications post-frame; forward any launch-from-notification payload.
-      await NotificationService.init();
-
-      // Fire a minimal 'app_open' event (respects consent in ApiService)
-      logAnalyticsEvent(
-        'app_open',
-        metadata: {'action': 'app_open', 'source': 'app'},
-      );
-      // Handle simple deep link for web hash route: #/home/quest
-      final fragment = Uri.base.fragment; // e.g., '/home/quest'
-      if (fragment == '/home/quest') {
-        if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed('/home/quest');
-      }
-      // Debug 12s auto-scheduling: disabled per current plan.
-      // To re-enable later, wrap in kDebugMode and call NotificationService.scheduleOneShot(...).
-
-      // (No debug harness; dedupe verified. Keep production clean.)
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -165,45 +155,67 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => QuestProvider()..loadQuests()),
         ChangeNotifierProvider(create: (_) => CommunityProvider()),
       ],
-      child: dhiwise_sizer.Sizer(
-        builder: (context, o, d) => Sizer(
-          builder: (context, orientation, deviceType) {
-            return MaterialApp(
-              title: 'Progress Without Pressure',
-              debugShowCheckedModeBanner: false,
-              theme: ThemeData(
-                colorScheme: ColorScheme.fromSeed(
-                  seedColor: const Color(0xFF667EEA),
-                  primary: const Color(0xFF667EEA),
-                  secondary: const Color(0xFFFF6B6B),
-                ),
-                useMaterial3: true,
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: 'Progress Without Pressure',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xFF667EEA),
+                primary: const Color(0xFF667EEA),
+                secondary: const Color(0xFFFF6B6B),
               ),
-              navigatorKey: rootNavigatorKey,
-              navigatorObservers: [routeObserver],
-              home: const HomeShell(initialTab: AppTab.talk),
-              routes: {
-                '/home': (context) {
-                  final args = ModalRoute.of(context)?.settings.arguments;
-                  final initial = (args is AppTab) ? args : AppTab.talk;
-                  return HomeShell(initialTab: initial);
-                },
-                '/home/quest': (context) => HomeShell(initialTab: AppTab.quest),
-                // Legacy landing route redirected to HomeShell Talk tab
-                '/main': (context) => HomeShell(initialTab: AppTab.talk),
-                '/dhiwise-chat': (context) => const MentalHealthChatScreen(),
-                '/preview-quest': (context) => const QuestPreviewScreen(),
-                '/interactive-chat': (context) => const InteractiveChatScreen(),
-                // New direct routes for clarity
-                '/wellness-dashboard': (context) => dhiwise_sizer.Sizer(
-                  builder: (context, orientation, deviceType) =>
-                      dhiwise_wellness.WellnessDashboardScreen(),
+              useMaterial3: true,
+            ),
+            navigatorKey: rootNavigatorKey,
+            navigatorObservers: [routeObserver],
+            home: UpgradeAlert(
+              upgrader: Upgrader(
+                minAppVersion: '1.0.0',
+                messages: UpgraderMessages(
+                  code: 'en',
                 ),
-                '/quests-list': (context) => const dhiwise_quest.QuestScreen(),
+                onUpdate: () {
+                  FirebaseService().logEvent('app_update_prompted');
+                  return true;
+                },
+                onIgnore: () {
+                  FirebaseService().logEvent('app_update_ignored');
+                  return true;
+                },
+                onLater: () {
+                  FirebaseService().logEvent('app_update_later');
+                  return true;
+                },
+              ),
+              child: const SplashScreen(),
+            ),
+            routes: {
+              '/home': (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                final initial = (args is AppTab) ? args : AppTab.talk;
+                return HomeShell(initialTab: initial);
               },
-            );
-          },
-        ),
+              '/home/quest': (context) => HomeShell(initialTab: AppTab.quest),
+              // Legacy landing route redirected to HomeShell Talk tab
+              '/main': (context) => HomeShell(initialTab: AppTab.talk),
+              '/dhiwise-chat': (context) => const MentalHealthChatScreen(),
+              '/preview-quest': (context) => const QuestPreviewScreen(),
+              '/interactive-chat': (context) => const InteractiveChatScreen(),
+              '/privacy': (context) => const LegalScreen(
+                    title: 'Privacy Policy',
+                    assetPath: 'assets/legal/privacy.md',
+                  ),
+              // New direct routes for clarity
+              '/wellness-dashboard': (context) => dhiwise_sizer.Sizer(
+                    builder: (context, orientation, deviceType) =>
+                        dhiwise_wellness.WellnessDashboardScreen(),
+                  ),
+              '/quests-list': (context) => const dhiwise_quest.QuestScreen(),
+            },
+          );
+        },
       ),
     );
   }

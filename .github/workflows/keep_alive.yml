@@ -22,4 +22,4 @@ jobs:
           URL="https://gentlequest.onrender.com/api/ping"
           # Try a HEAD request first (lightweight), fallback to GET /api/health
           (curl -fsSI --max-time 5 -H "User-Agent: gentlequest-keepalive/1.0" "$URL" || \
-           curl -fsS  --max-time 5 -H "User-Agent: gentlequest-keepalive/1.0" "https://gentlequest.onrender.com/api/health") || true
+           curl -fsS  --max-time 5 -H "User-Agent: gentlequest-keepalive/1.0" "https://gentlequest.onrender.com/api/health")

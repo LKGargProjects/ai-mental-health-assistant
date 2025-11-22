@@ -34,7 +34,6 @@ from providers.perplexity import get_perplexity_response
 from providers.openai import get_openai_response
 from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
 from crisis_detection import detect_crisis_level
-# from crisis_resources import get_crisis_response_and_resources, get_country_from_request  # Removed: using internal definitions in this module
 from community import register_community_routes
 
 # Import enterprise integration

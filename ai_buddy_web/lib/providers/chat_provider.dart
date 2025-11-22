@@ -137,9 +137,8 @@ class ChatProvider extends ChangeNotifier {
               }
               streaming!.content += text;
               if (kDebugMode) {
-                final sample = text.length > 60
-                    ? '${text.substring(0, 60)}…'
-                    : text;
+                final sample =
+                    text.length > 60 ? '${text.substring(0, 60)}…' : text;
                 debugPrint(
                   '🟢 [SSE token] +${text.length} chars: "$sample" (total=${streaming!.content.length})',
                 );
@@ -214,9 +213,8 @@ class ChatProvider extends ChangeNotifier {
 
       // Avoid adding an empty bubble. Delay insertion until first chunk exists.
       final full = aiMessage.content;
-      final lines = full.contains('\n')
-          ? full.split('\n')
-          : _splitIntoSentences(full);
+      final lines =
+          full.contains('\n') ? full.split('\n') : _splitIntoSentences(full);
 
       if (lines.isEmpty || full.trim().isEmpty) {
         // Nothing meaningful to show; just stop typing and return.
@@ -266,12 +264,22 @@ class ChatProvider extends ChangeNotifier {
       );
     } catch (e) {
       debugPrint('❌ Unexpected error in sendMessage: $e');
-      _error = 'An unexpected error occurred. Please try again.';
+
+      // Surface any user-friendly message from wrapped exceptions (e.g. from
+      // ApiService._retryOperation), otherwise fall back to a clearer
+      // cold-start style message instead of a generic error.
+      final raw = e.toString();
+      final cleaned = raw.replaceFirst('Exception: ', '').trim();
+      final friendly = cleaned.isNotEmpty && cleaned != 'Exception'
+          ? cleaned
+          : 'The server is waking up or temporarily unavailable. Please wait a few seconds and try again.';
+
+      _error = friendly;
       if (_isTyping) _isTyping = false;
 
       _messages.add(
         Message(
-          content: 'An unexpected error occurred. Please try again.',
+          content: friendly,
           isUser: false,
           type: MessageType.error,
         ),
