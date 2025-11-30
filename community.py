@@ -500,6 +500,7 @@ def register_community_routes(app: Flask) -> None:
             except Exception:
                 pass
             return jsonify({"error": "Failed to add reaction"}), 500
+
     @app.route("/api/community/react/<int:post_id>", methods=["POST"])
     @app.limiter.limit(limits_reaction)
     def community_react_legacy(post_id: int):
