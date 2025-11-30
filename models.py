@@ -1,4 +1,3 @@
-
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import uuid
@@ -7,53 +6,60 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 db = SQLAlchemy()
 
+
 class UserSession(db.Model):
-    __tablename__ = 'user_sessions'
-    
+    __tablename__ = "user_sessions"
+
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_active = db.Column(db.DateTime, default=datetime.utcnow)
     conversation_count = db.Column(db.Integer, default=0)
-    risk_level = db.Column(db.String(20), default='low')
-    
+    risk_level = db.Column(db.String(20), default="low")
+
+
 class Message(db.Model):
-    __tablename__ = 'messages'
-    
+    __tablename__ = "messages"
+
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(36), db.ForeignKey('user_sessions.id'))
+    session_id = db.Column(db.String(36), db.ForeignKey("user_sessions.id"))
     content = db.Column(db.Text, nullable=False)
     is_user = db.Column(db.Boolean, default=False)  # True for user, False for AI
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    risk_level = db.Column(db.String(20), default='none')
+    risk_level = db.Column(db.String(20), default="none")
     resources = db.Column(db.Text)  # JSON string for crisis resources
-    
+
+
 class ConversationLog(db.Model):
-    __tablename__ = 'conversation_logs'
-    
+    __tablename__ = "conversation_logs"
+
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(36), db.ForeignKey('user_sessions.id'))
+    session_id = db.Column(db.String(36), db.ForeignKey("user_sessions.id"))
     user_message = db.Column(db.Text, nullable=False)
     ai_response = db.Column(db.Text, nullable=False)
-    risk_level = db.Column(db.String(20), default='low')
+    risk_level = db.Column(db.String(20), default="low")
     risk_score = db.Column(db.Float, default=0.0)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
+
 class CrisisEvent(db.Model):
-    __tablename__ = 'crisis_events'
-    
+    __tablename__ = "crisis_events"
+
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(36), db.ForeignKey('user_sessions.id'))
+    session_id = db.Column(db.String(36), db.ForeignKey("user_sessions.id"))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     risk_level = db.Column(db.String(20))
     intervention_taken = db.Column(db.String(100))
     escalated = db.Column(db.Boolean, default=False)
 
+
 class SelfAssessmentEntry(db.Model):
-    __tablename__ = 'self_assessment_entries'
+    __tablename__ = "self_assessment_entries"
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(36), db.ForeignKey('user_sessions.id'), nullable=False)
+    session_id = db.Column(
+        db.String(36), db.ForeignKey("user_sessions.id"), nullable=False
+    )
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     assessment_data = db.Column(JSONB, nullable=False)
 
     def __repr__(self):
-        return f'<SelfAssessmentEntry id={self.id} session_id={self.session_id}>'
+        return f"<SelfAssessmentEntry id={self.id} session_id={self.session_id}>"

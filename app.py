@@ -32,13 +32,21 @@ load_dotenv()
 from providers.gemini import get_gemini_response
 from providers.perplexity import get_perplexity_response
 from providers.openai import get_openai_response
-from models import db, UserSession, Message, ConversationLog, CrisisEvent, SelfAssessmentEntry
+from models import (
+    db,
+    UserSession,
+    Message,
+    ConversationLog,
+    CrisisEvent,
+    SelfAssessmentEntry,
+)
 from crisis_detection import detect_crisis_level
 from community import register_community_routes
 
 # Import enterprise integration
 try:
     from integrations import integrate_with_app, process_chat_with_enterprise
+
     ENTERPRISE_FEATURES = True
 except ImportError as e:
     ENTERPRISE_FEATURES = False
@@ -47,309 +55,361 @@ except ImportError as e:
 try:
     import sentry_sdk
     from sentry_sdk.integrations.flask import FlaskIntegration
+
     SENTRY_AVAILABLE = True
 except Exception:
     SENTRY_AVAILABLE = False
 
 # Geography-specific crisis resources
 CRISIS_RESOURCES_BY_COUNTRY = {
-    'in': {  # India
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call iCall Helpline at 022-25521111 or AASRA at 91-22-27546669. You can also text HOME to 741741 to reach Crisis Text Line. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'iCall Helpline', 'number': '022-25521111', 'available': '24/7'},
-            {'name': 'AASRA', 'number': '91-22-27546669', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'}
-        ]
+    "in": {  # India
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call iCall Helpline at 022-25521111 or AASRA at 91-22-27546669. You can also text HOME to 741741 to reach Crisis Text Line. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {"name": "iCall Helpline", "number": "022-25521111", "available": "24/7"},
+            {"name": "AASRA", "number": "91-22-27546669", "available": "24/7"},
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+        ],
     },
-    'us': {  # United States
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call the National Suicide Prevention Lifeline at 988 or text HOME to 741741 to reach the Crisis Text Line. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'National Suicide Prevention Lifeline', 'number': '988', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '911', 'available': '24/7'}
-        ]
+    "us": {  # United States
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call the National Suicide Prevention Lifeline at 988 or text HOME to 741741 to reach the Crisis Text Line. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {
+                "name": "National Suicide Prevention Lifeline",
+                "number": "988",
+                "available": "24/7",
+            },
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {"name": "Emergency Services", "number": "911", "available": "24/7"},
+        ],
     },
-    'uk': {  # United Kingdom
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call Samaritans at 116 123 or text SHOUT to 85258. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'Samaritans', 'number': '116 123', 'available': '24/7'},
-            {'name': 'SHOUT Text Line', 'text': 'SHOUT to 85258', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '999', 'available': '24/7'}
-        ]
+    "uk": {  # United Kingdom
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call Samaritans at 116 123 or text SHOUT to 85258. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {"name": "Samaritans", "number": "116 123", "available": "24/7"},
+            {"name": "SHOUT Text Line", "text": "SHOUT to 85258", "available": "24/7"},
+            {"name": "Emergency Services", "number": "999", "available": "24/7"},
+        ],
     },
-    'ca': {  # Canada
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call the National Suicide Prevention Service at 1-833-456-4566 or text HOME to 741741. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'National Suicide Prevention Service', 'number': '1-833-456-4566', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '911', 'available': '24/7'}
-        ]
+    "ca": {  # Canada
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call the National Suicide Prevention Service at 1-833-456-4566 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {
+                "name": "National Suicide Prevention Service",
+                "number": "1-833-456-4566",
+                "available": "24/7",
+            },
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {"name": "Emergency Services", "number": "911", "available": "24/7"},
+        ],
     },
-    'au': {  # Australia
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call Lifeline at 13 11 14 or text HOME to 741741. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'Lifeline', 'number': '13 11 14', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '000', 'available': '24/7'}
-        ]
+    "au": {  # Australia
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call Lifeline at 13 11 14 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {"name": "Lifeline", "number": "13 11 14", "available": "24/7"},
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {"name": "Emergency Services", "number": "000", "available": "24/7"},
+        ],
     },
-    'de': {  # Germany
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call TelefonSeelsorge at 0800 111 0 111 or text HOME to 741741. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'TelefonSeelsorge', 'number': '0800 111 0 111', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '112', 'available': '24/7'}
-        ]
+    "de": {  # Germany
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call TelefonSeelsorge at 0800 111 0 111 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {
+                "name": "TelefonSeelsorge",
+                "number": "0800 111 0 111",
+                "available": "24/7",
+            },
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {"name": "Emergency Services", "number": "112", "available": "24/7"},
+        ],
     },
-    'fr': {  # France
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call SOS Amitié at 09 72 39 40 50 or text HOME to 741741. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'SOS Amitié', 'number': '09 72 39 40 50', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '112', 'available': '24/7'}
-        ]
+    "fr": {  # France
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call SOS Amitié at 09 72 39 40 50 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {"name": "SOS Amitié", "number": "09 72 39 40 50", "available": "24/7"},
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {"name": "Emergency Services", "number": "112", "available": "24/7"},
+        ],
     },
-    'jp': {  # Japan
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call TELL Lifeline at 03-5774-0992 or text HOME to 741741. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'TELL Lifeline', 'number': '03-5774-0992', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '119', 'available': '24/7'}
-        ]
+    "jp": {  # Japan
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call TELL Lifeline at 03-5774-0992 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {"name": "TELL Lifeline", "number": "03-5774-0992", "available": "24/7"},
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {"name": "Emergency Services", "number": "119", "available": "24/7"},
+        ],
     },
-    'br': {  # Brazil
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call CVV at 188 or text HOME to 741741. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'CVV', 'number': '188', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '192', 'available': '24/7'}
-        ]
+    "br": {  # Brazil
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call CVV at 188 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {"name": "CVV", "number": "188", "available": "24/7"},
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {"name": "Emergency Services", "number": "192", "available": "24/7"},
+        ],
     },
-    'mx': {  # Mexico
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call SAPTEL at 55-5259-8121 or text HOME to 741741. You're not alone, and help is available 24/7.",
-        'crisis_numbers': [
-            {'name': 'SAPTEL', 'number': '55-5259-8121', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'number': '911', 'available': '24/7'}
-        ]
+    "mx": {  # Mexico
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please call SAPTEL at 55-5259-8121 or text HOME to 741741. You're not alone, and help is available 24/7.",
+        "crisis_numbers": [
+            {"name": "SAPTEL", "number": "55-5259-8121", "available": "24/7"},
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {"name": "Emergency Services", "number": "911", "available": "24/7"},
+        ],
     },
-    'generic': {  # Fallback for unsupported countries
-        'crisis_msg': "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please reach out to Befrienders Worldwide or call your local emergency services. You can also text HOME to 741741 for international crisis support. You're not alone, and help is available.",
-        'crisis_numbers': [
-            {'name': 'Befrienders Worldwide', 'url': 'https://www.befrienders.org/', 'available': '24/7'},
-            {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-            {'name': 'Emergency Services', 'note': 'Call your local emergency number', 'available': '24/7'}
-        ]
-    }
+    "generic": {  # Fallback for unsupported countries
+        "crisis_msg": "I'm very concerned about what you're sharing. This is a crisis situation and you need immediate help. Please reach out to Befrienders Worldwide or call your local emergency services. You can also text HOME to 741741 for international crisis support. You're not alone, and help is available.",
+        "crisis_numbers": [
+            {
+                "name": "Befrienders Worldwide",
+                "url": "https://www.befrienders.org/",
+                "available": "24/7",
+            },
+            {"name": "Crisis Text Line", "text": "HOME to 741741", "available": "24/7"},
+            {
+                "name": "Emergency Services",
+                "note": "Call your local emergency number",
+                "available": "24/7",
+            },
+        ],
+    },
 }
+
 
 def get_country_code_from_ip(ip: str) -> str:
     """Get country code from IP address using ipinfo.io"""
     try:
         # Skip local/private IPs
-        if ip in ['127.0.0.1', 'localhost', '::1'] or ip.startswith(('10.', '172.', '192.168.')):
-            return 'generic'
-        
+        if ip in ["127.0.0.1", "localhost", "::1"] or ip.startswith(
+            ("10.", "172.", "192.168.")
+        ):
+            return "generic"
+
         # Use ipinfo.io for geolocation
-        response = requests.get(f'https://ipinfo.io/{ip}/json', timeout=5)
+        response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)
         if response.status_code == 200:
             data = response.json()
-            country_code = data.get('country', '').lower()
-            return country_code if country_code in CRISIS_RESOURCES_BY_COUNTRY else 'generic'
+            country_code = data.get("country", "").lower()
+            return (
+                country_code
+                if country_code in CRISIS_RESOURCES_BY_COUNTRY
+                else "generic"
+            )
         else:
-            return 'generic'
+            return "generic"
     except Exception as e:
         print(f"IP geolocation error: {e}")
-        return 'generic'
+        return "generic"
+
 
 def get_country_from_request(req) -> str:
     """Get country from request - either from country parameter or IP"""
     # Check for explicit country override
     data = req.get_json() if req.is_json else {}
-    country = data.get('country', '').lower()
-    
+    country = data.get("country", "").lower()
+
     if country and country in CRISIS_RESOURCES_BY_COUNTRY:
         return country
-    
+
     # Get IP from various headers
-    ip = req.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+    ip = req.headers.get("X-Forwarded-For", "").split(",")[0].strip()
     if not ip:
-        ip = req.headers.get('X-Real-IP', '')
+        ip = req.headers.get("X-Real-IP", "")
     if not ip:
         ip = req.remote_addr
-    
+
     return get_country_code_from_ip(ip)
+
 
 def _detect_environment() -> str:
     """Detect current environment automatically for single codebase usage"""
-    if os.environ.get('RENDER'):
-        return 'production'
-    elif os.environ.get('DOCKER_ENV') or os.environ.get('DOCKER'):
-        return 'docker'
-    elif os.environ.get('ENVIRONMENT'):
-        return os.environ.get('ENVIRONMENT')
+    if os.environ.get("RENDER"):
+        return "production"
+    elif os.environ.get("DOCKER_ENV") or os.environ.get("DOCKER"):
+        return "docker"
+    elif os.environ.get("ENVIRONMENT"):
+        return os.environ.get("ENVIRONMENT")
     else:
-        return 'local'
+        return "local"
+
 
 def _get_environment_config(environment: str) -> Dict[str, Any]:
     """Get environment-specific configuration for single codebase usage"""
     configs = {
-        'local': {
-            'port': 5055,
-            'database_url': 'postgresql+psycopg://ai_buddy:ai_buddy_password@localhost:5432/mental_health',
-            'redis_url': 'redis://localhost:6379',
-            'cors_origins': [
-                'http://localhost:8080', 
-                'http://127.0.0.1:8080',
-                'http://localhost:3000',
-                'http://localhost:9100',
-                'http://127.0.0.1:9100'
+        "local": {
+            "port": 5055,
+            "database_url": "postgresql+psycopg://ai_buddy:ai_buddy_password@localhost:5432/mental_health",
+            "redis_url": "redis://localhost:6379",
+            "cors_origins": [
+                "http://localhost:8080",
+                "http://127.0.0.1:8080",
+                "http://localhost:3000",
+                "http://localhost:9100",
+                "http://127.0.0.1:9100",
             ],
         },
-        'docker': {
-            'port': 5055,
-            'database_url': 'postgresql+psycopg://ai_buddy:ai_buddy_password@db:5432/mental_health',
-            'redis_url': 'redis://redis:6379',
-            'cors_origins': [
-                'http://localhost:8080', 
-                'http://127.0.0.1:8080',
-                'http://localhost:3000',
-                'http://localhost:9100',
-                'http://127.0.0.1:9100',
-                'http://localhost:57442',
-                'http://localhost:55725'
+        "docker": {
+            "port": 5055,
+            "database_url": "postgresql+psycopg://ai_buddy:ai_buddy_password@db:5432/mental_health",
+            "redis_url": "redis://redis:6379",
+            "cors_origins": [
+                "http://localhost:8080",
+                "http://127.0.0.1:8080",
+                "http://localhost:3000",
+                "http://localhost:9100",
+                "http://127.0.0.1:9100",
+                "http://localhost:57442",
+                "http://localhost:55725",
             ],
         },
-        'production': {
-            'port': 10000,
-            'database_url': os.environ.get('DATABASE_URL'),
-            'redis_url': 'redis://localhost:6379',
-            'cors_origins': [
-                'https://gentlequest.onrender.com',
-                'https://*.onrender.com',
-                'https://gentlequest.com',
-                'https://www.gentlequest.com',
-                'https://gentlequest.app',
-                'https://www.gentlequest.app'
+        "production": {
+            "port": 10000,
+            "database_url": os.environ.get("DATABASE_URL"),
+            "redis_url": "redis://localhost:6379",
+            "cors_origins": [
+                "https://gentlequest.onrender.com",
+                "https://*.onrender.com",
+                "https://gentlequest.com",
+                "https://www.gentlequest.com",
+                "https://gentlequest.app",
+                "https://www.gentlequest.app",
             ],
-        }
+        },
     }
-    return configs.get(environment, configs['local'])
+    return configs.get(environment, configs["local"])
+
 
 # Configuration constants with environment detection
 ENVIRONMENT = _detect_environment()
 ENV_CONFIG = _get_environment_config(ENVIRONMENT)
 
+
 class Config:
     """Configuration class for single codebase usage"""
-    
+
     # Environment detection
-    ENVIRONMENT = os.getenv('ENVIRONMENT', 'local')
-    RENDER = os.getenv('RENDER', 'false').lower() == 'true'
-    DOCKER_ENV = os.getenv('DOCKER_ENV', 'false').lower() == 'true'
-    
+    ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
+    RENDER = os.getenv("RENDER", "false").lower() == "true"
+    DOCKER_ENV = os.getenv("DOCKER_ENV", "false").lower() == "true"
+
     # Database configuration
     if RENDER:
         # Production (Render) configuration
-        DATABASE_URL = os.getenv('DATABASE_URL')
-        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+        DATABASE_URL = os.getenv("DATABASE_URL")
+        if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+            DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     elif DOCKER_ENV:
         # Docker environment
-        DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://ai_buddy:ai_buddy_password@db:5432/mental_health')
+        DATABASE_URL = os.getenv(
+            "DATABASE_URL",
+            "postgresql://ai_buddy:ai_buddy_password@db:5432/mental_health",
+        )
     else:
         # Local development
-        DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://ai_buddy:ai_buddy_password@localhost:5432/mental_health')
-    
+        DATABASE_URL = os.getenv(
+            "DATABASE_URL",
+            "postgresql://ai_buddy:ai_buddy_password@localhost:5432/mental_health",
+        )
+
     # Redis configuration
     if RENDER:
-        REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
+        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
     elif DOCKER_ENV:
-        REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379')
+        REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
     else:
-        REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
-    
+        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
     # Flask configuration
-    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-    SESSION_TYPE = os.getenv('SESSION_TYPE', 'redis')
-    
+    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    SESSION_TYPE = os.getenv("SESSION_TYPE", "redis")
+
     # Server configuration
-    PORT = int(os.getenv('PORT', 5055))
-    BACKEND_PORT = int(os.getenv('BACKEND_PORT', 5055))
-    
+    PORT = int(os.getenv("PORT", 5055))
+    BACKEND_PORT = int(os.getenv("BACKEND_PORT", 5055))
+
     # AI Provider configuration
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-    PPLX_API_KEY = os.getenv('PPLX_API_KEY')
-    AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
-    
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    PPLX_API_KEY = os.getenv("PPLX_API_KEY")
+    AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini")
+
     # CORS configuration (env-driven; fallback to environment config)
     CORS_ORIGINS = [
-        o.strip() for o in (
-            os.getenv('CORS_ORIGINS') or ','.join(ENV_CONFIG.get('cors_origins', []))
-        ).split(',') if o.strip()
+        o.strip()
+        for o in (
+            os.getenv("CORS_ORIGINS") or ",".join(ENV_CONFIG.get("cors_origins", []))
+        ).split(",")
+        if o.strip()
     ]
-    
+
     # Rate limiting
-    RATE_LIMIT_ENABLED = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() == 'true'
-    RATE_LIMIT_REQUESTS = int(os.getenv('RATE_LIMIT_REQUESTS', 30))
-    RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', 60))
-    
+    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+    RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", 30))
+    RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 60))
+
     # Logging
-    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-    
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
     # Version and build info
-    VERSION = os.getenv('VERSION', '1.0.0')
-    BUILD_TIME = os.getenv('BUILD_TIME', 'unknown')
+    VERSION = os.getenv("VERSION", "1.0.0")
+    BUILD_TIME = os.getenv("BUILD_TIME", "unknown")
 
     # Community feature flags and limits
-    COMMUNITY_ENABLED = os.getenv('COMMUNITY_ENABLED', 'true')
-    COMMUNITY_POSTING_ENABLED = os.getenv('COMMUNITY_POSTING_ENABLED', 'false')
-    TEMPLATES_ONLY = os.getenv('TEMPLATES_ONLY', 'true')
-    RATE_LIMITS_COMMUNITY_FEED = os.getenv('RATE_LIMITS_COMMUNITY_FEED', '120 per minute')
-    RATE_LIMITS_REACTION = os.getenv('RATE_LIMITS_REACTION', '20 per minute; 200 per day')
-    RATE_LIMITS_REPORT = os.getenv('RATE_LIMITS_REPORT', '10 per minute; 100 per day')
+    COMMUNITY_ENABLED = os.getenv("COMMUNITY_ENABLED", "true")
+    COMMUNITY_POSTING_ENABLED = os.getenv("COMMUNITY_POSTING_ENABLED", "false")
+    TEMPLATES_ONLY = os.getenv("TEMPLATES_ONLY", "true")
+    RATE_LIMITS_COMMUNITY_FEED = os.getenv(
+        "RATE_LIMITS_COMMUNITY_FEED", "120 per minute"
+    )
+    RATE_LIMITS_REACTION = os.getenv(
+        "RATE_LIMITS_REACTION", "20 per minute; 200 per day"
+    )
+    RATE_LIMITS_REPORT = os.getenv("RATE_LIMITS_REPORT", "10 per minute; 100 per day")
 
     # Retention policy (days)
-    MESSAGE_RETENTION_DAYS = int(os.getenv('MESSAGE_RETENTION_DAYS', 30))
-    SESSION_RETENTION_DAYS = int(os.getenv('SESSION_RETENTION_DAYS', 14))
-    ERROR_LOG_RETENTION_DAYS = int(os.getenv('ERROR_LOG_RETENTION_DAYS', 14))
-    ANALYTICS_RETENTION_DAYS = int(os.getenv('ANALYTICS_RETENTION_DAYS', 90))
-    
+    MESSAGE_RETENTION_DAYS = int(os.getenv("MESSAGE_RETENTION_DAYS", 30))
+    SESSION_RETENTION_DAYS = int(os.getenv("SESSION_RETENTION_DAYS", 14))
+    ERROR_LOG_RETENTION_DAYS = int(os.getenv("ERROR_LOG_RETENTION_DAYS", 14))
+    ANALYTICS_RETENTION_DAYS = int(os.getenv("ANALYTICS_RETENTION_DAYS", 90))
+
     # Admin token for protected maintenance endpoints
-    ADMIN_API_TOKEN = os.getenv('ADMIN_API_TOKEN')
+    ADMIN_API_TOKEN = os.getenv("ADMIN_API_TOKEN")
+
 
 def create_app() -> Flask:
     """Application factory pattern for single codebase usage"""
-    app = Flask(__name__, static_folder='static', static_url_path='')
-    
+    app = Flask(__name__, static_folder="static", static_url_path="")
+
     # Load configuration
     app.config.from_object(Config)
-    
+
     # Configure logging level/handler early so INFO diagnostics are emitted
     try:
-        level_name = str(app.config.get('LOG_LEVEL', 'INFO')).upper()
+        level_name = str(app.config.get("LOG_LEVEL", "INFO")).upper()
         level = getattr(logging, level_name, logging.INFO)
         app.logger.setLevel(level)
         # Ensure a StreamHandler exists (avoid duplicates)
         if not any(isinstance(h, logging.StreamHandler) for h in app.logger.handlers):
             sh = logging.StreamHandler()
             sh.setLevel(level)
-            formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
+            formatter = logging.Formatter(
+                "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
+            )
             sh.setFormatter(formatter)
             app.logger.addHandler(sh)
     except Exception:
         pass
-    
+
     # Initialize Sentry (if DSN provided)
     try:
-        dsn = os.getenv('SENTRY_DSN_BACKEND', '').strip()
+        dsn = os.getenv("SENTRY_DSN_BACKEND", "").strip()
         if dsn:
             sentry_sdk.init(
                 dsn=dsn,
                 integrations=[FlaskIntegration()],
-                traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0') or 0),
-                profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE', '0') or 0),
+                traces_sample_rate=float(
+                    os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0") or 0
+                ),
+                profiles_sample_rate=float(
+                    os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0") or 0
+                ),
                 environment=Config.ENVIRONMENT,
                 release=Config.VERSION,
             )
@@ -357,30 +417,33 @@ def create_app() -> Flask:
     except Exception as e:
         # Non-fatal: continue without Sentry
         app.logger.warning(f"Sentry init failed: {e}")
-    
+
     # Set SQLAlchemy database URI with explicit psycopg driver and SSL if needed
     if Config.DATABASE_URL:
         db_url = Config.DATABASE_URL
         # Normalize legacy scheme if present
-        if db_url.startswith('postgres://'):
-            db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
         # Force use of psycopg driver
-        if 'postgresql://' in db_url and 'psycopg' not in db_url:
-            db_url = db_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+        if "postgresql://" in db_url and "psycopg" not in db_url:
+            db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
         # Append sslmode=require and a short connect_timeout for Postgres if not already present
         try:
-            needs_ssl = (getattr(Config, 'RENDER', False) or str(getattr(Config, 'ENVIRONMENT', '')).lower() == 'production')
+            needs_ssl = (
+                getattr(Config, "RENDER", False)
+                or str(getattr(Config, "ENVIRONMENT", "")).lower() == "production"
+            )
             parsed = urlparse(db_url)
             # Only mutate query params for Postgres URLs; preserve sqlite formatting (e.g., sqlite:///)
-            if parsed.scheme.startswith('postgresql'):
+            if parsed.scheme.startswith("postgresql"):
                 query_items = dict(parse_qsl(parsed.query)) if parsed.query else {}
                 lower_keys = {k.lower() for k in query_items.keys()}
-                if needs_ssl and 'sslmode' not in lower_keys:
-                    query_items['sslmode'] = 'require'
+                if needs_ssl and "sslmode" not in lower_keys:
+                    query_items["sslmode"] = "require"
                 # Ensure a short connect timeout for Postgres to prevent long hangs
-                if 'connect_timeout' not in lower_keys:
-                    query_items['connect_timeout'] = '2'
+                if "connect_timeout" not in lower_keys:
+                    query_items["connect_timeout"] = "2"
                 new_query = urlencode(query_items)
                 parsed = parsed._replace(query=new_query)
                 db_url = urlunparse(parsed)
@@ -390,92 +453,107 @@ def create_app() -> Flask:
         except Exception as e:
             app.logger.warning(f"Failed to process DB URL SSL params: {e}")
 
-        app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+        app.config["SQLALCHEMY_DATABASE_URI"] = db_url
     else:
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mental_health.db'
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///mental_health.db"
 
     # SQLAlchemy reliability options
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True,
-        'pool_recycle': 300,
-        'pool_size': 5,
-        'max_overflow': 10,
-        'pool_timeout': 2,
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_timeout": 2,
     }
 
     # Log effective DB URL (masked) and attempt DNS resolution of host
     try:
-        effective_url = app.config.get('SQLALCHEMY_DATABASE_URI')
+        effective_url = app.config.get("SQLALCHEMY_DATABASE_URI")
+
         def _mask_db_url(url: str) -> str:
             try:
                 # For sqlite, return as-is to preserve triple slashes in logs (e.g., sqlite:///file.db)
-                if isinstance(url, str) and url.strip().lower().startswith('sqlite:'):
+                if isinstance(url, str) and url.strip().lower().startswith("sqlite:"):
                     return url
                 p = urlparse(url)
                 netloc = p.netloc
-                if '@' in netloc:
-                    creds, host = netloc.split('@', 1)
-                    if ':' in creds:
-                        user, _pwd = creds.split(':', 1)
+                if "@" in netloc:
+                    creds, host = netloc.split("@", 1)
+                    if ":" in creds:
+                        user, _pwd = creds.split(":", 1)
                         creds_masked = f"{user}:***"
                     else:
                         creds_masked = f"{creds}:***"
                     netloc_masked = f"{creds_masked}@{host}"
                 else:
                     netloc_masked = netloc
-                return urlunparse((p.scheme, netloc_masked, p.path, p.params, p.query, p.fragment))
+                return urlunparse(
+                    (p.scheme, netloc_masked, p.path, p.params, p.query, p.fragment)
+                )
             except Exception:
-                return '<mask_failed>'
+                return "<mask_failed>"
 
-        masked = _mask_db_url(effective_url) if effective_url else 'None'
+        masked = _mask_db_url(effective_url) if effective_url else "None"
         app.logger.info(f"Database URL (masked): {masked}")
 
         # DNS resolution info
         if effective_url:
             p = urlparse(effective_url)
             # Skip DNS resolution for sqlite
-            if p.scheme and p.scheme.lower().startswith('sqlite'):
+            if p.scheme and p.scheme.lower().startswith("sqlite"):
                 pass
             else:
                 host = p.hostname
                 if host:
                     try:
                         addr_list = socket.getaddrinfo(host, None)
-                        ips = sorted({item[4][0] for item in addr_list if item and item[4] and item[4][0]})
-                        app.logger.info(f"DB host '{host}' resolves to: {', '.join(ips)}")
+                        ips = sorted(
+                            {
+                                item[4][0]
+                                for item in addr_list
+                                if item and item[4] and item[4][0]
+                            }
+                        )
+                        app.logger.info(
+                            f"DB host '{host}' resolves to: {', '.join(ips)}"
+                        )
                     except Exception as e:
-                        app.logger.warning(f"DNS resolution failed for DB host '{host}': {e}")
+                        app.logger.warning(
+                            f"DNS resolution failed for DB host '{host}': {e}"
+                        )
     except Exception as e:
         app.logger.warning(f"Failed to log DB URL or DNS info: {e}")
 
     # AI startup diagnostics
     try:
-        debug_flag = (os.getenv('AI_DEBUG_LOGS') or '').lower() == 'true'
+        debug_flag = (os.getenv("AI_DEBUG_LOGS") or "").lower() == "true"
         available = _provider_keys_available()
-        configured = str(app.config.get('AI_PROVIDER', 'gemini')).lower()
+        configured = str(app.config.get("AI_PROVIDER", "gemini")).lower()
         chain = []
         try:
             with app.app_context():
                 chain = _build_failover_chain()
         except Exception:
             # Build a best-effort chain without app context
-            default_order = ['gemini', 'openai', 'perplexity']
+            default_order = ["gemini", "openai", "perplexity"]
             if available.get(configured):
                 chain.append(configured)
             for p in default_order:
                 if available.get(p) and p not in chain:
                     chain.append(p)
-        app.logger.info(f"AI startup: AI_DEBUG_LOGS={debug_flag} configured={configured} available={available} failover_chain={chain}")
+        app.logger.info(
+            f"AI startup: AI_DEBUG_LOGS={debug_flag} configured={configured} available={available} failover_chain={chain}"
+        )
     except Exception as e_diag:
         app.logger.warning(f"AI startup diagnostics failed: {e_diag}")
 
     # Initialize extensions
     _init_extensions(app)
-    
+
     # Initialize database tables
     _init_database(app)
-    
+
     # Register routes
     _register_routes(app)
     _register_additional_routes(app)
@@ -485,7 +563,7 @@ def create_app() -> Flask:
         app.logger.info("Community routes registered")
     except Exception as e:
         app.logger.warning(f"Community routes failed to register: {e}")
-    
+
     # Initialize Enterprise Features
     if ENTERPRISE_FEATURES:
         try:
@@ -495,77 +573,99 @@ def create_app() -> Flask:
             app.logger.warning(f"⚠️ Enterprise features integration failed: {e}")
     else:
         app.logger.info("ℹ️ Enterprise features not enabled")
-    
+
     # Add enterprise endpoints directly
-    @app.route('/api/enterprise/status')
+    @app.route("/api/enterprise/status")
     def enterprise_status():
         """Enterprise status endpoint"""
-        return jsonify({
-            'status': 'active',
-            'features': {
-                'ai_optimization': os.getenv('ENABLE_AI_OPTIMIZATION', 'false').lower() == 'true',
-                'clinical_detection': os.getenv('ENABLE_CLINICAL_DETECTION', 'false').lower() == 'true',
-                'revenue_system': os.getenv('ENABLE_REVENUE_SYSTEM', 'false').lower() == 'true',
-                'security_encryption': os.getenv('ENABLE_SECURITY_ENCRYPTION', 'false').lower() == 'true',
-                'distributed_scale': os.getenv('ENABLE_DISTRIBUTED_SCALE', 'false').lower() == 'true',
-            },
-            'version': '2.0.0',
-            'environment': os.getenv('ENVIRONMENT', 'production'),
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        })
-    
-    @app.route('/api/enterprise/metrics')
+        return jsonify(
+            {
+                "status": "active",
+                "features": {
+                    "ai_optimization": os.getenv(
+                        "ENABLE_AI_OPTIMIZATION", "false"
+                    ).lower()
+                    == "true",
+                    "clinical_detection": os.getenv(
+                        "ENABLE_CLINICAL_DETECTION", "false"
+                    ).lower()
+                    == "true",
+                    "revenue_system": os.getenv(
+                        "ENABLE_REVENUE_SYSTEM", "false"
+                    ).lower()
+                    == "true",
+                    "security_encryption": os.getenv(
+                        "ENABLE_SECURITY_ENCRYPTION", "false"
+                    ).lower()
+                    == "true",
+                    "distributed_scale": os.getenv(
+                        "ENABLE_DISTRIBUTED_SCALE", "false"
+                    ).lower()
+                    == "true",
+                },
+                "version": "2.0.0",
+                "environment": os.getenv("ENVIRONMENT", "production"),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+    @app.route("/api/enterprise/metrics")
     def enterprise_metrics():
         """Enterprise metrics endpoint"""
-        return jsonify({
-            'status': 'active',
-            'metrics': {
-                'uptime': True,
-                'health': 'healthy',
-                'version': '2.0.0'
+        return jsonify(
+            {
+                "status": "active",
+                "metrics": {"uptime": True, "health": "healthy", "version": "2.0.0"},
             }
-        })
-    
+        )
+
     # Attach a request ID to each request and response for traceability
     @app.before_request
     def _attach_request_id():
         try:
-            rid = request.headers.get('X-Request-ID') or str(uuid.uuid4())
+            rid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
             g.request_id = rid
             # Also set as Sentry tag if available
             try:
-                sentry_sdk.set_tag('request_id', rid)
+                sentry_sdk.set_tag("request_id", rid)
             except Exception:
                 pass
         except Exception:
             pass
-    
+
     @app.after_request
     def _add_request_id_header(resp):
         try:
-            rid = getattr(g, 'request_id', None)
+            rid = getattr(g, "request_id", None)
             if rid:
-                resp.headers['X-Request-ID'] = rid
+                resp.headers["X-Request-ID"] = rid
         except Exception:
             pass
         return resp
-    
+
     return app
+
 
 def _init_database(app: Flask) -> None:
     """Initialize database with tables"""
     with app.app_context():
         try:
             # Create tables if they don't exist
-            db.session.execute(text("""
+            db.session.execute(
+                text(
+                    """
                 CREATE TABLE IF NOT EXISTS sessions (
                     id VARCHAR(255) PRIMARY KEY,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """))
-            
-            db.session.execute(text("""
+            """
+                )
+            )
+
+            db.session.execute(
+                text(
+                    """
                 CREATE TABLE IF NOT EXISTS chat_messages (
                     id SERIAL PRIMARY KEY,
                     session_id VARCHAR(255) REFERENCES sessions(id),
@@ -574,9 +674,13 @@ def _init_database(app: Flask) -> None:
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     message_type VARCHAR(50) DEFAULT 'text'
                 )
-            """))
-            
-            db.session.execute(text("""
+            """
+                )
+            )
+
+            db.session.execute(
+                text(
+                    """
                 CREATE TABLE IF NOT EXISTS mood_entries (
                     id SERIAL PRIMARY KEY,
                     session_id VARCHAR(255) REFERENCES sessions(id),
@@ -584,9 +688,13 @@ def _init_database(app: Flask) -> None:
                     note TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """))
-            
-            db.session.execute(text("""
+            """
+                )
+            )
+
+            db.session.execute(
+                text(
+                    """
                 CREATE TABLE IF NOT EXISTS self_assessments (
                     id SERIAL PRIMARY KEY,
                     session_id VARCHAR(255) REFERENCES sessions(id),
@@ -599,9 +707,13 @@ def _init_database(app: Flask) -> None:
                     notes TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """))
-            
-            db.session.execute(text("""
+            """
+                )
+            )
+
+            db.session.execute(
+                text(
+                    """
                 CREATE TABLE IF NOT EXISTS crisis_detections (
                     id SERIAL PRIMARY KEY,
                     session_id VARCHAR(255) REFERENCES sessions(id),
@@ -611,10 +723,14 @@ def _init_database(app: Flask) -> None:
                     keywords TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """))
-            
+            """
+                )
+            )
+
             # Minimal analytics events table (no PII)
-            db.session.execute(text("""
+            db.session.execute(
+                text(
+                    """
                 CREATE TABLE IF NOT EXISTS analytics_events (
                     id SERIAL PRIMARY KEY,
                     session_id VARCHAR(255) REFERENCES sessions(id),
@@ -623,8 +739,10 @@ def _init_database(app: Flask) -> None:
                     request_id VARCHAR(64),
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """))
-            
+            """
+                )
+            )
+
             db.session.commit()
             # Ensure SQLAlchemy models exist (creates missing tables only)
             try:
@@ -636,21 +754,22 @@ def _init_database(app: Flask) -> None:
             # Lightweight migration: ensure conversation_logs table and columns exist
             try:
                 engine = db.session.bind
-                dialect = engine.dialect.name if engine else 'unknown'
+                dialect = engine.dialect.name if engine else "unknown"
 
                 required_cols = {
-                    'session_id': "VARCHAR(36)",
-                    'user_message': "TEXT",
-                    'ai_response': "TEXT",
-                    'risk_level': "VARCHAR(20)",
-                    'risk_score': "DOUBLE PRECISION",
-                    'timestamp': "TIMESTAMP",
+                    "session_id": "VARCHAR(36)",
+                    "user_message": "TEXT",
+                    "ai_response": "TEXT",
+                    "risk_level": "VARCHAR(20)",
+                    "risk_score": "DOUBLE PRECISION",
+                    "timestamp": "TIMESTAMP",
                 }
 
                 # Create table if missing in a dialect-aware way
-                if dialect == 'postgresql':
-                    db.session.execute(text(
-                        """
+                if dialect == "postgresql":
+                    db.session.execute(
+                        text(
+                            """
                         CREATE TABLE IF NOT EXISTS conversation_logs (
                             id SERIAL PRIMARY KEY,
                             session_id VARCHAR(36),
@@ -661,10 +780,12 @@ def _init_database(app: Flask) -> None:
                             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )
                         """
-                    ))
-                elif dialect == 'sqlite':
-                    db.session.execute(text(
-                        """
+                        )
+                    )
+                elif dialect == "sqlite":
+                    db.session.execute(
+                        text(
+                            """
                         CREATE TABLE IF NOT EXISTS conversation_logs (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             session_id TEXT,
@@ -675,11 +796,13 @@ def _init_database(app: Flask) -> None:
                             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                         )
                         """
-                    ))
+                        )
+                    )
                 else:
                     # Fallback generic DDL
-                    db.session.execute(text(
-                        """
+                    db.session.execute(
+                        text(
+                            """
                         CREATE TABLE IF NOT EXISTS conversation_logs (
                             id SERIAL PRIMARY KEY,
                             session_id VARCHAR(36),
@@ -690,30 +813,43 @@ def _init_database(app: Flask) -> None:
                             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )
                         """
-                    ))
+                        )
+                    )
 
                 # Determine existing columns
                 existing_cols = set()
-                if dialect == 'postgresql':
-                    res = db.session.execute(text(
-                        """
+                if dialect == "postgresql":
+                    res = db.session.execute(
+                        text(
+                            """
                         SELECT column_name FROM information_schema.columns
                         WHERE table_name = 'conversation_logs'
                         """
-                    )).fetchall()
+                        )
+                    ).fetchall()
                     existing_cols = {row[0] for row in res}
                     # Add any missing columns safely
                     for col, coltype in required_cols.items():
                         if col not in existing_cols:
-                            db.session.execute(text(f"ALTER TABLE conversation_logs ADD COLUMN IF NOT EXISTS {col} {coltype}"))
-                elif dialect == 'sqlite':
-                    res = db.session.execute(text("PRAGMA table_info(conversation_logs)")).fetchall()
+                            db.session.execute(
+                                text(
+                                    f"ALTER TABLE conversation_logs ADD COLUMN IF NOT EXISTS {col} {coltype}"
+                                )
+                            )
+                elif dialect == "sqlite":
+                    res = db.session.execute(
+                        text("PRAGMA table_info(conversation_logs)")
+                    ).fetchall()
                     # SQLite PRAGMA returns: cid, name, type, notnull, dflt_value, pk
                     existing_cols = {row[1] for row in res}
                     for col, coltype in required_cols.items():
                         if col not in existing_cols:
                             try:
-                                db.session.execute(text(f"ALTER TABLE conversation_logs ADD COLUMN {col} {coltype}"))
+                                db.session.execute(
+                                    text(
+                                        f"ALTER TABLE conversation_logs ADD COLUMN {col} {coltype}"
+                                    )
+                                )
                             except Exception:
                                 # Column may have been added concurrently; ignore
                                 pass
@@ -721,12 +857,18 @@ def _init_database(app: Flask) -> None:
                     # Best-effort attempt to add columns without IF NOT EXISTS
                     for col, coltype in required_cols.items():
                         try:
-                            db.session.execute(text(f"ALTER TABLE conversation_logs ADD COLUMN {col} {coltype}"))
+                            db.session.execute(
+                                text(
+                                    f"ALTER TABLE conversation_logs ADD COLUMN {col} {coltype}"
+                                )
+                            )
                         except Exception:
                             pass
 
                 db.session.commit()
-                app.logger.info("conversation_logs schema ensured/migrated successfully")
+                app.logger.info(
+                    "conversation_logs schema ensured/migrated successfully"
+                )
             except Exception as e:
                 try:
                     db.session.rollback()
@@ -735,7 +877,7 @@ def _init_database(app: Flask) -> None:
                 app.logger.error(f"conversation_logs migration failed (non-fatal): {e}")
 
             app.logger.info("Database tables initialized successfully")
-            
+
         except Exception as e:
             app.logger.error(f"Database initialization error: {e}")
             try:
@@ -743,8 +885,14 @@ def _init_database(app: Flask) -> None:
             except Exception:
                 pass
             # Do NOT crash app during startup; continue and let health endpoint report DB status
-            env = str(getattr(app.config, 'ENVIRONMENT', app.config.get('ENVIRONMENT', 'local'))).lower()
-            app.logger.warning(f"Continuing without DB tables (env={env}). Health checks will reflect DB status.")
+            env = str(
+                getattr(
+                    app.config, "ENVIRONMENT", app.config.get("ENVIRONMENT", "local")
+                )
+            ).lower()
+            app.logger.warning(
+                f"Continuing without DB tables (env={env}). Health checks will reflect DB status."
+            )
 
 
 def _init_extensions(app: Flask) -> None:
@@ -752,27 +900,30 @@ def _init_extensions(app: Flask) -> None:
     try:
         # Initialize database
         db.init_app(app)
-        
+
         # Initialize session management
         _setup_session(app)
-        
+
         # Initialize rate limiter
         app.limiter = _setup_rate_limiter(app)
-        
+
         # Setup CORS
         _setup_cors(app)
-        
-        app.logger.info(f"All extensions initialized successfully for environment: {app.config.get('ENVIRONMENT')}")
-        
+
+        app.logger.info(
+            f"All extensions initialized successfully for environment: {app.config.get('ENVIRONMENT')}"
+        )
+
     except Exception as e:
         app.logger.error(f"Failed to initialize extensions: {e}")
         raise
 
+
 def _setup_session(app: Flask) -> None:
     """Configure session management with Redis fallback"""
-    redis_url = app.config.get('REDIS_URL')
-    
-    if redis_url and redis_url != 'port' and redis_url.strip():
+    redis_url = app.config.get("REDIS_URL")
+
+    if redis_url and redis_url != "port" and redis_url.strip():
         try:
             # Use short socket timeouts so Redis cannot hang requests
             redis_client = redis.from_url(
@@ -782,29 +933,32 @@ def _setup_session(app: Flask) -> None:
                 retry_on_timeout=False,
             )
             redis_client.ping()
-            app.config['SESSION_TYPE'] = 'redis'
-            app.config['SESSION_REDIS'] = redis_client
+            app.config["SESSION_TYPE"] = "redis"
+            app.config["SESSION_REDIS"] = redis_client
             app.logger.info("Redis sessions enabled")
         except Exception as e:
-            app.logger.warning(f"Redis connection failed: {e}, using filesystem sessions")
-            app.config['SESSION_TYPE'] = 'filesystem'
-            app.config['SESSION_REDIS'] = None
+            app.logger.warning(
+                f"Redis connection failed: {e}, using filesystem sessions"
+            )
+            app.config["SESSION_TYPE"] = "filesystem"
+            app.config["SESSION_REDIS"] = None
     else:
         app.logger.info("No REDIS_URL found, using filesystem sessions")
-        app.config['SESSION_TYPE'] = 'filesystem'
-        app.config['SESSION_REDIS'] = None
+        app.config["SESSION_TYPE"] = "filesystem"
+        app.config["SESSION_REDIS"] = None
 
-    app.config['SESSION_PERMANENT'] = False
-    app.config['SESSION_USE_SIGNER'] = False
+    app.config["SESSION_PERMANENT"] = False
+    app.config["SESSION_USE_SIGNER"] = False
 
     Session(app)
+
 
 def _rate_limit_key():
     """Prefer per-session limiting; fall back to client IP.
     This reduces false-positive 429s when many clients share an IP (e.g., behind proxies).
     """
     try:
-        sid = request.headers.get('X-Session-ID')
+        sid = request.headers.get("X-Session-ID")
         if sid and sid.strip():
             return f"sid:{sid.strip()}"
     except Exception:
@@ -812,13 +966,17 @@ def _rate_limit_key():
         pass
     return get_remote_address()
 
+
 def _setup_rate_limiter(app: Flask) -> Limiter:
     """Configure rate limiting"""
     # Choose storage based on Redis availability to avoid blocking when Redis is down
-    storage_uri = 'memory://'
+    storage_uri = "memory://"
     try:
-        if app.config.get('SESSION_TYPE') == 'redis' and app.config.get('SESSION_REDIS') is not None:
-            storage_uri = app.config.get('REDIS_URL', 'memory://')
+        if (
+            app.config.get("SESSION_TYPE") == "redis"
+            and app.config.get("SESSION_REDIS") is not None
+        ):
+            storage_uri = app.config.get("REDIS_URL", "memory://")
     except Exception:
         pass
 
@@ -826,25 +984,26 @@ def _setup_rate_limiter(app: Flask) -> Limiter:
         key_func=_rate_limit_key,
         app=app,
         default_limits=["5000 per day", "1000 per hour"],
-        storage_uri=storage_uri
+        storage_uri=storage_uri,
     )
+
 
 def _setup_cors(app: Flask) -> None:
     """Configure CORS with security best practices"""
-    origins = app.config.get('CORS_ORIGINS') or [
-        'http://localhost:8080',
-        'http://127.0.0.1:8080',
-        'http://localhost:3000',
-        'http://localhost:9100',
-        'http://127.0.0.1:9100',
+    origins = app.config.get("CORS_ORIGINS") or [
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:3000",
+        "http://localhost:9100",
+        "http://127.0.0.1:9100",
     ]
     # In local environment, also allow any localhost/127.0.0.1 port to avoid dev port hassle
     try:
-        if Config.ENVIRONMENT == 'local' or Config.DOCKER_ENV:
+        if Config.ENVIRONMENT == "local" or Config.DOCKER_ENV:
             # Append regex origins that match any port on localhost/127.0.0.1
             origins = list(origins) + [
-                re.compile(r'^http://localhost:\d+$'),
-                re.compile(r'^http://127\.0\.0\.1:\d+$'),
+                re.compile(r"^http://localhost:\d+$"),
+                re.compile(r"^http://127\.0\.0\.1:\d+$"),
             ]
     except Exception:
         # Non-fatal: fall back to explicit origins only
@@ -866,27 +1025,32 @@ def _setup_cors(app: Flask) -> None:
         expose_headers=["Content-Type", "X-Session-ID", "X-Request-ID"],
     )
 
+
 def _register_routes(app: Flask) -> None:
     """Register all application routes"""
-    
+
     @app.before_request
     def ensure_session_id_is_str():
         """Ensure session ID is always a string for consistency"""
-        session_id = request.headers.get('X-Session-ID')
+        session_id = request.headers.get("X-Session-ID")
         if session_id and not isinstance(session_id, str):
             request.headers = request.headers.copy()
-            request.headers['X-Session-ID'] = str(session_id)
+            request.headers["X-Session-ID"] = str(session_id)
 
     @app.route("/", methods=["GET"])
     def index():
         """Serve the Flutter web app or fallback page"""
-        app.logger.info(f"Root route called. Environment: {app.config.get('ENVIRONMENT')}")
-        
-        if os.path.exists(app.static_folder) and os.path.exists(os.path.join(app.static_folder, 'index.html')):
-            return send_from_directory(app.static_folder, 'index.html')
+        app.logger.info(
+            f"Root route called. Environment: {app.config.get('ENVIRONMENT')}"
+        )
+
+        if os.path.exists(app.static_folder) and os.path.exists(
+            os.path.join(app.static_folder, "index.html")
+        ):
+            return send_from_directory(app.static_folder, "index.html")
         else:
             return _get_fallback_html(app)
-    
+
     @app.route("/<path:filename>")
     def serve_static(filename):
         """Serve static files for Flutter web app"""
@@ -894,7 +1058,7 @@ def _register_routes(app: Flask) -> None:
             return send_from_directory(app.static_folder, filename)
         else:
             # Fallback to index.html for SPA routing
-            return send_from_directory(app.static_folder, 'index.html')
+            return send_from_directory(app.static_folder, "index.html")
 
     @app.route("/api/health", methods=["GET"])
     @app.limiter.exempt
@@ -911,15 +1075,17 @@ def _register_routes(app: Flask) -> None:
             redis_ms = int((time.monotonic() - t1) * 1000)
 
             overall = "healthy"
-            if ('unhealthy' in db_status.lower()) or ('unhealthy' in str(redis_status).lower()):
+            if ("unhealthy" in db_status.lower()) or (
+                "unhealthy" in str(redis_status).lower()
+            ):
                 overall = "degraded"
-            
+
             health_data = {
                 "status": overall,
                 "timestamp": datetime.utcnow().isoformat(),
-                "environment": app.config.get('ENVIRONMENT'),
-                "port": app.config.get('PORT'),
-                "provider": app.config.get('AI_PROVIDER'),
+                "environment": app.config.get("ENVIRONMENT"),
+                "port": app.config.get("PORT"),
+                "provider": app.config.get("AI_PROVIDER"),
                 "database": db_status,
                 "redis": redis_status,
                 "latency_ms": {
@@ -927,16 +1093,18 @@ def _register_routes(app: Flask) -> None:
                     "redis_check": redis_ms,
                 },
                 "cors_enabled": True,
-                "cors_origins": app.config.get('CORS_ORIGINS', []),
+                "cors_origins": app.config.get("CORS_ORIGINS", []),
                 "deployment": {
                     "platform": _detect_platform(),
-                    "environment": app.config.get('ENVIRONMENT'),
-                    "version": os.environ.get('VERSION', '1.0.0'),
-                    "build_time": os.environ.get('BUILD_TIME', datetime.utcnow().isoformat()),
+                    "environment": app.config.get("ENVIRONMENT"),
+                    "version": os.environ.get("VERSION", "1.0.0"),
+                    "build_time": os.environ.get(
+                        "BUILD_TIME", datetime.utcnow().isoformat()
+                    ),
                 },
                 "endpoints": [
                     "/api/health",
-                    "/api/chat", 
+                    "/api/chat",
                     "/api/chat_stream",
                     "/api/get_or_create_session",
                     "/api/chat_history",
@@ -945,17 +1113,19 @@ def _register_routes(app: Flask) -> None:
                     "/api/self_assessment",
                     "/api/analytics/log",
                     "/api/metrics",
-                    "/api/deploy-test"
-                ]
+                    "/api/deploy-test",
+                ],
             }
             try:
-                rid = getattr(g, 'request_id', None)
+                rid = getattr(g, "request_id", None)
             except Exception:
                 rid = None
-            app.logger.info(f"health endpoint status={overall} db={db_status} db_ms={db_ms} redis={redis_status} redis_ms={redis_ms} rid={rid}")
-            
+            app.logger.info(
+                f"health endpoint status={overall} db={db_status} db_ms={db_ms} redis={redis_status} redis_ms={redis_ms} rid={rid}"
+            )
+
             return jsonify(health_data), 200
-            
+
         except Exception as e:
             app.logger.error(f"Health check failed: {e}")
             return jsonify({"status": "unhealthy", "error": str(e)}), 500
@@ -976,11 +1146,16 @@ def _register_routes(app: Flask) -> None:
     @app.limiter.exempt
     def deploy_test():
         """Simple deploy verification endpoint"""
-        return jsonify({
-            "ok": True,
-            "version": app.config.get("VERSION"),
-            "environment": app.config.get("ENVIRONMENT")
-        }), 200
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "version": app.config.get("VERSION"),
+                    "environment": app.config.get("ENVIRONMENT"),
+                }
+            ),
+            200,
+        )
 
     @app.route("/api/chat", methods=["POST"])
     @app.limiter.limit("30 per minute")
@@ -988,32 +1163,37 @@ def _register_routes(app: Flask) -> None:
         """Enhanced chat endpoint with geography-specific crisis detection"""
         try:
             data = request.get_json()
-            if not data or 'message' not in data:
+            if not data or "message" not in data:
                 return jsonify({"error": "Message is required"}), 400
-            
+
             session_id = _get_or_create_session()
-            user_message = data['message'].strip()
-            
+            user_message = data["message"].strip()
+
             if not user_message:
                 return jsonify({"error": "Message cannot be empty"}), 400
-            
+
             # Get country from request
             country = get_country_from_request(request)
-            
+
             # Process message with AI provider
             ai_response, risk_level = _process_chat_message(user_message, session_id)
-            
+
             # Get geography-specific crisis data
             crisis_data = get_crisis_response_and_resources(risk_level, country)
-            
-            return jsonify({
-                "response": ai_response,
-                "risk_level": risk_level,
-                "session_id": session_id,
-                "crisis_msg": crisis_data['crisis_msg'],
-                "crisis_numbers": crisis_data['crisis_numbers']
-            }), 200
-            
+
+            return (
+                jsonify(
+                    {
+                        "response": ai_response,
+                        "risk_level": risk_level,
+                        "session_id": session_id,
+                        "crisis_msg": crisis_data["crisis_msg"],
+                        "crisis_numbers": crisis_data["crisis_numbers"],
+                    }
+                ),
+                200,
+            )
+
         except Exception as e:
             app.logger.error(f"Chat endpoint error: {e}")
             return jsonify({"error": "Internal server error"}), 500
@@ -1026,47 +1206,67 @@ def _register_routes(app: Flask) -> None:
         now = datetime.utcnow()
         counts = {}
         try:
-            msg_days = int(app.config.get('MESSAGE_RETENTION_DAYS', 30))
-            sess_days = int(app.config.get('SESSION_RETENTION_DAYS', 14))
-            analytics_days = int(app.config.get('ANALYTICS_RETENTION_DAYS', 90))
+            msg_days = int(app.config.get("MESSAGE_RETENTION_DAYS", 30))
+            sess_days = int(app.config.get("SESSION_RETENTION_DAYS", 14))
+            analytics_days = int(app.config.get("ANALYTICS_RETENTION_DAYS", 90))
             cutoff_msgs = now - timedelta(days=msg_days)
             cutoff_sess = now - timedelta(days=sess_days)
             cutoff_analytics = now - timedelta(days=analytics_days)
 
             # Messages
-            counts['messages_deleted'] = db.session.query(Message).filter(Message.timestamp < cutoff_msgs).delete(synchronize_session=False)
+            counts["messages_deleted"] = (
+                db.session.query(Message)
+                .filter(Message.timestamp < cutoff_msgs)
+                .delete(synchronize_session=False)
+            )
             # Conversation logs
-            counts['conversation_logs_deleted'] = db.session.query(ConversationLog).filter(ConversationLog.timestamp < cutoff_msgs).delete(synchronize_session=False)
+            counts["conversation_logs_deleted"] = (
+                db.session.query(ConversationLog)
+                .filter(ConversationLog.timestamp < cutoff_msgs)
+                .delete(synchronize_session=False)
+            )
             # Crisis events
-            counts['crisis_events_deleted'] = db.session.query(CrisisEvent).filter(CrisisEvent.timestamp < cutoff_msgs).delete(synchronize_session=False)
+            counts["crisis_events_deleted"] = (
+                db.session.query(CrisisEvent)
+                .filter(CrisisEvent.timestamp < cutoff_msgs)
+                .delete(synchronize_session=False)
+            )
             # Self assessments (optional: align with message retention)
-            counts['self_assessments_deleted'] = db.session.query(SelfAssessmentEntry).filter(SelfAssessmentEntry.timestamp < cutoff_msgs).delete(synchronize_session=False)
+            counts["self_assessments_deleted"] = (
+                db.session.query(SelfAssessmentEntry)
+                .filter(SelfAssessmentEntry.timestamp < cutoff_msgs)
+                .delete(synchronize_session=False)
+            )
             # Sessions inactive beyond retention
-            counts['sessions_deleted'] = db.session.query(UserSession).filter(UserSession.last_active < cutoff_sess).delete(synchronize_session=False)
+            counts["sessions_deleted"] = (
+                db.session.query(UserSession)
+                .filter(UserSession.last_active < cutoff_sess)
+                .delete(synchronize_session=False)
+            )
 
             # Legacy/raw tables (best-effort). Ignore if not present.
             try:
                 res = db.session.execute(
                     text("DELETE FROM chat_messages WHERE timestamp < :cutoff"),
-                    {"cutoff": cutoff_msgs}
+                    {"cutoff": cutoff_msgs},
                 )
-                counts['chat_messages_deleted'] = getattr(res, 'rowcount', None)
+                counts["chat_messages_deleted"] = getattr(res, "rowcount", None)
             except Exception as _:
                 pass
             try:
                 res = db.session.execute(
                     text("DELETE FROM user_sessions WHERE last_active < :cutoff"),
-                    {"cutoff": cutoff_sess}
+                    {"cutoff": cutoff_sess},
                 )
-                counts['legacy_sessions_deleted'] = getattr(res, 'rowcount', None)
+                counts["legacy_sessions_deleted"] = getattr(res, "rowcount", None)
             except Exception as _:
                 pass
             try:
                 res = db.session.execute(
                     text("DELETE FROM analytics_events WHERE timestamp < :cutoff"),
-                    {"cutoff": cutoff_analytics}
+                    {"cutoff": cutoff_analytics},
                 )
-                counts['analytics_events_deleted'] = getattr(res, 'rowcount', None)
+                counts["analytics_events_deleted"] = getattr(res, "rowcount", None)
             except Exception as _:
                 pass
 
@@ -1077,7 +1277,7 @@ def _register_routes(app: Flask) -> None:
             app.logger.error(f"Purge error: {e}")
             raise
 
-    @app.route('/api/analytics/log', methods=['POST'])
+    @app.route("/api/analytics/log", methods=["POST"])
     @app.limiter.limit("120 per minute")
     def log_analytics_event():
         """Minimal analytics logging endpoint.
@@ -1087,31 +1287,47 @@ def _register_routes(app: Flask) -> None:
         - Associates events to a session and request_id for traceability.
         """
         try:
-            consent = (request.headers.get('X-Analytics-Consent', '') or '').lower()
-            if consent != 'true':
+            consent = (request.headers.get("X-Analytics-Consent", "") or "").lower()
+            if consent != "true":
                 return jsonify({"skipped": "no consent"}), 202
 
             data = request.get_json(silent=True) or {}
-            event_type = (data.get('event_type') or '').strip()
+            event_type = (data.get("event_type") or "").strip()
             if not event_type or len(event_type) > 64:
                 return jsonify({"error": "Invalid event_type"}), 400
 
             # Allow only safe characters in event_type
-            allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-")
+            allowed = set(
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-"
+            )
             if any(ch not in allowed for ch in event_type):
                 return jsonify({"error": "Invalid event_type"}), 400
 
-            raw_meta = data.get('metadata') or {}
+            raw_meta = data.get("metadata") or {}
             metadata: Dict[str, Any] = {}
             if isinstance(raw_meta, dict):
                 # Whitelist allowed keys and simple types only, trim long strings
                 allowed_keys = {
                     # Generic analytics keys
-                    'action', 'label', 'screen', 'source', 'value', 'count', 'duration_ms', 'success', 'code', 'provider',
+                    "action",
+                    "label",
+                    "screen",
+                    "source",
+                    "value",
+                    "count",
+                    "duration_ms",
+                    "success",
+                    "code",
+                    "provider",
                     # Quest telemetry contract keys (PII-free)
-                    'quest_id', 'tag', 'surface', 'variant', 'ts', 'progress',
+                    "quest_id",
+                    "tag",
+                    "surface",
+                    "variant",
+                    "ts",
+                    "progress",
                     # UI context (non-PII)
-                    'ui'
+                    "ui",
                 }
                 for k, v in raw_meta.items():
                     if k in allowed_keys and isinstance(v, (str, int, float, bool)):
@@ -1121,10 +1337,10 @@ def _register_routes(app: Flask) -> None:
 
             # Ensure session exists and get ID
             session_id = _get_or_create_session()
-            req_id = getattr(g, 'request_id', None)
+            req_id = getattr(g, "request_id", None)
 
             # Store as compact JSON string in TEXT column to avoid dialect issues
-            meta_json = json.dumps(metadata, separators=(',', ':'), ensure_ascii=False)
+            meta_json = json.dumps(metadata, separators=(",", ":"), ensure_ascii=False)
 
             db.session.execute(
                 text(
@@ -1132,11 +1348,11 @@ def _register_routes(app: Flask) -> None:
                     "VALUES (:session_id, :event_type, :metadata, :request_id, CURRENT_TIMESTAMP)"
                 ),
                 {
-                    'session_id': session_id,
-                    'event_type': event_type,
-                    'metadata': meta_json,
-                    'request_id': req_id,
-                }
+                    "session_id": session_id,
+                    "event_type": event_type,
+                    "metadata": meta_json,
+                    "request_id": req_id,
+                },
             )
             db.session.commit()
             return jsonify({"ok": True}), 201
@@ -1145,7 +1361,7 @@ def _register_routes(app: Flask) -> None:
             app.logger.error(f"Analytics log error: {e}")
             return jsonify({"error": "Failed to log analytics"}), 500
 
-    @app.route('/api/analytics/recent', methods=['GET'])
+    @app.route("/api/analytics/recent", methods=["GET"])
     @app.limiter.limit("60 per minute")
     def analytics_recent():
         """Read-only: Fetch recent analytics events for debugging.
@@ -1154,18 +1370,18 @@ def _register_routes(app: Flask) -> None:
           - limit: max records (default 50, max 200)
         """
         try:
-            prefix = (request.args.get('event_prefix') or '').strip()
+            prefix = (request.args.get("event_prefix") or "").strip()
             try:
-                limit = int(request.args.get('limit', '50'))
+                limit = int(request.args.get("limit", "50"))
             except Exception:
                 limit = 50
             limit = max(1, min(limit, 200))
 
-            params: Dict[str, Any] = { 'limit': limit }
+            params: Dict[str, Any] = {"limit": limit}
             where_clause = ""
             if prefix:
                 where_clause = "WHERE event_type LIKE :prefix"
-                params['prefix'] = f"{prefix}%"
+                params["prefix"] = f"{prefix}%"
 
             # Initialize timing and accumulator to avoid NameError and measure latency
             start = time.monotonic()
@@ -1185,7 +1401,7 @@ def _register_routes(app: Flask) -> None:
             # Execute with a short statement timeout on Postgres to avoid hangs
             engine = db.session.bind
             dialect = engine.dialect.name if engine else None
-            if dialect == 'postgresql':
+            if dialect == "postgresql":
                 with engine.connect() as conn:
                     with conn.begin():
                         conn.execute(text("SET LOCAL statement_timeout = 2000"))
@@ -1195,34 +1411,43 @@ def _register_routes(app: Flask) -> None:
                 result = db.session.execute(sql, params)
                 rows = list(result.mappings())
             for r in rows:
-                meta = r.get('metadata')
-                ts_val = r.get('ts')
+                meta = r.get("metadata")
+                ts_val = r.get("ts")
                 if isinstance(ts_val, datetime):
                     ts_str = ts_val.isoformat()
                 elif ts_val is not None:
                     ts_str = str(ts_val)
                 else:
                     ts_str = None
-                events.append({
-                    'event_type': r.get('event_type'),
-                    'metadata': meta,
-                    'request_id': r.get('request_id'),
-                    'timestamp': ts_str,
-                })
+                events.append(
+                    {
+                        "event_type": r.get("event_type"),
+                        "metadata": meta,
+                        "request_id": r.get("request_id"),
+                        "timestamp": ts_str,
+                    }
+                )
             elapsed_ms = int((time.monotonic() - start) * 1000)
-            app.logger.info(f"analytics_recent fetched count={len(events)} elapsed_ms={elapsed_ms} prefix='{prefix}' limit={limit}")
-            return jsonify({ 'events': events, 'count': len(events), 'elapsed_ms': elapsed_ms }), 200
+            app.logger.info(
+                f"analytics_recent fetched count={len(events)} elapsed_ms={elapsed_ms} prefix='{prefix}' limit={limit}"
+            )
+            return (
+                jsonify(
+                    {"events": events, "count": len(events), "elapsed_ms": elapsed_ms}
+                ),
+                200,
+            )
         except Exception as e:
             app.logger.error(f"Analytics recent error: {e}")
             return jsonify({"error": "Failed to fetch analytics"}), 500
 
-    @app.route('/api/admin/purge', methods=['POST'])
+    @app.route("/api/admin/purge", methods=["POST"])
     def admin_purge():
         """Admin-only: Purge old data per retention policy.
         Requires header X-Admin-Token matching ADMIN_API_TOKEN.
         """
-        token = request.headers.get('X-Admin-Token')
-        expected = app.config.get('ADMIN_API_TOKEN')
+        token = request.headers.get("X-Admin-Token")
+        expected = app.config.get("ADMIN_API_TOKEN")
         if not expected or token != expected:
             return jsonify({"error": "Unauthorized"}), 401
         try:
@@ -1231,48 +1456,63 @@ def _register_routes(app: Flask) -> None:
         except Exception as e:
             return jsonify({"error": "Purge failed", "details": str(e)}), 500
 
-    @app.route('/api/admin/retention_config', methods=['GET'])
+    @app.route("/api/admin/retention_config", methods=["GET"])
     def retention_config():
         """Admin-only: View effective retention configuration."""
-        token = request.headers.get('X-Admin-Token')
-        expected = app.config.get('ADMIN_API_TOKEN')
+        token = request.headers.get("X-Admin-Token")
+        expected = app.config.get("ADMIN_API_TOKEN")
         if not expected or token != expected:
             return jsonify({"error": "Unauthorized"}), 401
-        return jsonify({
-            "message_retention_days": app.config.get('MESSAGE_RETENTION_DAYS'),
-            "session_retention_days": app.config.get('SESSION_RETENTION_DAYS'),
-            "error_log_retention_days": app.config.get('ERROR_LOG_RETENTION_DAYS'),
-            "analytics_retention_days": app.config.get('ANALYTICS_RETENTION_DAYS'),
-        }), 200
+        return (
+            jsonify(
+                {
+                    "message_retention_days": app.config.get("MESSAGE_RETENTION_DAYS"),
+                    "session_retention_days": app.config.get("SESSION_RETENTION_DAYS"),
+                    "error_log_retention_days": app.config.get(
+                        "ERROR_LOG_RETENTION_DAYS"
+                    ),
+                    "analytics_retention_days": app.config.get(
+                        "ANALYTICS_RETENTION_DAYS"
+                    ),
+                }
+            ),
+            200,
+        )
+
 
 def _get_or_create_session() -> str:
     """Get or create user session with proper error handling"""
-    session_id = request.headers.get('X-Session-ID')
-    
+    session_id = request.headers.get("X-Session-ID")
+
     if not session_id:
         session_id = str(uuid.uuid4())
-    
+
     try:
         # First ensure legacy 'sessions' table has the row, since many FKs reference it
         existing_legacy = db.session.execute(
             text("SELECT id FROM sessions WHERE id = :session_id"),
-            {"session_id": session_id}
+            {"session_id": session_id},
         ).fetchone()
 
         from flask import current_app
+
         if not existing_legacy:
             # Create session in legacy table (authoritative for FK references)
             db.session.execute(
-                text("INSERT INTO sessions (id, created_at, last_activity) VALUES (:session_id, NOW(), NOW())"),
-                {"session_id": session_id}
+                text(
+                    "INSERT INTO sessions (id, created_at, last_activity) VALUES (:session_id, NOW(), NOW())"
+                ),
+                {"session_id": session_id},
             )
             db.session.commit()
             current_app.logger.info(f"Created new session (sessions): {session_id}")
         else:
             # Touch last_activity to keep it fresh
             db.session.execute(
-                text("UPDATE sessions SET last_activity = NOW() WHERE id = :session_id"),
-                {"session_id": session_id}
+                text(
+                    "UPDATE sessions SET last_activity = NOW() WHERE id = :session_id"
+                ),
+                {"session_id": session_id},
             )
             db.session.commit()
             current_app.logger.info(f"Using existing session (sessions): {session_id}")
@@ -1285,80 +1525,89 @@ def _get_or_create_session() -> str:
                     "VALUES (:session_id, NOW(), NOW()) "
                     "ON CONFLICT (id) DO UPDATE SET last_active = EXCLUDED.last_active"
                 ),
-                {"session_id": session_id}
+                {"session_id": session_id},
             )
             db.session.commit()
         except Exception as e:
             # Non-fatal. This table may not exist in older deployments.
             current_app.logger.warning(f"user_sessions mirror failed: {e}")
-        
+
     except Exception as e:
         # Use current_app for logging in request context
         from flask import current_app
+
         current_app.logger.error(f"Session management error: {e}")
         # Continue without database session if needed
-    
+
     return session_id
+
 
 def _process_chat_message(message: str, session_id: str) -> Tuple[str, str]:
     """Process chat message with AI provider and crisis detection"""
     try:
         # Detect crisis level FIRST
         risk_level = detect_crisis_level(message)
-        
+
         # Get AI response with cross-provider failover inferred from key presence
-        ai_response, _used_provider = _get_ai_response_with_failover(message, session_id, risk_level)
+        ai_response, _used_provider = _get_ai_response_with_failover(
+            message, session_id, risk_level
+        )
 
         # Log conversation
         _log_conversation(session_id, message, ai_response, risk_level)
-        
+
         return ai_response, risk_level
-        
+
     except Exception as e:
         # Use current_app for logging in request context
         from flask import current_app
-        current_app.logger.error(f"Message processing error: {e}")
-        return "I'm having trouble processing your message right now. Please try again.", "low"
 
-def _log_conversation(session_id: str, user_message: str, ai_response: str, risk_level: str) -> None:
+        current_app.logger.error(f"Message processing error: {e}")
+        return (
+            "I'm having trouble processing your message right now. Please try again.",
+            "low",
+        )
+
+
+def _log_conversation(
+    session_id: str, user_message: str, ai_response: str, risk_level: str
+) -> None:
     """Log conversation to database with error handling"""
     try:
         # Convert risk level to numeric score
         risk_score = _convert_risk_level_to_score(risk_level)
-        
+
         conversation_log = ConversationLog(
             session_id=session_id,
             user_message=user_message,
             ai_response=ai_response,
             risk_level=risk_level,
             risk_score=risk_score,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
-        
+
         db.session.add(conversation_log)
         db.session.commit()
-        
+
     except Exception as e:
         # Use current_app for logging in request context
         from flask import current_app
+
         current_app.logger.error(f"Failed to log conversation: {e}")
+
 
 def _convert_risk_level_to_score(risk_level: str) -> float:
     """Convert risk level string to numeric score"""
-    risk_mapping = {
-        'low': 0.0,
-        'medium': 0.5,
-        'high': 0.8,
-        'crisis': 1.0
-    }
+    risk_mapping = {"low": 0.0, "medium": 0.5, "high": 0.8, "crisis": 1.0}
     return risk_mapping.get(risk_level.lower(), 0.0)
+
 
 def _check_database_health() -> str:
     """Check database connection health"""
     try:
         engine = db.session.bind
         dialect = engine.dialect.name if engine else None
-        if dialect == 'postgresql':
+        if dialect == "postgresql":
             # Run within a short transaction with a statement timeout
             with engine.connect() as conn:
                 with conn.begin():
@@ -1370,17 +1619,20 @@ def _check_database_health() -> str:
     except Exception as e:
         try:
             from flask import current_app
+
             current_app.logger.error(f"Database health check failed: {e}")
         except Exception:
             pass
         return f"unhealthy: {str(e)}"
 
+
 def _check_redis_health() -> str:
     """Check Redis connection health"""
     try:
         from flask import current_app
-        if current_app.config.get('SESSION_TYPE') == 'redis':
-            redis_client = current_app.config.get('SESSION_REDIS')
+
+        if current_app.config.get("SESSION_TYPE") == "redis":
+            redis_client = current_app.config.get("SESSION_REDIS")
             if redis_client:
                 # ping uses the socket timeouts configured in _setup_session
                 redis_client.ping()
@@ -1392,14 +1644,16 @@ def _check_redis_health() -> str:
     except Exception as e:
         return f"unhealthy: {str(e)}"
 
+
 def _detect_platform() -> str:
     """Detect deployment platform for single codebase usage"""
-    if os.environ.get('RENDER'):
-        return 'render'
-    elif os.environ.get('DOCKER_ENV') or os.environ.get('DOCKER'):
-        return 'docker'
+    if os.environ.get("RENDER"):
+        return "render"
+    elif os.environ.get("DOCKER_ENV") or os.environ.get("DOCKER"):
+        return "docker"
     else:
-        return 'local'
+        return "local"
+
 
 def _get_fallback_html(app: Flask) -> str:
     """Generate fallback HTML page with environment info"""
@@ -1437,6 +1691,7 @@ def _get_fallback_html(app: Flask) -> str:
     </html>
     """
 
+
 def _is_failure_response(text: str) -> bool:
     """Heuristic to detect unusable provider responses."""
     if not text:
@@ -1462,16 +1717,22 @@ def _parse_csv_env(val: str) -> List[str]:
 def _provider_keys_available() -> Dict[str, bool]:
     """Infer provider availability from environment variables."""
     import os as _os
-    gem_keys = _parse_csv_env(_os.getenv("GEMINI_API_KEY") or "") + _parse_csv_env(_os.getenv("GEMINI_API_KEYS") or "")
+
+    gem_keys = _parse_csv_env(_os.getenv("GEMINI_API_KEY") or "") + _parse_csv_env(
+        _os.getenv("GEMINI_API_KEYS") or ""
+    )
     has_gemini = len(gem_keys) > 0
     has_openai = bool((_os.getenv("OPENAI_API_KEY") or "").strip())
-    has_pplx = bool(((_os.getenv("PERPLEXITY_API_KEY") or _os.getenv("PPLX_API_KEY") or "").strip()))
+    has_pplx = bool(
+        ((_os.getenv("PERPLEXITY_API_KEY") or _os.getenv("PPLX_API_KEY") or "").strip())
+    )
     return {"gemini": has_gemini, "openai": has_openai, "perplexity": has_pplx}
 
 
 def _build_failover_chain() -> List[str]:
     """Prefer configured provider if available, then gemini -> openai -> perplexity."""
     from flask import current_app
+
     available = _provider_keys_available()
     configured = str(current_app.config.get("AI_PROVIDER", "gemini")).lower()
     default_order = ["gemini", "openai", "perplexity"]
@@ -1484,7 +1745,9 @@ def _build_failover_chain() -> List[str]:
     return chain or ["gemini"]
 
 
-def _call_provider(provider: str, message: str, session_id: str, risk_level: str) -> str:
+def _call_provider(
+    provider: str, message: str, session_id: str, risk_level: str
+) -> str:
     """Call providers with correct signatures and minimal side effects."""
     from providers.gemini import get_gemini_response
     from providers.openai import get_openai_response
@@ -1492,7 +1755,9 @@ def _call_provider(provider: str, message: str, session_id: str, risk_level: str
     import os as _os
 
     if provider == "gemini":
-        return get_gemini_response(message, session_id=session_id, risk_level=risk_level)
+        return get_gemini_response(
+            message, session_id=session_id, risk_level=risk_level
+        )
     elif provider == "openai":
         return get_openai_response(message)
     elif provider == "perplexity":
@@ -1503,10 +1768,14 @@ def _call_provider(provider: str, message: str, session_id: str, risk_level: str
                 _os.environ["PERPLEXITY_API_KEY"] = alt
         return get_perplexity_response(message)
     else:
-        return get_gemini_response(message, session_id=session_id, risk_level=risk_level)
+        return get_gemini_response(
+            message, session_id=session_id, risk_level=risk_level
+        )
 
 
-def _get_ai_response_with_failover(message: str, session_id: str, risk_level: str) -> Tuple[str, str]:
+def _get_ai_response_with_failover(
+    message: str, session_id: str, risk_level: str
+) -> Tuple[str, str]:
     """Try providers in order until a viable response is obtained. Returns (text, used_provider)."""
     chain = _build_failover_chain()
     last_err_text = None
@@ -1519,198 +1788,262 @@ def _get_ai_response_with_failover(message: str, session_id: str, risk_level: st
         except Exception as _e:
             last_err_text = f"Error generating response: {_e}"
             continue
-    return (last_err_text or "I'm having trouble connecting to my AI services. Please try again in a moment."), (chain[-1] if chain else "unknown")
+    return (
+        last_err_text
+        or "I'm having trouble connecting to my AI services. Please try again in a moment."
+    ), (chain[-1] if chain else "unknown")
+
 
 def _enhanced_crisis_detection(message: str) -> Tuple[str, float, List[str]]:
     """Enhanced crisis detection with keyword analysis"""
     message_lower = message.lower()
-    
+
     # Crisis keywords with weights
     crisis_keywords = {
-        'suicide': 1.0, 'kill myself': 1.0, 'want to die': 1.0, 'end it all': 1.0,
-        'take me from this earth': 1.0, 'take me from earth': 1.0, 'remove me from earth': 1.0,
-        'self harm': 0.9, 'cut myself': 0.9, 'hurt myself': 0.9,
-        'hopeless': 0.8, 'no hope': 0.8, 'worthless': 0.8, 'useless': 0.8,
-        'depressed': 0.7, 'depression': 0.7, 'anxiety': 0.6, 'panic': 0.6,
-        'lonely': 0.5, 'alone': 0.5, 'isolated': 0.5,
-        'stress': 0.4, 'overwhelmed': 0.4, 'can\'t cope': 0.4
+        "suicide": 1.0,
+        "kill myself": 1.0,
+        "want to die": 1.0,
+        "end it all": 1.0,
+        "take me from this earth": 1.0,
+        "take me from earth": 1.0,
+        "remove me from earth": 1.0,
+        "self harm": 0.9,
+        "cut myself": 0.9,
+        "hurt myself": 0.9,
+        "hopeless": 0.8,
+        "no hope": 0.8,
+        "worthless": 0.8,
+        "useless": 0.8,
+        "depressed": 0.7,
+        "depression": 0.7,
+        "anxiety": 0.6,
+        "panic": 0.6,
+        "lonely": 0.5,
+        "alone": 0.5,
+        "isolated": 0.5,
+        "stress": 0.4,
+        "overwhelmed": 0.4,
+        "can't cope": 0.4,
     }
-    
+
     found_keywords = []
     total_score = 0.0
-    
+
     for keyword, weight in crisis_keywords.items():
         if keyword in message_lower:
             found_keywords.append(keyword)
             total_score += weight
-    
+
     # Normalize score
     max_possible_score = sum(crisis_keywords.values())
     normalized_score = total_score / max_possible_score if max_possible_score > 0 else 0
-    
+
     # Determine risk level
     if normalized_score >= 0.8:
-        risk_level = 'crisis'
+        risk_level = "crisis"
     elif normalized_score >= 0.6:
-        risk_level = 'high'
+        risk_level = "high"
     elif normalized_score >= 0.4:
-        risk_level = 'medium'
+        risk_level = "medium"
     else:
-        risk_level = 'low'
-    
+        risk_level = "low"
+
     return risk_level, normalized_score, found_keywords
 
 
-def get_crisis_response_and_resources(risk_level: str, country: str = 'generic') -> Dict[str, Any]:
+def get_crisis_response_and_resources(
+    risk_level: str, country: str = "generic"
+) -> Dict[str, Any]:
     """Get geography-specific crisis response and resources"""
-    if risk_level == 'crisis':
+    if risk_level == "crisis":
         # Get country-specific crisis resources
-        country_resources = CRISIS_RESOURCES_BY_COUNTRY.get(country, CRISIS_RESOURCES_BY_COUNTRY['generic'])
+        country_resources = CRISIS_RESOURCES_BY_COUNTRY.get(
+            country, CRISIS_RESOURCES_BY_COUNTRY["generic"]
+        )
         return {
-            'crisis_msg': country_resources['crisis_msg'],
-            'crisis_numbers': country_resources['crisis_numbers'],
-            'risk_level': risk_level
+            "crisis_msg": country_resources["crisis_msg"],
+            "crisis_numbers": country_resources["crisis_numbers"],
+            "risk_level": risk_level,
         }
     else:
         # For non-crisis levels, return standard responses
         responses = {
-            'high': "I'm worried about what you're experiencing. These feelings are serious and you deserve support. Please consider reaching out to a mental health professional or calling your local crisis helpline. You don't have to face this alone.",
-            'medium': "I can see you're going through a difficult time. It's important to take these feelings seriously. Consider talking to someone you trust or reaching out to a mental health professional. You're showing strength by sharing this.",
-            'low': "Thank you for sharing how you're feeling. It's normal to have difficult moments, and it's okay to not be okay. Consider reaching out to friends, family, or a mental health professional for support."
+            "high": "I'm worried about what you're experiencing. These feelings are serious and you deserve support. Please consider reaching out to a mental health professional or calling your local crisis helpline. You don't have to face this alone.",
+            "medium": "I can see you're going through a difficult time. It's important to take these feelings seriously. Consider talking to someone you trust or reaching out to a mental health professional. You're showing strength by sharing this.",
+            "low": "Thank you for sharing how you're feeling. It's normal to have difficult moments, and it's okay to not be okay. Consider reaching out to friends, family, or a mental health professional for support.",
         }
         return {
-            'crisis_msg': responses.get(risk_level, responses['low']),
-            'crisis_numbers': [],
-            'risk_level': risk_level
+            "crisis_msg": responses.get(risk_level, responses["low"]),
+            "crisis_numbers": [],
+            "risk_level": risk_level,
         }
+
 
 def _get_crisis_response(risk_level: str, risk_score: float) -> str:
     """Get appropriate crisis response based on risk level (legacy function)"""
-    if risk_level == 'crisis':
-        return CRISIS_RESOURCES_BY_COUNTRY['generic']['crisis_msg']
+    if risk_level == "crisis":
+        return CRISIS_RESOURCES_BY_COUNTRY["generic"]["crisis_msg"]
     else:
         responses = {
-            'high': "I'm worried about what you're experiencing. These feelings are serious and you deserve support. Please consider reaching out to a mental health professional or calling your local crisis helpline. You don't have to face this alone.",
-            'medium': "I can see you're going through a difficult time. It's important to take these feelings seriously. Consider talking to someone you trust or reaching out to a mental health professional. You're showing strength by sharing this.",
-            'low': "Thank you for sharing how you're feeling. It's normal to have difficult moments, and it's okay to not be okay. Consider reaching out to friends, family, or a mental health professional for support."
+            "high": "I'm worried about what you're experiencing. These feelings are serious and you deserve support. Please consider reaching out to a mental health professional or calling your local crisis helpline. You don't have to face this alone.",
+            "medium": "I can see you're going through a difficult time. It's important to take these feelings seriously. Consider talking to someone you trust or reaching out to a mental health professional. You're showing strength by sharing this.",
+            "low": "Thank you for sharing how you're feeling. It's normal to have difficult moments, and it's okay to not be okay. Consider reaching out to friends, family, or a mental health professional for support.",
         }
-        return responses.get(risk_level, responses['low'])
+        return responses.get(risk_level, responses["low"])
 
 
 def _get_crisis_resources(risk_level: str) -> Dict[str, Any]:
     """Get crisis resources based on risk level"""
     resources = {
-        'crisis': {
-            'immediate': [
-                {'name': 'National Suicide Prevention Lifeline', 'number': '988', 'available': '24/7'},
-                {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'},
-                {'name': 'Emergency Services', 'number': '911', 'available': '24/7'}
+        "crisis": {
+            "immediate": [
+                {
+                    "name": "National Suicide Prevention Lifeline",
+                    "number": "988",
+                    "available": "24/7",
+                },
+                {
+                    "name": "Crisis Text Line",
+                    "text": "HOME to 741741",
+                    "available": "24/7",
+                },
+                {"name": "Emergency Services", "number": "911", "available": "24/7"},
             ],
-            'online': [
-                {'name': 'Crisis Chat', 'url': 'https://www.crisischat.org/'},
-                {'name': 'IMAlive', 'url': 'https://www.imalive.org/'}
-            ]
-        },
-        'high': {
-            'immediate': [
-                {'name': 'National Suicide Prevention Lifeline', 'number': '988', 'available': '24/7'},
-                {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'}
+            "online": [
+                {"name": "Crisis Chat", "url": "https://www.crisischat.org/"},
+                {"name": "IMAlive", "url": "https://www.imalive.org/"},
             ],
-            'online': [
-                {'name': 'Find a Therapist', 'url': 'https://www.psychologytoday.com/us/therapists'},
-                {'name': 'Mental Health Resources', 'url': 'https://www.nami.org/help'}
-            ]
         },
-        'medium': {
-            'immediate': [
-                {'name': 'Crisis Text Line', 'text': 'HOME to 741741', 'available': '24/7'}
+        "high": {
+            "immediate": [
+                {
+                    "name": "National Suicide Prevention Lifeline",
+                    "number": "988",
+                    "available": "24/7",
+                },
+                {
+                    "name": "Crisis Text Line",
+                    "text": "HOME to 741741",
+                    "available": "24/7",
+                },
             ],
-            'online': [
-                {'name': 'Find a Therapist', 'url': 'https://www.psychologytoday.com/us/therapists'},
-                {'name': 'Mental Health Resources', 'url': 'https://www.nami.org/help'}
-            ]
+            "online": [
+                {
+                    "name": "Find a Therapist",
+                    "url": "https://www.psychologytoday.com/us/therapists",
+                },
+                {"name": "Mental Health Resources", "url": "https://www.nami.org/help"},
+            ],
         },
-        'low': {
-            'immediate': [],
-            'online': [
-                {'name': 'Mental Health Resources', 'url': 'https://www.nami.org/help'},
-                {'name': 'Self-Care Tips', 'url': 'https://www.mind.org.uk/information-support/tips-for-everyday-living/'}
-            ]
-        }
+        "medium": {
+            "immediate": [
+                {
+                    "name": "Crisis Text Line",
+                    "text": "HOME to 741741",
+                    "available": "24/7",
+                }
+            ],
+            "online": [
+                {
+                    "name": "Find a Therapist",
+                    "url": "https://www.psychologytoday.com/us/therapists",
+                },
+                {"name": "Mental Health Resources", "url": "https://www.nami.org/help"},
+            ],
+        },
+        "low": {
+            "immediate": [],
+            "online": [
+                {"name": "Mental Health Resources", "url": "https://www.nami.org/help"},
+                {
+                    "name": "Self-Care Tips",
+                    "url": "https://www.mind.org.uk/information-support/tips-for-everyday-living/",
+                },
+            ],
+        },
     }
-    return resources.get(risk_level, resources['low'])
+    return resources.get(risk_level, resources["low"])
 
-def _get_personalized_recommendations(avg_mood: float, recent_entries: List) -> List[Dict[str, Any]]:
+
+def _get_personalized_recommendations(
+    avg_mood: float, recent_entries: List
+) -> List[Dict[str, Any]]:
     """Get personalized wellness recommendations based on mood"""
     recommendations = []
-    
+
     if avg_mood <= 2.0:
         # Low mood recommendations
-        recommendations.extend([
-            {
-                'type': 'immediate',
-                'title': 'Reach Out for Support',
-                'description': 'Consider talking to a trusted friend, family member, or mental health professional.',
-                'action': 'Call a friend or family member'
-            },
-            {
-                'type': 'activity',
-                'title': 'Gentle Physical Activity',
-                'description': 'Even a short walk can help improve your mood and energy levels.',
-                'action': 'Take a 10-minute walk outside'
-            },
-            {
-                'type': 'self_care',
-                'title': 'Practice Self-Compassion',
-                'description': 'Be kind to yourself. It\'s okay to not be okay.',
-                'action': 'Write down 3 things you\'re grateful for'
-            }
-        ])
+        recommendations.extend(
+            [
+                {
+                    "type": "immediate",
+                    "title": "Reach Out for Support",
+                    "description": "Consider talking to a trusted friend, family member, or mental health professional.",
+                    "action": "Call a friend or family member",
+                },
+                {
+                    "type": "activity",
+                    "title": "Gentle Physical Activity",
+                    "description": "Even a short walk can help improve your mood and energy levels.",
+                    "action": "Take a 10-minute walk outside",
+                },
+                {
+                    "type": "self_care",
+                    "title": "Practice Self-Compassion",
+                    "description": "Be kind to yourself. It's okay to not be okay.",
+                    "action": "Write down 3 things you're grateful for",
+                },
+            ]
+        )
     elif avg_mood <= 3.5:
         # Moderate mood recommendations
-        recommendations.extend([
-            {
-                'type': 'activity',
-                'title': 'Engage in Enjoyable Activities',
-                'description': 'Do something you normally enjoy, even if you don\'t feel like it initially.',
-                'action': 'Listen to your favorite music or watch a movie'
-            },
-            {
-                'type': 'social',
-                'title': 'Social Connection',
-                'description': 'Connect with others, even if it\'s just a brief conversation.',
-                'action': 'Send a message to a friend'
-            },
-            {
-                'type': 'routine',
-                'title': 'Maintain Daily Routine',
-                'description': 'Stick to your regular schedule to provide structure and stability.',
-                'action': 'Follow your usual daily routine'
-            }
-        ])
+        recommendations.extend(
+            [
+                {
+                    "type": "activity",
+                    "title": "Engage in Enjoyable Activities",
+                    "description": "Do something you normally enjoy, even if you don't feel like it initially.",
+                    "action": "Listen to your favorite music or watch a movie",
+                },
+                {
+                    "type": "social",
+                    "title": "Social Connection",
+                    "description": "Connect with others, even if it's just a brief conversation.",
+                    "action": "Send a message to a friend",
+                },
+                {
+                    "type": "routine",
+                    "title": "Maintain Daily Routine",
+                    "description": "Stick to your regular schedule to provide structure and stability.",
+                    "action": "Follow your usual daily routine",
+                },
+            ]
+        )
     else:
         # Good mood recommendations
-        recommendations.extend([
-            {
-                'type': 'maintenance',
-                'title': 'Maintain Positive Habits',
-                'description': 'Keep up with activities that contribute to your well-being.',
-                'action': 'Continue your current positive routines'
-            },
-            {
-                'type': 'growth',
-                'title': 'Personal Development',
-                'description': 'Use your positive energy to work on personal goals.',
-                'action': 'Set a small goal for the week'
-            },
-            {
-                'type': 'gratitude',
-                'title': 'Practice Gratitude',
-                'description': 'Reflect on what\'s going well in your life.',
-                'action': 'Write down 5 things you appreciate today'
-            }
-        ])
-    
+        recommendations.extend(
+            [
+                {
+                    "type": "maintenance",
+                    "title": "Maintain Positive Habits",
+                    "description": "Keep up with activities that contribute to your well-being.",
+                    "action": "Continue your current positive routines",
+                },
+                {
+                    "type": "growth",
+                    "title": "Personal Development",
+                    "description": "Use your positive energy to work on personal goals.",
+                    "action": "Set a small goal for the week",
+                },
+                {
+                    "type": "gratitude",
+                    "title": "Practice Gratitude",
+                    "description": "Reflect on what's going well in your life.",
+                    "action": "Write down 5 things you appreciate today",
+                },
+            ]
+        )
+
     return recommendations
 
 
@@ -1718,121 +2051,132 @@ def _get_default_recommendations() -> List[Dict[str, Any]]:
     """Get default wellness recommendations"""
     return [
         {
-            'type': 'general',
-            'title': 'Start with Small Steps',
-            'description': 'Begin with simple activities that can improve your mood.',
-            'action': 'Take a few deep breaths and stretch'
+            "type": "general",
+            "title": "Start with Small Steps",
+            "description": "Begin with simple activities that can improve your mood.",
+            "action": "Take a few deep breaths and stretch",
         },
         {
-            'type': 'connection',
-            'title': 'Reach Out',
-            'description': 'Connect with someone you trust.',
-            'action': 'Send a message to a friend or family member'
+            "type": "connection",
+            "title": "Reach Out",
+            "description": "Connect with someone you trust.",
+            "action": "Send a message to a friend or family member",
         },
         {
-            'type': 'self_care',
-            'title': 'Practice Self-Care',
-            'description': 'Do something kind for yourself.',
-            'action': 'Take a warm shower or bath'
-        }
+            "type": "self_care",
+            "title": "Practice Self-Care",
+            "description": "Do something kind for yourself.",
+            "action": "Take a warm shower or bath",
+        },
     ]
 
 
 def _analyze_mood_pattern(entries: List) -> Dict[str, Any]:
     """Analyze mood patterns from recent entries"""
     if not entries:
-        return {'pattern': 'insufficient_data', 'trend': 'unknown'}
-    
+        return {"pattern": "insufficient_data", "trend": "unknown"}
+
     mood_levels = [entry.mood_level for entry in entries]
-    
+
     # Calculate trend
     if len(mood_levels) >= 2:
         recent_avg = sum(mood_levels[:3]) / min(3, len(mood_levels))
         older_avg = sum(mood_levels[3:6]) / min(3, len(mood_levels[3:]))
-        
+
         if recent_avg > older_avg + 0.5:
-            trend = 'improving'
+            trend = "improving"
         elif recent_avg < older_avg - 0.5:
-            trend = 'declining'
+            trend = "declining"
         else:
-            trend = 'stable'
+            trend = "stable"
     else:
-        trend = 'insufficient_data'
-    
+        trend = "insufficient_data"
+
     # Identify patterns
     if len(mood_levels) >= 3:
         if all(level <= 2 for level in mood_levels[:3]):
-            pattern = 'consistently_low'
+            pattern = "consistently_low"
         elif all(level >= 4 for level in mood_levels[:3]):
-            pattern = 'consistently_high'
+            pattern = "consistently_high"
         elif mood_levels[0] < mood_levels[1] < mood_levels[2]:
-            pattern = 'improving'
+            pattern = "improving"
         elif mood_levels[0] > mood_levels[1] > mood_levels[2]:
-            pattern = 'declining'
+            pattern = "declining"
         else:
-            pattern = 'fluctuating'
+            pattern = "fluctuating"
     else:
-        pattern = 'insufficient_data'
-    
+        pattern = "insufficient_data"
+
     return {
-        'pattern': pattern,
-        'trend': trend,
-        'recent_moods': mood_levels[:5],
-        'average': round(sum(mood_levels) / len(mood_levels), 2)
+        "pattern": pattern,
+        "trend": trend,
+        "recent_moods": mood_levels[:5],
+        "average": round(sum(mood_levels) / len(mood_levels), 2),
     }
 
 
-def _log_crisis_detection(session_id: str, message: str, risk_level: str, risk_score: float, keywords: List[str]) -> None:
+def _log_crisis_detection(
+    session_id: str,
+    message: str,
+    risk_level: str,
+    risk_score: float,
+    keywords: List[str],
+) -> None:
     """Log crisis detection for monitoring"""
     try:
         db.session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO crisis_detections (session_id, message, risk_level, risk_score, keywords, timestamp)
                 VALUES (:session_id, :message, :risk_level, :risk_score, :keywords, :timestamp)
-            """),
+            """
+            ),
             {
-                'session_id': session_id,
-                'message': message,
-                'risk_level': risk_level,
-                'risk_score': risk_score,
-                'keywords': ','.join(keywords),
-                'timestamp': datetime.utcnow()
-            }
+                "session_id": session_id,
+                "message": message,
+                "risk_level": risk_level,
+                "risk_score": risk_score,
+                "keywords": ",".join(keywords),
+                "timestamp": datetime.utcnow(),
+            },
         )
         db.session.commit()
     except Exception as e:
         # Use current_app for logging in request context
         from flask import current_app
+
         current_app.logger.error(f"Failed to log crisis detection: {e}")
         db.session.rollback()
 
 
 def _register_additional_routes(app: Flask) -> None:
     """Register additional API routes"""
-    
-    @app.route('/api/chat_stream', methods=['GET'])
+
+    @app.route("/api/chat_stream", methods=["GET"])
     def chat_stream():
         """Server-Sent Events (SSE) streaming endpoint for chat responses.
         Accepts query params: message (required), country (optional), session_id (optional)
         Streams JSON objects with a 'type' field: 'meta', 'token', 'done', 'error'.
         """
         try:
-            message = (request.args.get('message') or '').strip()
+            message = (request.args.get("message") or "").strip()
             if not message:
                 return jsonify({"error": "Message is required"}), 400
 
             # Session handling: prefer provided session_id (from web EventSource cannot set headers)
-            session_id = request.args.get('session_id') or _get_or_create_session()
+            session_id = request.args.get("session_id") or _get_or_create_session()
 
             # Country for geo-specific crisis resources
-            country = request.args.get('country') or 'generic'
+            country = request.args.get("country") or "generic"
 
             # Crisis detection first
             risk_level = detect_crisis_level(message)
             crisis_data = get_crisis_response_and_resources(risk_level, country)
 
             # Generate full AI response with failover chain
-            full_text, _used_provider = _get_ai_response_with_failover(message, session_id, risk_level)
+            full_text, _used_provider = _get_ai_response_with_failover(
+                message, session_id, risk_level
+            )
 
             # Log conversation (non-streaming DB log)
             _log_conversation(session_id, message, full_text, risk_level)
@@ -1846,131 +2190,155 @@ def _register_additional_routes(app: Flask) -> None:
                     return f"data: {data}\n\n"
 
                 # Send initial metadata (risk/crisis info and session)
-                yield sse({
-                    'type': 'meta',
-                    'session_id': session_id,
-                    'risk_level': risk_level,
-                    'crisis_msg': crisis_data.get('crisis_msg'),
-                    'crisis_numbers': crisis_data.get('crisis_numbers', []),
-                })
+                yield sse(
+                    {
+                        "type": "meta",
+                        "session_id": session_id,
+                        "risk_level": risk_level,
+                        "crisis_msg": crisis_data.get("crisis_msg"),
+                        "crisis_numbers": crisis_data.get("crisis_numbers", []),
+                    }
+                )
 
                 # Chunk the AI response for progressive reveal
-                text = full_text or ''
+                text = full_text or ""
                 # Prefer newline splits, then sentence-ish (preserving spaces), then words
                 chunks: List[str]
-                joiner = ''
-                if '\n' in text:
-                    chunks = text.split('\n')
-                    joiner = '\n'
+                joiner = ""
+                if "\n" in text:
+                    chunks = text.split("\n")
+                    joiner = "\n"
                 else:
                     import re as _re
-                    parts = [p for p in _re.split(r'(?<=[.!?])\s+', text) if p]
+
+                    parts = [p for p in _re.split(r"(?<=[.!?])\s+", text) if p]
                     if len(parts) <= 1:
-                        chunks = text.split(' ')
+                        chunks = text.split(" ")
                     else:
                         # Re-attach a single space that was consumed by the split for all but the last part.
-                        chunks = [p + (' ' if i < len(parts) - 1 else '') for i, p in enumerate(parts)]
+                        chunks = [
+                            p + (" " if i < len(parts) - 1 else "")
+                            for i, p in enumerate(parts)
+                        ]
 
                 for idx, ch in enumerate(chunks):
-                    yield sse({'type': 'token', 'text': (joiner + ch) if (idx > 0 and joiner) else ch})
+                    yield sse(
+                        {
+                            "type": "token",
+                            "text": (joiner + ch) if (idx > 0 and joiner) else ch,
+                        }
+                    )
                     # Small human-like pacing
                     delay_ms = max(60, min(220, int(len(ch.strip()) * 12)))
                     time.sleep(delay_ms / 1000.0)
 
                 # Done signal
-                yield sse({'type': 'done'})
+                yield sse({"type": "done"})
 
             headers = {
-                'Cache-Control': 'no-cache',
-                'Content-Type': 'text/event-stream',
-                'Connection': 'keep-alive',
+                "Cache-Control": "no-cache",
+                "Content-Type": "text/event-stream",
+                "Connection": "keep-alive",
             }
             return Response(stream_generator(), headers=headers)
 
         except Exception as e:
             # Use app logger in request context
             from flask import current_app
+
             current_app.logger.error(f"Chat stream error: {e}")
             # Fallback JSON error (non-SSE)
             return jsonify({"error": "Internal server error"}), 500
 
-    @app.route("/api/get_or_create_session", methods=['GET'])
+    @app.route("/api/get_or_create_session", methods=["GET"])
     def get_or_create_session_endpoint():
         """Get or create user session"""
         session_id = _get_or_create_session()
-        return jsonify({'session_id': session_id})
+        return jsonify({"session_id": session_id})
 
-    @app.route('/api/chat_history', methods=['GET'])
+    @app.route("/api/chat_history", methods=["GET"])
     @app.limiter.limit("120 per minute")
     def get_chat_history():
         """Get chat history for the current session"""
         try:
-            session_id = request.headers.get('X-Session-ID')
+            session_id = request.headers.get("X-Session-ID")
             if not session_id:
-                return jsonify({'error': 'Session ID required'}), 400
+                return jsonify({"error": "Session ID required"}), 400
 
             # Get chat messages from database
             messages = db.session.execute(
-                text("""
+                text(
+                    """
                     SELECT content, is_user, timestamp 
                     FROM chat_messages 
                     WHERE session_id = :session_id 
                     ORDER BY timestamp ASC 
                     LIMIT 50
-                """),
-                {'session_id': session_id}
+                """
+                ),
+                {"session_id": session_id},
             ).fetchall()
 
             chat_history = []
             for message in messages:
-                chat_history.append({
-                    'content': message.content,
-                    'is_user': message.is_user,
-                    'timestamp': message.timestamp.isoformat() if message.timestamp else None
-                })
+                chat_history.append(
+                    {
+                        "content": message.content,
+                        "is_user": message.is_user,
+                        "timestamp": (
+                            message.timestamp.isoformat() if message.timestamp else None
+                        ),
+                    }
+                )
 
             return jsonify(chat_history)
 
         except Exception as e:
             app.logger.error(f"Error getting chat history: {e}")
-            return jsonify({'error': 'Failed to get chat history'}), 500
+            return jsonify({"error": "Failed to get chat history"}), 500
 
-    @app.route('/api/mood_history', methods=['GET'])
+    @app.route("/api/mood_history", methods=["GET"])
     @app.limiter.limit("120 per minute")
     def get_mood_history():
         """Get mood history for the current session"""
         try:
-            session_id = request.headers.get('X-Session-ID')
+            session_id = request.headers.get("X-Session-ID")
             if not session_id:
-                return jsonify({'error': 'Session ID required'}), 400
+                return jsonify({"error": "Session ID required"}), 400
 
             # Get mood entries from database
             entries = db.session.execute(
-                text("""
+                text(
+                    """
                     SELECT mood_level, note, timestamp 
                     FROM mood_entries 
                     WHERE session_id = :session_id 
                     ORDER BY timestamp DESC 
                     LIMIT 50
-                """),
-                {'session_id': session_id}
+                """
+                ),
+                {"session_id": session_id},
             ).fetchall()
 
             mood_history = []
             for entry in entries:
-                mood_history.append({
-                    'mood_level': entry.mood_level,
-                    'note': entry.note,
-                    'timestamp': entry.timestamp.isoformat() if entry.timestamp else None
-                })
+                mood_history.append(
+                    {
+                        "mood_level": entry.mood_level,
+                        "note": entry.note,
+                        "timestamp": (
+                            entry.timestamp.isoformat() if entry.timestamp else None
+                        ),
+                    }
+                )
 
             return jsonify(mood_history)
 
         except Exception as e:
             app.logger.error(f"Error getting mood history: {e}")
-            return jsonify({'error': 'Failed to get mood history'}), 500
+            return jsonify({"error": "Failed to get mood history"}), 500
 
-    @app.route('/api/mood_entry', methods=['POST'])
+    @app.route("/api/mood_entry", methods=["POST"])
     @app.limiter.limit("120 per minute")
     def add_mood_entry():
         """Add a new mood entry"""
@@ -1978,23 +2346,30 @@ def _register_additional_routes(app: Flask) -> None:
             # Ensure session exists in DB (also syncs legacy 'sessions' table)
             session_id = _get_or_create_session()
             if not session_id:
-                return jsonify({'error': 'Session ID required'}), 400
+                return jsonify({"error": "Session ID required"}), 400
 
             data = request.get_json()
             if not data:
-                return jsonify({'error': 'No data provided'}), 400
+                return jsonify({"error": "No data provided"}), 400
 
-            mood_level = data.get('mood_level')
-            note = data.get('note', '')
-            timestamp = data.get('timestamp')
+            mood_level = data.get("mood_level")
+            note = data.get("note", "")
+            timestamp = data.get("timestamp")
 
-            if not mood_level or not isinstance(mood_level, int) or mood_level < 1 or mood_level > 5:
-                return jsonify({'error': 'Invalid mood level (1-5 required)'}), 400
+            if (
+                not mood_level
+                or not isinstance(mood_level, int)
+                or mood_level < 1
+                or mood_level > 5
+            ):
+                return jsonify({"error": "Invalid mood level (1-5 required)"}), 400
 
             # Parse timestamp if provided, otherwise use current time
             if timestamp:
                 try:
-                    entry_timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    entry_timestamp = datetime.fromisoformat(
+                        timestamp.replace("Z", "+00:00")
+                    )
                 except ValueError:
                     entry_timestamp = datetime.utcnow()
             else:
@@ -2002,119 +2377,129 @@ def _register_additional_routes(app: Flask) -> None:
 
             # Insert mood entry into database
             db.session.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO mood_entries (session_id, mood_level, note, timestamp)
                     VALUES (:session_id, :mood_level, :note, :timestamp)
-                """),
+                """
+                ),
                 {
-                    'session_id': session_id,
-                    'mood_level': mood_level,
-                    'note': note,
-                    'timestamp': entry_timestamp
-                }
+                    "session_id": session_id,
+                    "mood_level": mood_level,
+                    "note": note,
+                    "timestamp": entry_timestamp,
+                },
             )
             db.session.commit()
 
-            return jsonify({
-                'message': 'Mood entry added successfully',
-                'mood_level': mood_level,
-                'note': note,
-                'timestamp': entry_timestamp.isoformat()
-            })
+            return jsonify(
+                {
+                    "message": "Mood entry added successfully",
+                    "mood_level": mood_level,
+                    "note": note,
+                    "timestamp": entry_timestamp.isoformat(),
+                }
+            )
 
         except Exception as e:
             app.logger.error(f"Error adding mood entry: {e}")
             db.session.rollback()
-            return jsonify({'error': 'Failed to add mood entry'}), 500
+            return jsonify({"error": "Failed to add mood entry"}), 500
 
-    @app.route('/api/crisis_detection', methods=['POST'])
+    @app.route("/api/crisis_detection", methods=["POST"])
     @app.limiter.limit("10 per minute")
     def crisis_detection():
         """Enhanced crisis detection with immediate response"""
         try:
             data = request.get_json()
             if not data:
-                return jsonify({'error': 'No data provided'}), 400
+                return jsonify({"error": "No data provided"}), 400
 
-            message = data.get('message', '')
-            session_id = request.headers.get('X-Session-ID')
-            
+            message = data.get("message", "")
+            session_id = request.headers.get("X-Session-ID")
+
             if not message:
-                return jsonify({'error': 'Message required'}), 400
+                return jsonify({"error": "Message required"}), 400
 
             # Enhanced crisis detection
             risk_level, risk_score, keywords = _enhanced_crisis_detection(message)
-            
+
             # Immediate response based on risk level
             response = _get_crisis_response(risk_level, risk_score)
-            
+
             # Log crisis detection
             _log_crisis_detection(session_id, message, risk_level, risk_score, keywords)
-            
-            return jsonify({
-                'risk_level': risk_level,
-                'risk_score': risk_score,
-                'keywords': keywords,
-                'response': response,
-                'immediate_action_required': risk_level in ['high', 'crisis'],
-                'resources': _get_crisis_resources(risk_level)
-            })
+
+            return jsonify(
+                {
+                    "risk_level": risk_level,
+                    "risk_score": risk_score,
+                    "keywords": keywords,
+                    "response": response,
+                    "immediate_action_required": risk_level in ["high", "crisis"],
+                    "resources": _get_crisis_resources(risk_level),
+                }
+            )
 
         except Exception as e:
             app.logger.error(f"Crisis detection error: {e}")
-            return jsonify({'error': 'Failed to process crisis detection'}), 500
+            return jsonify({"error": "Failed to process crisis detection"}), 500
 
-    @app.route('/api/mood_analytics', methods=['GET'])
+    @app.route("/api/mood_analytics", methods=["GET"])
     @app.limiter.limit("30 per minute")
     def mood_analytics():
         """Get mood analytics and trends"""
         try:
-            session_id = request.headers.get('X-Session-ID')
+            session_id = request.headers.get("X-Session-ID")
             if not session_id:
-                return jsonify({'error': 'Session ID required'}), 400
+                return jsonify({"error": "Session ID required"}), 400
 
             # Get mood entries from database
             entries = db.session.execute(
-                text("""
+                text(
+                    """
                     SELECT mood_level, note, timestamp 
                     FROM mood_entries 
                     WHERE session_id = :session_id 
                     ORDER BY timestamp DESC 
                     LIMIT 100
-                """),
-                {'session_id': session_id}
+                """
+                ),
+                {"session_id": session_id},
             ).fetchall()
 
             if not entries:
-                return jsonify({
-                    'message': 'No mood data available',
-                    'analytics': {
-                        'average_mood': 0,
-                        'mood_trend': 'stable',
-                        'total_entries': 0,
-                        'weekly_average': 0,
-                        'mood_distribution': {}
+                return jsonify(
+                    {
+                        "message": "No mood data available",
+                        "analytics": {
+                            "average_mood": 0,
+                            "mood_trend": "stable",
+                            "total_entries": 0,
+                            "weekly_average": 0,
+                            "mood_distribution": {},
+                        },
                     }
-                })
+                )
 
             # Calculate analytics
             mood_levels = [entry.mood_level for entry in entries]
-            
+
             # Mood trend calculation
             recent_moods = mood_levels[:7] if len(mood_levels) >= 7 else mood_levels
             older_moods = mood_levels[7:14] if len(mood_levels) >= 14 else []
-            
+
             if older_moods:
                 recent_avg = sum(recent_moods) / len(recent_moods)
                 older_avg = sum(older_moods) / len(older_moods)
                 if recent_avg > older_avg + 0.5:
-                    trend = 'improving'
+                    trend = "improving"
                 elif recent_avg < older_avg - 0.5:
-                    trend = 'declining'
+                    trend = "declining"
                 else:
-                    trend = 'stable'
+                    trend = "stable"
             else:
-                trend = 'stable'
+                trend = "stable"
 
             # Mood distribution
             mood_distribution = {}
@@ -2125,130 +2510,146 @@ def _register_additional_routes(app: Flask) -> None:
             # Weekly average
             week_ago = datetime.utcnow() - timedelta(days=7)
             weekly_entries = [entry for entry in entries if entry.timestamp >= week_ago]
-            weekly_average = sum(entry.mood_level for entry in weekly_entries) / len(weekly_entries) if weekly_entries else 0
+            weekly_average = (
+                sum(entry.mood_level for entry in weekly_entries) / len(weekly_entries)
+                if weekly_entries
+                else 0
+            )
 
-            return jsonify({
-                'analytics': {
-                    'average_mood': round(sum(mood_levels) / len(mood_levels), 2),
-                    'mood_trend': trend,
-                    'total_entries': len(entries),
-                    'weekly_average': round(weekly_average, 2),
-                    'mood_distribution': mood_distribution,
-                    'recent_entries': len(recent_moods)
+            return jsonify(
+                {
+                    "analytics": {
+                        "average_mood": round(sum(mood_levels) / len(mood_levels), 2),
+                        "mood_trend": trend,
+                        "total_entries": len(entries),
+                        "weekly_average": round(weekly_average, 2),
+                        "mood_distribution": mood_distribution,
+                        "recent_entries": len(recent_moods),
+                    }
                 }
-            })
+            )
 
         except Exception as e:
             app.logger.error(f"Mood analytics error: {e}")
-            return jsonify({'error': 'Failed to get mood analytics'}), 500
+            return jsonify({"error": "Failed to get mood analytics"}), 500
 
-    @app.route('/api/wellness_recommendations', methods=['GET'])
+    @app.route("/api/wellness_recommendations", methods=["GET"])
     @app.limiter.limit("30 per minute")
     def wellness_recommendations():
         """Get personalized wellness recommendations"""
         try:
-            session_id = request.headers.get('X-Session-ID')
+            session_id = request.headers.get("X-Session-ID")
             if not session_id:
-                return jsonify({'error': 'Session ID required'}), 400
+                return jsonify({"error": "Session ID required"}), 400
 
             # Get recent mood data
             recent_entries = db.session.execute(
-                text("""
+                text(
+                    """
                     SELECT mood_level, note, timestamp 
                     FROM mood_entries 
                     WHERE session_id = :session_id 
                     ORDER BY timestamp DESC 
                     LIMIT 10
-                """),
-                {'session_id': session_id}
+                """
+                ),
+                {"session_id": session_id},
             ).fetchall()
 
             if not recent_entries:
-                return jsonify({
-                    'recommendations': _get_default_recommendations(),
-                    'message': 'No recent mood data available'
-                })
+                return jsonify(
+                    {
+                        "recommendations": _get_default_recommendations(),
+                        "message": "No recent mood data available",
+                    }
+                )
 
             # Calculate average mood
-            avg_mood = sum(entry.mood_level for entry in recent_entries) / len(recent_entries)
-            
+            avg_mood = sum(entry.mood_level for entry in recent_entries) / len(
+                recent_entries
+            )
+
             # Get personalized recommendations
-            recommendations = _get_personalized_recommendations(avg_mood, recent_entries)
-            
-            return jsonify({
-                'recommendations': recommendations,
-                'current_mood_average': round(avg_mood, 2),
-                'analysis': _analyze_mood_pattern(recent_entries)
-            })
+            recommendations = _get_personalized_recommendations(
+                avg_mood, recent_entries
+            )
+
+            return jsonify(
+                {
+                    "recommendations": recommendations,
+                    "current_mood_average": round(avg_mood, 2),
+                    "analysis": _analyze_mood_pattern(recent_entries),
+                }
+            )
 
         except Exception as e:
             app.logger.error(f"Wellness recommendations error: {e}")
-            return jsonify({'error': 'Failed to get recommendations'}), 500
+            return jsonify({"error": "Failed to get recommendations"}), 500
 
-    @app.route('/api/metrics', methods=['GET'])
+    @app.route("/api/metrics", methods=["GET"])
     def metrics():
         """Prometheus metrics endpoint"""
         try:
             import psutil
             import time
-            
+
             metrics = []
-            
+
             # System metrics
             cpu_percent = psutil.cpu_percent(interval=1)
             memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
-            
+            disk = psutil.disk_usage("/")
+
             # Application metrics
             current_time = time.time()
-            
+
             # Database connection health
             db_health = _check_database_health()
             redis_health = _check_redis_health()
-            
+
             # Build metrics in Prometheus format
             metrics.append(f"# HELP app_cpu_usage CPU usage percentage")
             metrics.append(f"# TYPE app_cpu_usage gauge")
             metrics.append(f"app_cpu_usage {cpu_percent}")
-            
+
             metrics.append(f"# HELP app_memory_usage Memory usage percentage")
             metrics.append(f"# TYPE app_memory_usage gauge")
             metrics.append(f"app_memory_usage {memory.percent}")
-            
+
             metrics.append(f"# HELP app_disk_usage Disk usage percentage")
             metrics.append(f"# TYPE app_disk_usage gauge")
             metrics.append(f"app_disk_usage {disk.percent}")
-            
+
             metrics.append(f"# HELP app_uptime_seconds Application uptime in seconds")
             metrics.append(f"# TYPE app_uptime_seconds counter")
             metrics.append(f"app_uptime_seconds {current_time}")
-            
+
             metrics.append(f"# HELP app_database_health Database health status")
             metrics.append(f"# TYPE app_database_health gauge")
             metrics.append(f"app_database_health {1 if 'healthy' in db_health else 0}")
-            
+
             metrics.append(f"# HELP app_redis_health Redis health status")
             metrics.append(f"# TYPE app_redis_health gauge")
             metrics.append(f"app_redis_health {1 if 'healthy' in redis_health else 0}")
-            
+
             # Request metrics (if available)
-            if hasattr(app, 'request_count'):
+            if hasattr(app, "request_count"):
                 metrics.append(f"# HELP app_requests_total Total number of requests")
                 metrics.append(f"# TYPE app_requests_total counter")
                 metrics.append(f"app_requests_total {app.request_count}")
-            
-            return '\n'.join(metrics), 200, {'Content-Type': 'text/plain'}
-            
+
+            return "\n".join(metrics), 200, {"Content-Type": "text/plain"}
+
         except Exception as e:
             app.logger.error(f"Metrics collection error: {e}")
-            return f"# ERROR: {str(e)}", 500, {'Content-Type': 'text/plain'}
+            return f"# ERROR: {str(e)}", 500, {"Content-Type": "text/plain"}
 
-    @app.route('/api/self_assessment', methods=['POST'])
+    @app.route("/api/self_assessment", methods=["POST"])
     def submit_self_assessment():
         """Handle self-assessment submissions"""
-        if request.method == 'GET':
+        if request.method == "GET":
             return jsonify({"message": "Self-assessment endpoint ready"})
-        
+
         try:
             data = request.get_json() or {}
 
@@ -2259,24 +2660,30 @@ def _register_additional_routes(app: Flask) -> None:
 
             # Clean and validate data
             cleaned_data = {}
-            required_fields = ['mood', 'energy', 'sleep', 'stress']
+            required_fields = ["mood", "energy", "sleep", "stress"]
 
             for field in required_fields:
                 value = data.get(field)
-                if value is None or value == "" or str(value).lower() in ['null', 'none']:
+                if (
+                    value is None
+                    or value == ""
+                    or str(value).lower() in ["null", "none"]
+                ):
                     return jsonify({"error": f"Missing required field: {field}"}), 400
                 cleaned_data[field] = value.strip() if isinstance(value, str) else value
 
             # Optional fields
-            optional_fields = ['notes', 'crisis_level', 'anxiety_level']
+            optional_fields = ["notes", "crisis_level", "anxiety_level"]
             for field in optional_fields:
                 value = data.get(field)
-                if value and value != "" and str(value).lower() not in ['null', 'none']:
-                    cleaned_data[field] = value.strip() if isinstance(value, str) else value
+                if value and value != "" and str(value).lower() not in ["null", "none"]:
+                    cleaned_data[field] = (
+                        value.strip() if isinstance(value, str) else value
+                    )
 
             # Optional timezone offset in minutes to determine local "day" boundaries
             try:
-                tz_offset_min = int(data.get('tz_offset_minutes') or 0)
+                tz_offset_min = int(data.get("tz_offset_minutes") or 0)
             except Exception:
                 tz_offset_min = 0
 
@@ -2287,21 +2694,28 @@ def _register_additional_routes(app: Flask) -> None:
             start_of_day_utc = start_local - timedelta(minutes=tz_offset_min)
 
             # Enforce single completion per (local) day
-            existing = db.session.query(SelfAssessmentEntry) \
-                .filter(SelfAssessmentEntry.session_id == session_id) \
-                .filter(SelfAssessmentEntry.timestamp >= start_of_day_utc) \
+            existing = (
+                db.session.query(SelfAssessmentEntry)
+                .filter(SelfAssessmentEntry.session_id == session_id)
+                .filter(SelfAssessmentEntry.timestamp >= start_of_day_utc)
                 .first()
+            )
 
             if existing:
                 app.logger.info(
                     f"Self-assessment already completed today | session_id={session_id} completed_at={existing.timestamp.isoformat()} tz_offset_min={tz_offset_min}"
                 )
-                return jsonify({
-                    "success": True,
-                    "already_completed_today": True,
-                    "xp_awarded": 0,
-                    "completed_at": existing.timestamp.isoformat()
-                }), 200
+                return (
+                    jsonify(
+                        {
+                            "success": True,
+                            "already_completed_today": True,
+                            "xp_awarded": 0,
+                            "completed_at": existing.timestamp.isoformat(),
+                        }
+                    ),
+                    200,
+                )
 
             # Create new entry (authoritative store)
             entry = SelfAssessmentEntry(
@@ -2322,16 +2736,16 @@ def _register_additional_routes(app: Flask) -> None:
                         """
                     ),
                     {
-                        'session_id': session_id,
-                        'mood': cleaned_data.get('mood'),
-                        'energy': cleaned_data.get('energy'),
-                        'sleep': cleaned_data.get('sleep'),
-                        'stress': cleaned_data.get('stress'),
-                        'social': cleaned_data.get('social'),
-                        'work': cleaned_data.get('work'),
-                        'notes': cleaned_data.get('notes'),
-                        'timestamp': now_utc,
-                    }
+                        "session_id": session_id,
+                        "mood": cleaned_data.get("mood"),
+                        "energy": cleaned_data.get("energy"),
+                        "sleep": cleaned_data.get("sleep"),
+                        "stress": cleaned_data.get("stress"),
+                        "social": cleaned_data.get("social"),
+                        "work": cleaned_data.get("work"),
+                        "notes": cleaned_data.get("notes"),
+                        "timestamp": now_utc,
+                    },
                 )
                 db.session.commit()
             except Exception as e:
@@ -2344,22 +2758,28 @@ def _register_additional_routes(app: Flask) -> None:
                 f"Self-assessment recorded | session_id={session_id} xp_awarded={xp_awarded} tz_offset_min={tz_offset_min} data_keys={list(cleaned_data.keys())}"
             )
 
-            return jsonify({
-                "message": "Assessment recorded",
-                "success": True,
-                "already_completed_today": False,
-                "xp_awarded": xp_awarded,
-                "completed_at": now_utc.isoformat()
-            }), 201
-            
+            return (
+                jsonify(
+                    {
+                        "message": "Assessment recorded",
+                        "success": True,
+                        "already_completed_today": False,
+                        "xp_awarded": xp_awarded,
+                        "completed_at": now_utc.isoformat(),
+                    }
+                ),
+                201,
+            )
+
         except Exception as e:
             app.logger.error(f"Self-assessment error: {e}")
             return jsonify({"error": "Failed to process assessment"}), 500
 
+
 # Create the application instance
 app = create_app()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with app.app_context():
         try:
             db.create_all()
@@ -2367,4 +2787,4 @@ if __name__ == '__main__':
         except Exception as e:
             app.logger.error(f"Database initialization error: {e}")
 
-    app.run(host='0.0.0.0', port=app.config.get('PORT', 5055), debug=False)
+    app.run(host="0.0.0.0", port=app.config.get("PORT", 5055), debug=False)
