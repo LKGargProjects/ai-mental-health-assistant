@@ -10,7 +10,7 @@ on:
 env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '18'
-  FLUTTER_VERSION: '3.16.0'
+  FLUTTER_VERSION: '3.32.8'
 
 jobs:
   # Python Backend Tests
@@ -206,6 +206,7 @@ jobs:
           output: 'trivy-results.sarif'
           
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
+        continue-on-error: true

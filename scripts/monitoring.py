@@ -243,12 +243,15 @@ class MonitoringService:
                 severity = AlertSeverity.ERROR
             else:
                 severity = AlertSeverity.WARNING
-                
+
+            # Build error detail safely without nested f-strings
+            error_detail = result.get("error") or f"Status {result.get('status_code')}"
+
             # Create alert
             alert = Alert(
                 service=check.name,
                 severity=severity,
-                message=f"Health check failed: {check.name} - {result.get('error', f'Status {result.get('status_code')}')}",
+                message=f"Health check failed: {check.name} - {error_detail}",
                 timestamp=datetime.utcnow(),
                 metadata=result
             )
