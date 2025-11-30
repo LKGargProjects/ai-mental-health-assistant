@@ -974,30 +974,48 @@ def _setup_session(app: Flask) -> None:
     Session(app)
 
 
+def _rate_limit_enabled() -> bool:
+    """Return True if rate limiting should be applied for this request."""
+    try:
+        raw = current_app.config.get("RATE_LIMIT_ENABLED", True)
+    except Exception:
+        return True
+    if isinstance(raw, str):
+        return raw.lower() == "true"
+    return bool(raw)
+
+
 def _rate_limit_key():
     """Compute the rate-limit key.
 
     Prefer per-session limiting; fall back to client IP to avoid false positives
     when many clients share an IP (e.g., behind proxies).
 
-    In the test environment we intentionally key only by client IP so that
-    repeated requests in tests can exercise the limiter behavior reliably.
+    In most tests we effectively disable rate limits by using a unique key per
+    request when RATE_LIMIT_ENABLED is false, while still allowing explicit
+    rate-limiting tests to turn it back on.
     """
+    # When rate limiting is disabled, return a unique key per request so we
+    # never trip any limits.
+    if not _rate_limit_enabled():
+        return f"disabled:{request.remote_addr}:{time.time_ns()}"
+
+    # In the test environment, key purely by remote address so repeated
+    # requests from the same client exercise the limiter.
     try:
         env = (current_app.config.get("ENVIRONMENT") or "").lower()
     except Exception:
         env = ""
 
-    # In tests, key purely by remote address so repeated requests trigger limits
     if env == "test":
         return get_remote_address()
 
+    # Normal behavior: prefer per-session limiting; fall back to client IP.
     try:
         sid = request.headers.get("X-Session-ID")
         if sid and sid.strip():
             return f"sid:{sid.strip()}"
     except Exception:
-        # Fall back safely to remote address
         pass
     return get_remote_address()
 

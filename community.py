@@ -500,6 +500,59 @@ def register_community_routes(app: Flask) -> None:
             except Exception:
                 pass
             return jsonify({"error": "Failed to add reaction"}), 500
+    @app.route("/api/community/react/<int:post_id>", methods=["POST"])
+    @app.limiter.limit(limits_reaction)
+    def community_react_legacy(post_id: int):
+        """Legacy reaction endpoint for backward compatibility.
+
+        Mirrors /api/community/reaction but takes the post_id in the path.
+        """
+        if not _enabled():
+            return jsonify({"error": "Community disabled"}), 403
+        try:
+            data = request.get_json(silent=True) or {}
+            kind = (data.get("kind") or "").strip().lower()
+            if kind not in SAFE_REACTION_KINDS:
+                return jsonify({"error": "Invalid reaction kind"}), 400
+
+            # Optional user hash from session header (no PII)
+            sid = (request.headers.get("X-Session-ID") or "").strip()
+            user_hash = sid[:12] if sid else None
+
+            # Insert reaction
+            db.session.execute(
+                text(
+                    """
+                INSERT INTO community_reactions (post_id, kind, user_hash)
+                VALUES (:post_id, :kind, :user_hash)
+                """
+                ),
+                {"post_id": post_id, "kind": kind, "user_hash": user_hash},
+            )
+
+            # Increment aggregate counter on post
+            col = {
+                "relate": "reactions_relate",
+                "helped": "reactions_helped",
+                "strength": "reactions_strength",
+            }[kind]
+            db.session.execute(
+                text(f"UPDATE community_posts SET {col} = {col} + 1 WHERE id = :pid"),
+                {"pid": post_id},
+            )
+
+            db.session.commit()
+            return jsonify({"ok": True}), 201
+        except Exception as e:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            try:
+                app.logger.error(f"Community legacy reaction error: {e}")
+            except Exception:
+                pass
+            return jsonify({"error": "Failed to add reaction"}), 500
 
     @app.route("/api/community/report", methods=["POST"])
     @app.limiter.limit(limits_report)
