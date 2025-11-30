@@ -21,7 +21,8 @@ class _PinnedGuidelinesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      label: 'Community guidelines. Be kind and respectful. No personal info. Report concerning content.',
+      label:
+          'Community guidelines. Be kind and respectful. No personal info. Report concerning content.',
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         shape: RoundedRectangleBorder(
@@ -34,7 +35,8 @@ class _PinnedGuidelinesCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: const [
-              Text('Community Guidelines', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text('Community Guidelines',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
               SizedBox(height: 8),
               Text('• Be kind and respectful'),
               Text('• No personal info (we redact PII)'),
@@ -52,7 +54,8 @@ class _PinnedCrisisResourcesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      label: 'Crisis resources. If you are in immediate danger or thinking about self-harm, please reach out to local emergency services or crisis hotlines.',
+      label:
+          'Crisis resources. If you are in immediate danger or thinking about self-harm, please reach out to local emergency services or crisis hotlines.',
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         shape: RoundedRectangleBorder(
@@ -65,9 +68,11 @@ class _PinnedCrisisResourcesCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: const [
-              Text('Need help right now?', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text('Need help right now?',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
               SizedBox(height: 8),
-              Text('If you are in immediate danger or thinking about self-harm, please reach out to local emergency services or crisis hotlines.'),
+              Text(
+                  'If you are in immediate danger or thinking about self-harm, please reach out to local emergency services or crisis hotlines.'),
             ],
           ),
         ),
@@ -97,17 +102,36 @@ class _FeedSkeleton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(height: 10, width: 80, color: Colors.black12.withOpacity(0.08)),
+                Container(
+                    height: 10,
+                    width: 80,
+                    color: Colors.black12.withOpacity(0.08)),
                 const SizedBox(height: 10),
-                Container(height: 12, width: double.infinity, color: Colors.black12.withOpacity(0.08)),
+                Container(
+                    height: 12,
+                    width: double.infinity,
+                    color: Colors.black12.withOpacity(0.08)),
                 const SizedBox(height: 6),
-                Container(height: 12, width: double.infinity, color: Colors.black12.withOpacity(0.08)),
+                Container(
+                    height: 12,
+                    width: double.infinity,
+                    color: Colors.black12.withOpacity(0.08)),
                 const SizedBox(height: 6),
-                Container(height: 12, width: MediaQuery.of(context).size.width * 0.6, color: Colors.black12.withOpacity(0.08)),
+                Container(
+                    height: 12,
+                    width: MediaQuery.of(context).size.width * 0.6,
+                    color: Colors.black12.withOpacity(0.08)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Container(height: 28, width: 90, decoration: BoxDecoration(color: Colors.black12.withOpacity(0.06), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE0E6EE)))),
+                    Container(
+                        height: 28,
+                        width: 90,
+                        decoration: BoxDecoration(
+                            color: Colors.black12.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(16),
+                            border:
+                                Border.all(color: const Color(0xFFE0E6EE)))),
                   ],
                 )
               ],
@@ -122,7 +146,14 @@ class _FeedSkeleton extends StatelessWidget {
 class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   // Full topic set (used by picker)
   static const List<String> _topicsFull = <String>[
-    'All', 'Anxiety', 'Sleep', 'Mood', 'Grounding', 'Journaling', 'Routines', 'Gratitude'
+    'All',
+    'Anxiety',
+    'Sleep',
+    'Mood',
+    'Grounding',
+    'Journaling',
+    'Routines',
+    'Gratitude'
   ];
 
   final Set<int> _expandedPosts = <int>{};
@@ -219,7 +250,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    initialValue: (selectedTopic == null || selectedTopic == 'All')
+                    value: (selectedTopic == null || selectedTopic == 'All')
                         ? null
                         : selectedTopic,
                     items: _topicsFull
@@ -254,7 +285,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     children: [
                       Text(
                         '${remaining.clamp(-999, 999)} characters left',
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.black54),
                       ),
                       const Spacer(),
                       ElevatedButton.icon(
@@ -281,18 +313,20 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                     const SnackBar(content: Text('Posted')),
                                   );
                                   // Analytics: post submitted successfully
-                                  logAnalyticsEvent('community_compose_submit', metadata: {
-                                    'post_id': created.id,
-                                    'topic': created.topic,
-                                    'surface': 'community_tab',
-                                    'ts': DateTime.now().millisecondsSinceEpoch,
-                                  });
+                                  logAnalyticsEvent('community_compose_submit',
+                                      metadata: {
+                                        'post_id': created.id,
+                                        'topic': created.topic,
+                                        'surface': 'community_tab',
+                                        'ts': DateTime.now()
+                                            .millisecondsSinceEpoch,
+                                      });
                                 } else {
                                   if (!ctx.mounted) return;
                                   ScaffoldMessenger.of(ctx).showSnackBar(
                                     SnackBar(
-                                        content: Text(
-                                            cp.error ?? 'Failed to post')),
+                                        content:
+                                            Text(cp.error ?? 'Failed to post')),
                                   );
                                 }
                               },
@@ -346,19 +380,21 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                 children: [
                   Semantics(
                     header: true,
-                    child: Text('Choose a topic', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    child: Text('Choose a topic',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                   ),
                   const SizedBox(height: 8),
                   ..._topicsFull.map((t) => Semantics(
-                    button: true,
-                    child: ListTile(
-                      dense: true,
-                      title: Text(t),
-                      onTap: () => Navigator.of(ctx).pop(t),
-                      // Add focus node for better keyboard navigation
-                      focusNode: FocusNode(),
-                    ),
-                  )),
+                        button: true,
+                        child: ListTile(
+                          dense: true,
+                          title: Text(t),
+                          onTap: () => Navigator.of(ctx).pop(t),
+                          // Add focus node for better keyboard navigation
+                          focusNode: FocusNode(),
+                        ),
+                      )),
                 ],
               ),
             ),
@@ -376,7 +412,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     final notesController = TextEditingController();
     // Using a FocusNode for better keyboard navigation in the report dialog
     final FocusNode notesFocusNode = FocusNode();
-    
+
     // Helper function to clean up resources
     void cleanup() {
       notesController.dispose();
@@ -399,8 +435,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
               child: Padding(
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                  left: 16, 
-                  right: 16, 
+                  left: 16,
+                  right: 16,
                   top: 16,
                 ),
                 child: Column(
@@ -410,7 +446,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     Semantics(
                       header: true,
                       child: Text(
-                        'Report post', 
+                        'Report post',
                         style: Theme.of(ctx).textTheme.titleMedium,
                       ),
                     ),
@@ -469,13 +505,13 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                             onPressed: () {
                               // Report the post
                               context.read<CommunityProvider>().report(
-                                postId,
-                                reason,
-                                notes: notesController.text,
-                              );
+                                    postId,
+                                    reason,
+                                    notes: notesController.text,
+                                  );
                               cleanup();
                               Navigator.of(ctx).pop();
-                              
+
                               // Show confirmation message
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -534,7 +570,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     builder: (ctx) {
                       final canPop = Navigator.of(ctx).canPop();
                       final route = ModalRoute.of(ctx);
-                      final isModal = route is PageRoute && route.fullscreenDialog == true;
+                      final isModal =
+                          route is PageRoute && route.fullscreenDialog == true;
                       if (canPop) {
                         return AppBackButton(isModal: isModal);
                       }
@@ -561,10 +598,18 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
             child: Consumer<CommunityProvider>(
               builder: (context, cp, _) {
                 final sel = cp.selectedTopic ?? 'All';
-                const visibleTopics = <String>['All', 'Anxiety', 'Sleep', 'Mood', 'Grounding', 'More'];
+                const visibleTopics = <String>[
+                  'All',
+                  'Anxiety',
+                  'Sleep',
+                  'Mood',
+                  'Grounding',
+                  'More'
+                ];
                 if (cp.isLoading && !cp.hasLoaded) {
                   return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     scrollDirection: Axis.horizontal,
                     itemBuilder: (_, i) => Container(
                       width: 72,
@@ -579,7 +624,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                   );
                 }
                 return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   scrollDirection: Axis.horizontal,
                   itemBuilder: (ctx, i) {
                     final t = visibleTopics[i];
@@ -618,12 +664,14 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                 }
                 if (cp.error != null) {
                   return Center(
-                    child: Text(cp.error!, style: TextStyle(color: color.error)),
+                    child:
+                        Text(cp.error!, style: TextStyle(color: color.error)),
                   );
                 }
                 if (cp.posts.isEmpty) {
                   return const Center(
-                    child: Text('No posts yet. Gentle reflections will appear here.'),
+                    child: Text(
+                        'No posts yet. Gentle reflections will appear here.'),
                   );
                 }
                 return RefreshIndicator(
@@ -649,7 +697,11 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     },
                     child: ListView.builder(
                       padding: const EdgeInsets.only(top: 8, bottom: 16),
-                      itemCount: cp.posts.length + 2 + (cp.hasMore ? 1 : 0), // +2 pinned, +1 loading/footer when hasMore
+                      itemCount: cp.posts.length +
+                          2 +
+                          (cp.hasMore
+                              ? 1
+                              : 0), // +2 pinned, +1 loading/footer when hasMore
                       itemBuilder: (context, index) {
                         if (index == 0) {
                           return _PinnedGuidelinesCard();
@@ -663,7 +715,8 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                         }
                         final p = cp.posts[index - 2];
                         return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                             side: BorderSide(color: const Color(0xFFE0E6EE)),
@@ -679,16 +732,24 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                     Row(
                                       children: [
                                         Container(
-                                          width: 8, height: 8,
-                                          decoration: BoxDecoration(color: color.primary, shape: BoxShape.circle),
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                              color: color.primary,
+                                              shape: BoxShape.circle),
                                         ),
                                         const SizedBox(width: 6),
-                                        Text(p.topic, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                        Text(p.topic,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600)),
                                         if (p.createdAt != null) ...[
                                           const SizedBox(width: 8),
                                           Text(
                                             '•  ${_relativeTime(p.createdAt!)}',
-                                            style: const TextStyle(fontSize: 11, color: Colors.black54),
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.black54),
                                           ),
                                         ],
                                       ],
@@ -696,94 +757,127 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                     const Spacer(),
                                     PopupMenuButton<String>(
                                       tooltip: 'More',
-                                      icon: const Icon(Icons.more_horiz, size: 20, color: Colors.black54),
+                                      icon: const Icon(Icons.more_horiz,
+                                          size: 20, color: Colors.black54),
                                       onSelected: (v) {
-                                        if (v == 'report') _showReportDialog(postId: p.id);
+                                        if (v == 'report')
+                                          _showReportDialog(postId: p.id);
                                       },
                                       itemBuilder: (ctx) => const [
-                                        PopupMenuItem<String>(value: 'report', child: Text('Report')),
+                                        PopupMenuItem<String>(
+                                            value: 'report',
+                                            child: Text('Report')),
                                       ],
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
                                 Builder(builder: (_) {
-                                  final expanded = _expandedPosts.contains(p.id);
+                                  final expanded =
+                                      _expandedPosts.contains(p.id);
                                   final shouldTruncate = p.body.length > 180;
                                   return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         p.body,
                                         maxLines: expanded ? null : 4,
-                                        overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                                        overflow: expanded
+                                            ? TextOverflow.visible
+                                            : TextOverflow.ellipsis,
                                       ),
                                       if (shouldTruncate)
                                         TextButton(
-                                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
-                                          onPressed: () => _toggleExpanded(p.id),
-                                          child: Text(expanded ? 'Show less' : 'Read more'),
+                                          style: TextButton.styleFrom(
+                                              padding: EdgeInsets.zero,
+                                              minimumSize: const Size(0, 0)),
+                                          onPressed: () =>
+                                              _toggleExpanded(p.id),
+                                          child: Text(expanded
+                                              ? 'Show less'
+                                              : 'Read more'),
                                         ),
                                     ],
                                   );
                                 }),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  _ReactionChip(
-                                    icon: Icons.favorite_border,
-                                    label: 'I relate',
-                                    count: p.relate,
-                                    onTap: () {
-                                      context.read<CommunityProvider>().react(p.id, 'relate');
-                                      logAnalyticsEvent('community_reaction_add', metadata: {
-                                        'post_id': p.id,
-                                        'kind': 'relate',
-                                        'topic': p.topic,
-                                        'surface': 'community_tab',
-                                        'ts': DateTime.now().millisecondsSinceEpoch,
-                                      });
-                                    },
-                                  ),
-                                  const SizedBox(width: 8),
-                                  PopupMenuButton<String>(
-                                    tooltip: 'More actions',
-                                    icon: const Icon(Icons.more_horiz, size: 20, color: Colors.black54),
-                                    onSelected: (v) {
-                                      switch (v) {
-                                        case 'helped':
-                                          context.read<CommunityProvider>().react(p.id, 'helped');
-                                          logAnalyticsEvent('community_reaction_add', metadata: {
-                                            'post_id': p.id,
-                                            'kind': 'helped',
-                                            'topic': p.topic,
-                                            'surface': 'community_tab',
-                                            'ts': DateTime.now().millisecondsSinceEpoch,
-                                          });
-                                          break;
-                                        case 'strength':
-                                          context.read<CommunityProvider>().react(p.id, 'strength');
-                                          logAnalyticsEvent('community_reaction_add', metadata: {
-                                            'post_id': p.id,
-                                            'kind': 'strength',
-                                            'topic': p.topic,
-                                            'surface': 'community_tab',
-                                            'ts': DateTime.now().millisecondsSinceEpoch,
-                                          });
-                                          break;
-                                      }
-                                    },
-                                    itemBuilder: (ctx) => const [
-                                      PopupMenuItem<String>(value: 'helped', child: Text('This helped')),
-                                      PopupMenuItem<String>(value: 'strength', child: Text('Strength')),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    _ReactionChip(
+                                      icon: Icons.favorite_border,
+                                      label: 'I relate',
+                                      count: p.relate,
+                                      onTap: () {
+                                        context
+                                            .read<CommunityProvider>()
+                                            .react(p.id, 'relate');
+                                        logAnalyticsEvent(
+                                            'community_reaction_add',
+                                            metadata: {
+                                              'post_id': p.id,
+                                              'kind': 'relate',
+                                              'topic': p.topic,
+                                              'surface': 'community_tab',
+                                              'ts': DateTime.now()
+                                                  .millisecondsSinceEpoch,
+                                            });
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    PopupMenuButton<String>(
+                                      tooltip: 'More actions',
+                                      icon: const Icon(Icons.more_horiz,
+                                          size: 20, color: Colors.black54),
+                                      onSelected: (v) {
+                                        switch (v) {
+                                          case 'helped':
+                                            context
+                                                .read<CommunityProvider>()
+                                                .react(p.id, 'helped');
+                                            logAnalyticsEvent(
+                                                'community_reaction_add',
+                                                metadata: {
+                                                  'post_id': p.id,
+                                                  'kind': 'helped',
+                                                  'topic': p.topic,
+                                                  'surface': 'community_tab',
+                                                  'ts': DateTime.now()
+                                                      .millisecondsSinceEpoch,
+                                                });
+                                            break;
+                                          case 'strength':
+                                            context
+                                                .read<CommunityProvider>()
+                                                .react(p.id, 'strength');
+                                            logAnalyticsEvent(
+                                                'community_reaction_add',
+                                                metadata: {
+                                                  'post_id': p.id,
+                                                  'kind': 'strength',
+                                                  'topic': p.topic,
+                                                  'surface': 'community_tab',
+                                                  'ts': DateTime.now()
+                                                      .millisecondsSinceEpoch,
+                                                });
+                                            break;
+                                        }
+                                      },
+                                      itemBuilder: (ctx) => const [
+                                        PopupMenuItem<String>(
+                                            value: 'helped',
+                                            child: Text('This helped')),
+                                        PopupMenuItem<String>(
+                                            value: 'strength',
+                                            child: Text('Strength')),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
+                        );
                       },
                     ),
                   ),
@@ -827,7 +921,7 @@ class _ReactionChipState extends State<_ReactionChip> {
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
-    
+
     return Focus(
       focusNode: _focusNode,
       onFocusChange: (hasFocus) {
@@ -882,7 +976,8 @@ class _ReactionChipState extends State<_ReactionChip> {
                     widget.label,
                     style: TextStyle(
                       color: color.primary,
-                      fontWeight: _isFocused ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          _isFocused ? FontWeight.w600 : FontWeight.normal,
                     ),
                   ),
                   if (widget.count > 0) ...[
@@ -907,4 +1002,3 @@ class _ReactionChipState extends State<_ReactionChip> {
 
 // Loading footer has been moved to a separate file for better testability
 // See: lib/widgets/loading_footer.dart
- 

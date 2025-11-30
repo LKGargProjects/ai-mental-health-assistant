@@ -155,68 +155,61 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => QuestProvider()..loadQuests()),
         ChangeNotifierProvider(create: (_) => CommunityProvider()),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          return MaterialApp(
-            title: 'Progress Without Pressure',
-            debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color(0xFF667EEA),
-                primary: const Color(0xFF667EEA),
-                secondary: const Color(0xFFFF6B6B),
-              ),
-              useMaterial3: true,
+      child: MaterialApp(
+        title: 'Progress Without Pressure',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF667EEA),
+            primary: const Color(0xFF667EEA),
+            secondary: const Color(0xFFFF6B6B),
+          ),
+          useMaterial3: true,
+        ),
+        navigatorKey: rootNavigatorKey,
+        navigatorObservers: [routeObserver],
+        home: UpgradeAlert(
+          upgrader: Upgrader(
+            minAppVersion: '1.0.0',
+            messages: UpgraderMessages(
+              code: 'en',
             ),
-            navigatorKey: rootNavigatorKey,
-            navigatorObservers: [routeObserver],
-            home: UpgradeAlert(
-              upgrader: Upgrader(
-                minAppVersion: '1.0.0',
-                messages: UpgraderMessages(
-                  code: 'en',
-                ),
-                onUpdate: () {
-                  FirebaseService().logEvent('app_update_prompted');
-                  return true;
-                },
-                onIgnore: () {
-                  FirebaseService().logEvent('app_update_ignored');
-                  return true;
-                },
-                onLater: () {
-                  FirebaseService().logEvent('app_update_later');
-                  return true;
-                },
+          ),
+          child: const SplashScreen(),
+        ),
+        routes: {
+          '/home': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments;
+            final initial = (args is AppTab) ? args : AppTab.talk;
+            return HomeShell(initialTab: initial);
+          },
+          '/home/quest': (context) => HomeShell(initialTab: AppTab.quest),
+          // Legacy landing route redirected to HomeShell Talk tab
+          '/main': (context) => HomeShell(initialTab: AppTab.talk),
+          '/dhiwise-chat': (context) => const MentalHealthChatScreen(),
+          '/preview-quest': (context) => const QuestPreviewScreen(),
+          '/interactive-chat': (context) => const InteractiveChatScreen(),
+          '/privacy': (context) => const LegalScreen(
+                title: 'Privacy Policy',
+                assetPath: 'assets/legal/privacy.md',
               ),
-              child: const SplashScreen(),
-            ),
-            routes: {
-              '/home': (context) {
-                final args = ModalRoute.of(context)?.settings.arguments;
-                final initial = (args is AppTab) ? args : AppTab.talk;
-                return HomeShell(initialTab: initial);
-              },
-              '/home/quest': (context) => HomeShell(initialTab: AppTab.quest),
-              // Legacy landing route redirected to HomeShell Talk tab
-              '/main': (context) => HomeShell(initialTab: AppTab.talk),
-              '/dhiwise-chat': (context) => const MentalHealthChatScreen(),
-              '/preview-quest': (context) => const QuestPreviewScreen(),
-              '/interactive-chat': (context) => const InteractiveChatScreen(),
-              '/privacy': (context) => const LegalScreen(
-                    title: 'Privacy Policy',
-                    assetPath: 'assets/legal/privacy.md',
-                  ),
-              // New direct routes for clarity
-              '/wellness-dashboard': (context) => dhiwise_sizer.Sizer(
-                    builder: (context, orientation, deviceType) =>
-                        dhiwise_wellness.WellnessDashboardScreen(),
-                  ),
-              '/quests-list': (context) => const dhiwise_quest.QuestScreen(),
-            },
-          );
+          // New direct routes for clarity
+          '/wellness-dashboard': (context) => dhiwise_sizer.Sizer(
+                builder: (context, orientation, deviceType) =>
+                    dhiwise_wellness.WellnessDashboardScreen(),
+              ),
+          '/quests-list': (context) => const dhiwise_quest.QuestScreen(),
         },
       ),
     );
+  }
+}
+
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeShell(initialTab: AppTab.talk);
   }
 }

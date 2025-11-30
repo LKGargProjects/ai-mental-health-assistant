@@ -48,9 +48,22 @@ class FirebaseService {
     if (!_initialized) return;
 
     try {
+      Map<String, Object>? typedParams;
+      if (parameters != null) {
+        final map = <String, Object>{};
+        parameters.forEach((key, value) {
+          if (value != null) {
+            map[key] = value as Object;
+          }
+        });
+        if (map.isNotEmpty) {
+          typedParams = map;
+        }
+      }
+
       await _analytics.logEvent(
         name: name,
-        parameters: parameters,
+        parameters: typedParams,
       );
     } catch (e) {
       debugPrint('Analytics event failed: $e');

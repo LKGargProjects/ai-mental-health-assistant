@@ -324,7 +324,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               width: double.infinity,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                initialValue:
+                value:
                     _selectedCrisisLevel.isEmpty ? null : _selectedCrisisLevel,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
@@ -365,7 +365,7 @@ class _SelfAssessmentWidgetState extends State<SelfAssessmentWidget> {
               width: double.infinity,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                initialValue: _selectedAnxietyLevel.isEmpty
+                value: _selectedAnxietyLevel.isEmpty
                     ? null
                     : _selectedAnxietyLevel,
                 decoration: const InputDecoration(
