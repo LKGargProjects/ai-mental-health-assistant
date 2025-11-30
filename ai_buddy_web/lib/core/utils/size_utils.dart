@@ -7,11 +7,14 @@ const num FIGMA_DESIGN_HEIGHT = 932;
 const num FIGMA_DESIGN_STATUS_BAR = 0;
 
 extension ResponsiveExtension on num {
-  double get _width => SizeUtils.width;
+  double get _width => SizeUtils.safeWidth;
+  double get _height => SizeUtils.safeHeight;
 
   double get h => ((this * _width) / FIGMA_DESIGN_WIDTH);
 
   double get fSize => ((this * _width) / FIGMA_DESIGN_WIDTH);
+
+  double get v => ((this * _height) / FIGMA_DESIGN_HEIGHT);
 }
 
 extension FormatExtension on double {
@@ -26,12 +29,11 @@ extension FormatExtension on double {
 
 enum DeviceType { mobile, tablet, desktop }
 
-typedef ResponsiveBuild =
-    Widget Function(
-      BuildContext context,
-      Orientation orientation,
-      DeviceType deviceType,
-    );
+typedef ResponsiveBuild = Widget Function(
+  BuildContext context,
+  Orientation orientation,
+  DeviceType deviceType,
+);
 
 class Sizer extends StatelessWidget {
   const Sizer({super.key, required this.builder});
@@ -72,6 +74,22 @@ class SizeUtils {
 
   /// Device's Width
   static late double width;
+
+  static double get safeWidth {
+    try {
+      return width;
+    } catch (_) {
+      return FIGMA_DESIGN_WIDTH.toDouble();
+    }
+  }
+
+  static double get safeHeight {
+    try {
+      return height;
+    } catch (_) {
+      return FIGMA_DESIGN_HEIGHT.toDouble();
+    }
+  }
 
   static void setScreenSize(
     BoxConstraints constraints,
