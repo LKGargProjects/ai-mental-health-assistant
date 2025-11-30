@@ -49,20 +49,21 @@ class _ReactionChipState extends State<_ReactionChip> {
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
-    
+
     return FocusableActionDetector(
       focusNode: _focusNode,
       onFocusChange: (hasFocus) {
         setState(() => _isFocused = hasFocus);
       },
-      onKeyEvent: _handleKeyEvent,
       mouseCursor: SystemMouseCursors.click,
       child: Semantics(
         button: true,
-        label: widget.count > 0 ? '${widget.label}, ${widget.count}' : widget.label,
+        label: widget.count > 0
+            ? '${widget.label}, ${widget.count}'
+            : widget.label,
         child: Container(
           decoration: BoxDecoration(
-            color: _isFocused 
+            color: _isFocused
                 ? color.primary.withOpacity(0.1)
                 : color.primary.withOpacity(0.05),
             borderRadius: BorderRadius.circular(16),
@@ -86,7 +87,8 @@ class _ReactionChipState extends State<_ReactionChip> {
               onTap: widget.onTap,
               borderRadius: BorderRadius.circular(16),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -96,7 +98,8 @@ class _ReactionChipState extends State<_ReactionChip> {
                       widget.label,
                       style: TextStyle(
                         color: color.primary,
-                        fontWeight: _isFocused ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight:
+                            _isFocused ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                     if (widget.count > 0) ...[
