@@ -123,7 +123,7 @@ jobs:
         
       - name: Build web
         working-directory: ai_buddy_web
-        run: flutter build web --release --web-renderer html --pwa-strategy none
+        run: flutter build web --release
         
       - name: Upload web artifacts
         uses: actions/upload-artifact@v4
