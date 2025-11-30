@@ -565,59 +565,71 @@ def create_app() -> Flask:
         app.logger.warning(f"Community routes failed to register: {e}")
 
     # Initialize Enterprise Features
+    enterprise_routes_registered = False
     if ENTERPRISE_FEATURES:
         try:
             integrate_with_app(app)
+            # If the integration module defined these endpoints, avoid double registration
+            enterprise_routes_registered = (
+                "enterprise_status" in app.view_functions
+                and "enterprise_metrics" in app.view_functions
+            )
             app.logger.info("✅ Enterprise features integrated successfully")
         except Exception as e:
             app.logger.warning(f"⚠️ Enterprise features integration failed: {e}")
     else:
         app.logger.info("ℹ️ Enterprise features not enabled")
 
-    # Add enterprise endpoints directly
-    @app.route("/api/enterprise/status")
-    def enterprise_status():
-        """Enterprise status endpoint"""
-        return jsonify(
-            {
-                "status": "active",
-                "features": {
-                    "ai_optimization": os.getenv(
-                        "ENABLE_AI_OPTIMIZATION", "false"
-                    ).lower()
-                    == "true",
-                    "clinical_detection": os.getenv(
-                        "ENABLE_CLINICAL_DETECTION", "false"
-                    ).lower()
-                    == "true",
-                    "revenue_system": os.getenv(
-                        "ENABLE_REVENUE_SYSTEM", "false"
-                    ).lower()
-                    == "true",
-                    "security_encryption": os.getenv(
-                        "ENABLE_SECURITY_ENCRYPTION", "false"
-                    ).lower()
-                    == "true",
-                    "distributed_scale": os.getenv(
-                        "ENABLE_DISTRIBUTED_SCALE", "false"
-                    ).lower()
-                    == "true",
-                },
-                "version": "2.0.0",
-                "environment": os.getenv("ENVIRONMENT", "production"),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+    # Add enterprise endpoints directly only if they weren't provided by integrations
+    if not enterprise_routes_registered:
 
-    @app.route("/api/enterprise/metrics")
-    def enterprise_metrics():
-        """Enterprise metrics endpoint"""
-        return jsonify(
-            {
-                "status": "active",
-                "metrics": {"uptime": True, "health": "healthy", "version": "2.0.0"},
-            }
-        )
+        @app.route("/api/enterprise/status")
+        def enterprise_status():
+            """Enterprise status endpoint"""
+            return jsonify(
+                {
+                    "status": "active",
+                    "features": {
+                        "ai_optimization": os.getenv(
+                            "ENABLE_AI_OPTIMIZATION", "false"
+                        ).lower()
+                        == "true",
+                        "clinical_detection": os.getenv(
+                            "ENABLE_CLINICAL_DETECTION", "false"
+                        ).lower()
+                        == "true",
+                        "revenue_system": os.getenv(
+                            "ENABLE_REVENUE_SYSTEM", "false"
+                        ).lower()
+                        == "true",
+                        "security_encryption": os.getenv(
+                            "ENABLE_SECURITY_ENCRYPTION", "false"
+                        ).lower()
+                        == "true",
+                        "distributed_scale": os.getenv(
+                            "ENABLE_DISTRIBUTED_SCALE", "false"
+                        ).lower()
+                        == "true",
+                    },
+                    "version": "2.0.0",
+                    "environment": os.getenv("ENVIRONMENT", "production"),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
+        @app.route("/api/enterprise/metrics")
+        def enterprise_metrics():
+            """Enterprise metrics endpoint"""
+            return jsonify(
+                {
+                    "status": "active",
+                    "metrics": {
+                        "uptime": True,
+                        "health": "healthy",
+                        "version": "2.0.0",
+                    },
+                }
+            )
 
     # Attach a request ID to each request and response for traceability
     @app.before_request
