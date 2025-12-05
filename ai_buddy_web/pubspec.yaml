@@ -130,11 +130,11 @@ flutter:
 # Launcher icons configuration
 flutter_launcher_icons:
   android: true
-  ios: true
+  ios: false  # keep existing iOS icons; only regenerate Android
   # Base image used when a specific platform image is not provided
   image_path: assets/brand/icon_v1/gentlequest_ios_1024.png
   # Android adaptive layers
-  adaptive_icon_foreground: assets/brand/icon_v1/gentlequest_android_fg_1024.png
+  adaptive_icon_foreground: assets/brand/icon_v1/gentlequest_android_1024.png
   adaptive_icon_background: assets/brand/icon_v1/gentlequest_android_bg_1024.png
   remove_alpha_ios: true
   min_sdk_android: 21
