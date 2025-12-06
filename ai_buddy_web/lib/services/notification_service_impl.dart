@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -27,7 +28,8 @@ class NotificationService {
     }
 
     // Android init
-    const AndroidInitializationSettings androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const AndroidInitializationSettings androidInit =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
     // iOS (Darwin) init
     const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
@@ -60,7 +62,8 @@ class NotificationService {
 
     // Create Android channel explicitly
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      final androidImpl = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
       await androidImpl?.createNotificationChannel(_channel);
       // Android 13+ runtime permission
       await androidImpl?.requestNotificationsPermission();
@@ -70,7 +73,8 @@ class NotificationService {
     try {
       final launchDetails = await _plugin.getNotificationAppLaunchDetails();
       if ((launchDetails?.didNotificationLaunchApp ?? false)) {
-        onSelectNotification?.call(launchDetails?.notificationResponse?.payload);
+        onSelectNotification
+            ?.call(launchDetails?.notificationResponse?.payload);
       }
     } catch (_) {}
 
@@ -128,12 +132,15 @@ class NotificationService {
       presentBadge: true,
     );
 
-    final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    final details =
+        NotificationDetails(android: androidDetails, iOS: iosDetails);
 
     final tz.TZDateTime tzTarget = tz.TZDateTime.from(target, tz.local);
 
     // Debug logging for scheduling
     // Schedule notification silently
+    print('NotificationService.scheduleOneShot debugTag='
+        '$debugTag id=$id target=$tzTarget');
 
     await _plugin.zonedSchedule(
       id,
@@ -141,8 +148,11 @@ class NotificationService {
       body,
       tzTarget,
       details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      // Use inexact scheduling on Android to avoid requiring the
+      // SCHEDULE_EXACT_ALARM permission on Android 13+.
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
       payload: payload,
       // Do not set matchDateTimeComponents to keep it one-shot
     );
