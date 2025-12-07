@@ -148,8 +148,10 @@ def get_gemini_response(message, mode='mental_health', session_id=None, risk_lev
         prompt = f"{system_message}\n{conversation_context}\nUser: {message}"
 
         # Model fallback order (best first) - use broadly compatible identifiers
-        # Prefer newer flash models, then stable 1.5 variants, then older names
+        # Prefer newer 2.5 flash models, then 2.0, then stable 1.5 variants, then older names
         default_models = [
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',
             'gemini-2.0-flash',
             'gemini-1.5-flash',
             'gemini-1.5-flash-latest',
